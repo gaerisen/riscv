@@ -15,8 +15,6 @@ module ram
 	output	wire	[511:0]	data_o
 );
 
-integer i;
-
 reg [7:0] x [0:255][0:63];
 
 assign data_ready = chip_select ? addr_valid : 1'bz;

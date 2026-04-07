@@ -1,3 +1,9 @@
 #!/bin/sh
 
-verilator --cc top.v --exe main.cpp --trace --report-unoptflat --timing
+verilator \
+        --cc rtl/*.v \
+        --top-module top \
+        --exe main.cpp \
+        --trace \
+        --report-unoptflat \
+        --timing
