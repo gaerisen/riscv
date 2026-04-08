@@ -5,7 +5,7 @@ OBJCOPY = $(PREFIX)objcopy
 OBJDUMP = $(PREFIX)objdump
 
 LDSCRIPT = main.ld
-CFLAGS = -march=rv32i -mabi=ilp32 -ffreestanding -O0
+CFLAGS = -march=rv32izicsr -mabi=ilp32 -ffreestanding -O0
 ASFLAGS = $(CFLAGS)
 LDFLAGS = -T $(LDSCRIPT) -nostdlib -nostartfiles -static
 
