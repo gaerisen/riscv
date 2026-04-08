@@ -2,7 +2,9 @@
 | riscv |
 ---------
 
-Extension Checklist (for rv32gc):
+rtl/ contains verilog descriptions for the following systems:
+
+Extension Checklist (goal: rv32gc):
 
 [x] rvi
 [ ] rvm
@@ -38,3 +40,6 @@ Instruction and data cache are both 4 KiB direct-mapped caches with 64 byte line
 Write hits are also carried out immediately. The data cache is write-allocate, so write misses introduce 1 cycle of latency to retrieve old data from main memory. The data cache is also write-through, so all writes become visible to other harts 1 cycle after the write is completed. Write-through does not delay program execution.
 
 The caches interface with the hart and with main memory through a simple handshake mechanism (valid and ready signals for addresses and data), meaning, in theory, the system should work with any amount of latency in cache and memory operation (untested).
+
+src/ contains test code in RISC-V ASM and C. Hopefully this will one day be a
+bare-bones operating system, including a shell and some cool programs.
