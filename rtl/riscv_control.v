@@ -97,7 +97,7 @@ assign load_access_fault = ~dmem_op[2] & (addr > 32'hc00c);
 assign store_address_misaligned = dmem_op[2] & (	((dmem_op[1:0] == 2) & addr[0]) |
 							((dmem_op[1:0] == 3) & (addr[1] | addr[0])));
 
-assign store_access_fault = dmem_op[2] & ((addr < 32'h8004) | (addr > 32'hc00c));
+assign store_access_fault = dmem_op[2] & ((addr < 32'h8000) | (addr > 32'hc00c));
 
 // Exception trap logic
 

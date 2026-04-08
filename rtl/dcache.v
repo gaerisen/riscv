@@ -35,7 +35,8 @@ module dcache
 
 	// Read data port
 	input	wire		mem_read_data_ready,
-	input	wire	[511:0]	mem_read_data
+	input	wire	[511:0]	mem_read_data,
+        input   wire    [31:0]  mem_read_data_ready_addr
 );
 
 /*	
@@ -48,9 +49,6 @@ module dcache
 *	Write hit:	cpu->cache	cache->mem
 *	Write miss:	mem->cache	cpu->cache	cache->mem
 */
-
-wire	[4:0]	write_upper_bound;
-wire	[4:0]	write_lower_bound;
 
 reg	[31:0]	x	[0:63][0:15];
 reg	[63:0]	valid;
@@ -89,7 +87,7 @@ assign mem_write_data = mem_write_data_valid ?	{	x[addr_dly[11:6]][15],
 
 					512'b0;
 
-assign write_upper_bound =	(cpu_mem_op[1:0] == 2'b01) ?	{cpu_addr[1:0], 3'b111} :
+/*assign write_upper_bound =	(cpu_mem_op[1:0] == 2'b01) ?	{cpu_addr[1:0], 3'b111} :
 				(cpu_mem_op[1:0] == 2'b10) ?	{cpu_addr[1], 4'b1111} :
 				(cpu_mem_op[1:0] == 2'b11) ?	5'b11111 :
 								5'b0;
@@ -98,7 +96,7 @@ assign write_lower_bound =	(cpu_mem_op[1:0] == 2'b01) ?	{cpu_addr[1:0], 3'b000} 
 				(cpu_mem_op[1:0] == 2'b10) ?	{cpu_addr[1], 4'b0000} :
 				(cpu_mem_op[1:0] == 2'b11) ?	5'b00000 :
 								5'b0;
-	
+*/	
 always @(posedge clk)
 begin
 	if (cpu_write_data_valid & valid[cpu_addr[11:6]] & (tag[cpu_addr[11:6]] == cpu_addr[31:12]))
@@ -131,7 +129,7 @@ begin
 	begin
 		dirty[addr_dly[11:6]] <= 0;
 	end
-	else if (cpu_addr_valid & cpu_addr_cacheable & mem_addr_valid & mem_read_data_ready & (cpu_addr == mem_addr))
+	else if (cpu_addr_valid & cpu_addr_cacheable & mem_addr_valid & mem_read_data_ready & (cpu_addr == mem_read_data_ready_addr))
 	begin
 		x[cpu_addr[11:6]][0] <= mem_read_data[31:0];
 		x[cpu_addr[11:6]][1] <= mem_read_data[63:32];

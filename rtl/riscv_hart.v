@@ -13,6 +13,7 @@ module riscv_hart
 	output	wire	[31:0]	dcache_addr,
 	input	wire		dcache_read_data_ready,
 	input	wire	[31:0]	dcache_read_data,
+
 	output	wire		dcache_write_data_valid,
 	output	wire	[31:0]	dcache_write_data,
 

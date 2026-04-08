@@ -11,6 +11,7 @@ module riscv_core
 
 	input	wire		ext_read_data_ready,
 	input	wire	[511:0]	ext_read_data,
+        input   wire    [31:0]  ext_read_data_ready_addr,
 
 	input	wire		ext_timer_tick,
 
@@ -89,7 +90,8 @@ icache imem
 
 	// External data port
 	.mem_read_data_ready(ext_read_data_ready),
-	.mem_read_data(ext_read_data)
+	.mem_read_data(ext_read_data),
+        .mem_read_data_ready_addr(ext_read_data_ready_addr)
 );
 
 dcache dmem
@@ -121,7 +123,8 @@ dcache dmem
 
 	// External data read port
 	.mem_read_data_ready(ext_read_data_ready),
-	.mem_read_data(ext_read_data)
+	.mem_read_data(ext_read_data),
+        .mem_read_data_ready_addr(ext_read_data_ready_addr)
 );
 
 timer rtclock

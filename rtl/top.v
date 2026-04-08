@@ -37,6 +37,7 @@ wire		write_data_valid;
 wire	[511:0]	write_data;
 wire		read_data_ready;
 wire	[511:0]	read_data;
+wire    [31:0]  read_data_ready_addr;
 
 assign rtc = rtc_clk ^ rtc_dly;
 
@@ -53,38 +54,25 @@ riscv_core core0
 
 	.ext_read_data_ready(read_data_ready),
 	.ext_read_data(read_data),
+        .ext_read_data_ready_addr(read_data_ready_addr),
 
 	.ext_timer_tick(rtc),
 
 	.ext_irq(0)
 );
 
-rom flash
-(
-	.chip_select(addr[31:15] == 0),
+mem_ctrl mem (
+        .clk(mem_clock),
 
-	.addr_valid(addr_valid),
-	.addr(addr[14:0]),
+        .addr_valid(addr_valid),
+        .addr(addr),
 
-	.data_ready(read_data_ready),
-	.data(read_data)
-);
+        .write_enable(write_data_valid),
+        .data_i(write_data),
 
-ram ram
-(
-	.clk(clock),
-
-	.chip_select(addr[31:14] == 2),
-	.write_enable(write_data_valid),
-
-	.addr_valid(addr_valid),
-	.addr(addr[13:0]),
-
-	.data_valid(write_data_valid),
-	.data_i(write_data),
-
-	.data_ready(read_data_ready),
-	.data_o(read_data)
+        .data_ready(read_data_ready),
+        .data_o(read_data),
+        .data_ready_addr(read_data_ready_addr)
 );
 
 

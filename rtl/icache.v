@@ -13,7 +13,8 @@ module icache
 	output	wire	[31:0]	mem_addr,
 
 	input	wire		mem_read_data_ready,
-	input	wire	[511:0]	mem_read_data
+	input	wire	[511:0]	mem_read_data,
+        input   wire    [31:0]  mem_read_data_ready_addr
 );
 
 reg	[31:0]	x	[0:63][0:15];
@@ -28,7 +29,7 @@ assign mem_addr =	mem_addr_valid ? cpu_addr : 32'bz;
 
 always @(posedge clk)
 begin
-	if (mem_read_data_ready & (cpu_addr == mem_addr))
+	if (mem_read_data_ready & (cpu_addr == mem_read_data_ready_addr))
 	begin
 		x[cpu_addr[11:6]][0] <= mem_read_data[31:0];
 		x[cpu_addr[11:6]][1] <= mem_read_data[63:32];

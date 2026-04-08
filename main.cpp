@@ -14,7 +14,7 @@ int main(int argc, char** argv, char** env)
 
 	Vtop* top = new Vtop;
 
-	while (elapsedtime < 500000)
+	while (elapsedtime < 50000)
 	{
 		elapsedtime++;
 		top->eval();
