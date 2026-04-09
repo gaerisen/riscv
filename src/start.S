@@ -1,6 +1,5 @@
 .text
 .globl _start
-.globl _vec
 
 _start:
         nop
@@ -8,13 +7,21 @@ _start:
         la sp, _stack_top
         la a0, _vec
         csrw mtvec, a0
-        
-        call init
+        la a0, init
+        csrw mepc, a0
+        mret
 
-halt:
-        j halt
-        
+.globl ecall
+ecall:
+        addi sp, sp, -4
+        lw a7, 0(sp)
+        mv a7, a0
+        ecall
+        lw a7, 0(sp)
+        addi sp, sp, 4
+        ret
 
+.globl _vec
 _vec:
         addi sp, sp, -128
 
@@ -53,6 +60,9 @@ _vec:
         csrr a0, mcause
         mv a1, a7
         call handle_interrupt
+        csrr a0, mepc
+        addi a0, a0, 4
+        csrw mepc, a0
         
         lw x1, 124(sp)
         lw x2, 120(sp)

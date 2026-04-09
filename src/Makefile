@@ -40,4 +40,4 @@ dump:
 	$(OBJDUMP) -D $(TARGET).elf
 
 clean:
-	rm $(TARGET).* *.o
+	rm *.elf *.bin *.hex *.o
