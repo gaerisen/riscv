@@ -3,19 +3,19 @@ module riscv_hart
 	input	wire		clk,
 	input	wire		rst,
 
-	output	wire		icache_addr_valid,
-	output	wire	[31:0]	icache_addr,
-	input	wire		icache_data_ready,
-	input	wire	[31:0]	icache_data,
+	output	wire		i_addr_valid,
+	output	wire	[31:0]	i_addr,
+	input	wire		i_data_ready,
+	input	wire	[31:0]	i_data,
 
-	output	wire	[2:0]	dcache_mem_op,
-	output	wire		dcache_addr_valid,
-	output	wire	[31:0]	dcache_addr,
-	input	wire		dcache_read_data_ready,
-	input	wire	[31:0]	dcache_read_data,
+	output	wire	[2:0]	d_mem_op,
+	output	wire		d_addr_valid,
+	output	wire	[31:0]	d_addr,
+	input	wire		d_read_data_ready,
+	input	wire	[31:0]	d_read_data,
 
-	output	wire		dcache_write_data_valid,
-	output	wire	[31:0]	dcache_write_data,
+	output	wire		d_write_data_valid,
+	output	wire	[31:0]	d_write_data,
 
 	input	wire		hardware_irq,
 	input	wire		timer_irq
@@ -79,9 +79,9 @@ riscv_control control
 	// Memory access monitoring port
 	.pc(pc),
 	.pc_(pc_),
-	.imem_data_ready(icache_data_ready),
-	.dmem_op(dcache_mem_op),
-	.addr(dcache_addr),
+	.imem_data_ready(i_data_ready),
+	.dmem_op(d_mem_op),
+	.addr(d_addr),
 
 	// Inline event port
 	.illegal_instruction(illegal_instruction),
@@ -110,8 +110,8 @@ assign nextpc =	rst ?				0 :
 		jump ?				jump_target :
 						pc + 4;
 
-assign icache_addr_valid = 1;
-assign icache_addr = nextpc;
+assign i_addr_valid = 1;
+assign i_addr = nextpc;
 
 always @(posedge clk, posedge rst)
 begin
@@ -121,11 +121,11 @@ begin
 		pc_ <= -4;
 		instr <= 32'h13;
 	end
-	else if (icache_data_ready & (dcache_addr_valid ? dcache_read_data_ready : 1))
+	else if (i_data_ready & (d_addr_valid ? d_read_data_ready : 1))
 	begin
 		pc <= nextpc;
 		pc_ <= nextpc;
-		instr <= icache_data;
+		instr <= i_data;
 	end
 	else
 		pc_ <= nextpc;
@@ -164,11 +164,11 @@ riscv_datapath datapath
 	.jump_target(jump_target),
 
 	// memory access port 
-	.is_mem_op(dcache_addr_valid),
-	.mem_op(dcache_mem_op),
-	.mem_addr(dcache_addr),
-	.mem_load_data(dcache_read_data),
-	.mem_store_data(dcache_write_data),
+	.is_mem_op(d_addr_valid),
+	.mem_op(d_mem_op),
+	.mem_addr(d_addr),
+	.mem_load_data(d_read_data),
+	.mem_store_data(d_write_data),
 
 	// irf writeback port 
 	.rd(rd),
@@ -185,7 +185,7 @@ begin
 		begin
 			irf[i] <= 32'b0;
 		end
-	end else if ((rd != 5'b0) & icache_data_ready)
+	end else if ((rd != 5'b0) & i_data_ready)
 	begin
 		irf[rd] <= irf_wb;
 	end

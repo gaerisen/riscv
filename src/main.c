@@ -1,4 +1,3 @@
-extern int num;
 int i;
 
 void halt();
@@ -6,7 +5,7 @@ extern void ecall(unsigned int);
 
 void init()
 {
-        i = num;
+        i = 32;
         ecall(i);
         halt();
 }

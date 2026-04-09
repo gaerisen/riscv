@@ -1,3 +1,11 @@
+/**
+ * File: start.S
+ * Author: Garrison Taylor
+ * Description: Entry point and interrupt vector
+ *
+ * Copyright (c) Garrison Taylor
+ **/
+
 .text
 .globl _start
 
@@ -10,16 +18,6 @@ _start:
         la a0, init
         csrw mepc, a0
         mret
-
-.globl ecall
-ecall:
-        addi sp, sp, -4
-        lw a7, 0(sp)
-        mv a7, a0
-        ecall
-        lw a7, 0(sp)
-        addi sp, sp, 4
-        ret
 
 .globl _vec
 _vec:
@@ -99,8 +97,3 @@ _vec:
         addi sp, sp, 128
 
         mret
-
-.section .rodata
-.globl num
-num:
-        .word 420

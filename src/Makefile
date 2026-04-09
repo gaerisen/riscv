@@ -9,8 +9,11 @@ CFLAGS = -march=rv32izicsr -mabi=ilp32 -ffreestanding -O0
 ASFLAGS = $(CFLAGS)
 LDFLAGS = -T $(LDSCRIPT) -nostdlib -nostartfiles -static
 
-OBJ = start.o main.o
-SRC = start.S main.c
+CSRC = main.c
+ASMSRC = start.S alias.S
+SRC = $(CSRC) $(ASMSRC)
+
+OBJ = $(ASMSRC:%.S=%.o) $(CSRC:%.c=%.o)
 
 TARGET = mem
 

@@ -41,7 +41,7 @@ wire    [31:0]  read_data_ready_addr;
 
 assign rtc = rtc_clk ^ rtc_dly;
 
-riscv_core core0
+riscv_cpu cpu
 (
 	.clk(clock),
 	.rst(reset),
@@ -61,7 +61,7 @@ riscv_core core0
 	.ext_irq(0)
 );
 
-mem_ctrl mem (
+mem_ctrl mem_ctrl (
         .clk(mem_clock),
 
         .addr_valid(addr_valid),

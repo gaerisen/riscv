@@ -7,3 +7,9 @@ verilator \
         --trace \
         --report-unoptflat \
         --timing
+
+cd obj_dir
+make -f Vtop.mk -j$(nproc)
+./Vtop
+cd ..
+

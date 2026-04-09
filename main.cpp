@@ -1,9 +1,9 @@
 #include <verilated.h>
-#include <stdio.h>
+#include <iostream>
 #include "Vtop.h"
 #include <time.h>
 
-vluint64_t elapsedtime = 0; 
+vluint64_t elapsedtime = -1; 
 double sc_time_stamp() {return elapsedtime;}
 
 int main(int argc, char** argv, char** env)
@@ -18,6 +18,11 @@ int main(int argc, char** argv, char** env)
 	{
 		elapsedtime++;
 		top->eval();
+
+                if (top->clk &&
+                        top->uart_valid) {
+                        std::cout << top->uart;
+                }
 	}
 
 	top->final();
