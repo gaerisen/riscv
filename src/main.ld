@@ -13,6 +13,13 @@ SECTIONS
                 . = ALIGN(4);
         } > FLASH
 
+        .rodata :
+        {
+                *(.rodata)
+                *(.rodata.*)
+                . = ALIGN(4);
+        } > FLASH
+
         .data :
         {
                 *(.data)

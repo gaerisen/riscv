@@ -13,25 +13,22 @@ module mem_ctrl
         output  reg     [31:0]  data_ready_addr
 );
 
-always @(posedge clk)
-begin
-        data_ready <= addr_valid;
-        data_ready_addr <= addr;
-end
-
 wire select_flash = addr[31:15] == 0;
 wire select_ram = addr[31:14] == 2;
 
 wire [511:0] flash_data_r;
 wire [511:0] ram_data_r;
 
-assign data_o = select_flash ? flash_data_r :
+always @(posedge clk)
+begin
+        data_ready <= addr_valid;
+        data_ready_addr <= addr;
+        data_o <= select_flash ? flash_data_r :
                 select_ram ? ram_data_r :
-                512'bz;
+                512'b0;
+end
 
 rom flash (
-        .clk(clk),
-
         .addr(addr[14:0]),
 
         .data(flash_data_r)

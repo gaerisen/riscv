@@ -1,26 +1,11 @@
-int a = 1;
-int b = 1;
-int c;
+extern int num;
+int i;
 
-void fork();
-
-int init()
+void init()
 {
-        for (unsigned int i = 0; i < 32; i++) {
-                c = a + b;
-                a = b;
-                b = c;
-        }
-
-        return 0;
+        i = num;
 }
 
-int handle_interrupt(int mcause, int syscall)
-{
-        return mcause;
-}
+void handle_interrupt()
+{}
 
-void fork()
-{
-        
-}

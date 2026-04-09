@@ -1,7 +1,9 @@
+.text
 .globl _start
 .globl _vec
 
 _start:
+        nop
         la gp, _heap_start
         la sp, _stack_top
         la a0, _vec
@@ -87,3 +89,8 @@ _vec:
         addi sp, sp, 128
 
         mret
+
+.section .rodata
+.globl num
+num:
+        .word 420
