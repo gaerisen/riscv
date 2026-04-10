@@ -8,9 +8,12 @@ reg	rtc_dly;
 
 initial
 begin
-	clock = 0;
-	mem_clock = 0;
+	clock = 1;
+	mem_clock = 1;
 	reset = 0;
+
+        #2 reset = 1;
+        #36 reset = 0;
 
 	$dumpfile("wave.vcd");
 	$dumpvars(0, top);
@@ -19,7 +22,7 @@ end
 always #10
 	clock <= !clock;
 
-always #100
+always #40
 	mem_clock <= !mem_clock;
 
 always #320
@@ -31,13 +34,10 @@ begin
 end
 
 wire		rtc;
-wire		addr_valid;
 wire	[31:0]	addr;
-wire		write_data_valid;
-wire	[511:0]	write_data;
-wire		read_data_ready;
-wire	[511:0]	read_data;
-wire    [31:0]  read_data_ready_addr;
+wire            write_enable;
+wire	[63:0]	write_data;
+wire	[63:0]	read_data;
 
 assign rtc = rtc_clk ^ rtc_dly;
 
@@ -46,34 +46,34 @@ riscv_cpu cpu
 	.clk(clock),
 	.rst(reset),
 
-	.ext_addr_valid(addr_valid),
-	.ext_addr(addr),
+	.addr(addr),
 
-	.ext_write_data_valid(write_data_valid),
-	.ext_write_data(write_data),
+        .write_enable(write_enable),
+	.write_data(write_data),
+	.read_data(read_data),
 
-	.ext_read_data_ready(read_data_ready),
-	.ext_read_data(read_data),
-        .ext_read_data_ready_addr(read_data_ready_addr),
-
-	.ext_timer_tick(rtc),
-
-	.ext_irq(0)
+	.irq(0)
 );
 
-mem_ctrl mem_ctrl (
+rom rom (
         .clk(mem_clock),
 
-        .addr_valid(addr_valid),
-        .addr(addr),
+        .cs(addr[31:15] == 0),
 
-        .write_enable(write_data_valid),
-        .data_i(write_data),
-
-        .data_ready(read_data_ready),
-        .data_o(read_data),
-        .data_ready_addr(read_data_ready_addr)
+        .addr(addr[14:0]),
+        .data(read_data)
 );
 
+ram ram (
+        .clk(mem_clock),
+
+        .cs(addr[31:14] == 18'b10),
+        .we(write_enable),
+
+        .addr(addr[13:0]),
+
+        .data_i(write_data),
+        .data_o(read_data)
+);
 
 endmodule

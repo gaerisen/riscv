@@ -11,10 +11,10 @@ module riscv_hart
 	output	wire	[2:0]	d_mem_op,
 	output	wire		d_addr_valid,
 	output	wire	[31:0]	d_addr,
-	input	wire		d_read_data_ready,
+	input	wire		d_data_ready,
 	input	wire	[31:0]	d_read_data,
 
-	output	wire		d_write_data_valid,
+	output	wire		d_data_valid,
 	output	wire	[31:0]	d_write_data,
 
 	input	wire		hardware_irq,
@@ -121,7 +121,7 @@ begin
 		pc_ <= -4;
 		instr <= 32'h13;
 	end
-	else if (i_data_ready & (d_addr_valid ? d_read_data_ready : 1))
+	else if (i_data_ready & (d_addr_valid ? d_data_ready : 1))
 	begin
 		pc <= nextpc;
 		pc_ <= nextpc;
@@ -174,6 +174,8 @@ riscv_datapath datapath
 	.rd(rd),
 	.irf_wb(irf_wb)
 );
+
+assign d_data_valid = d_mem_op[2];
 
 // Writeback
 

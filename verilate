@@ -8,8 +8,17 @@ verilator \
         --report-unoptflat \
         --timing
 
-cd obj_dir
-make -f Vtop.mk -j$(nproc)
-./Vtop
-cd ..
+STATUS=$?
 
+if [ ${STATUS} -ne 0 ]; then
+        echo -e "Verilator failed with status ${STATUS}. Exiting..."
+        exit
+fi
+
+cd obj_dir
+
+make -f Vtop.mk -j$(nproc)
+
+./Vtop
+
+cd ..
