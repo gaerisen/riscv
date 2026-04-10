@@ -118,7 +118,7 @@ assign imm[0] =		is_i ?	instr[20] :
 // Decode logic
 
 assign funct3 = 8'b1 << ((is_u | is_j | `JALR) ? 0 : instr[14:12]);
-assign funct7 = 128'b1 << (is_r ? instr[31:26] : 0);
+assign funct7 = 128'b1 << (is_r ? instr[31:25] : 0);
 assign csr_ = 4096'b1 << (`SYSTEM ? instr[31:20] : 0);
 
 assign alu_in1 =	(`BRANCH | `ALUI | `ALUR) ?	rs1_value :
