@@ -94,10 +94,12 @@ always @(posedge clk) begin
                 `WBURST: begin
                         state <= (burst_ctr == 3'b111 && cycle_ctr == 2'b11) ? `IDLE : `WBURST;
                         cycle_ctr <= cycle_ctr + 1;
+
                         if (cycle_ctr == 2'b11)
                                 burst_ctr <= burst_ctr + 1;
                         else
                                 burst_ctr <= burst_ctr;
+
                         curr_addr <= curr_addr;
                 end
                 `LATENCY: begin
@@ -123,6 +125,6 @@ assign ext_addr = (state == `RBURST | state == `WBURST) ?
                         {curr_addr[31:6], burst_ctr, 3'b0} : 0;
 
 assign ext_write_enable = state == `WBURST;
-assign ext_data_o = membuf[burst_ctr];
+assign ext_data_o = ext_write_enable ? membuf[burst_ctr] : 0;
 
 endmodule

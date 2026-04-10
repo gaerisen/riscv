@@ -12,9 +12,6 @@ begin
 	mem_clock = 1;
 	reset = 0;
 
-        #2 reset = 1;
-        #36 reset = 0;
-
 	$dumpfile("wave.vcd");
 	$dumpvars(0, top);
 end

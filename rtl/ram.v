@@ -25,16 +25,16 @@ begin
                 x[addr + 1] <= data_i[55:48];
                 x[addr + 0] <= data_i[63:56];
         end
-        if (cs) begin
+        else if (cs) begin
                 data_o <= {
-                        x[addr + 7],
-                        x[addr + 6],
-                        x[addr + 5],
-                        x[addr + 4],
-                        x[addr + 3],
-                        x[addr + 2],
+                        x[addr + 0],
                         x[addr + 1],
-                        x[addr + 0]
+                        x[addr + 2],
+                        x[addr + 3],
+                        x[addr + 4],
+                        x[addr + 5],
+                        x[addr + 6],
+                        x[addr + 7]
                         };
         end
 end
