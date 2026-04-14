@@ -121,7 +121,7 @@ begin
 		pc_ <= -4;
 		instr <= 32'h13;
 	end
-	else if (i_data_ready & (d_addr_valid ? d_data_ready : 1))
+	else if (i_data_ready & (d_addr_valid & ~d_data_valid ? d_data_ready : 1))
 	begin
 		pc <= nextpc;
 		pc_ <= nextpc;

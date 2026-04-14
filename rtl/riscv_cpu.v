@@ -128,13 +128,13 @@ dcache dmem
 wire i_cacheable = i_addr_valid & i_addr < 32'hc000;
 wire d_cacheable = d_addr_valid & d_addr < 32'hc000;
 
-wire icache_waiting = i_cacheable & icache_addr_valid;
-wire dcache_waiting = d_cacheable & dcache_addr_valid;
+wire icache_waiting = icache_addr_valid;
+wire dcache_waiting = dcache_addr_valid;
 
 wire ctrl_addr_valid = icache_waiting | dcache_waiting;
 
-wire [31:0] ctrl_addr = (i_cacheable & icache_addr_valid) ? icache_addr :
-                     (d_cacheable & dcache_addr_valid) ? dcache_addr :
+wire [31:0] ctrl_addr = (icache_addr_valid) ? icache_addr :
+                     (dcache_addr_valid) ? dcache_addr :
                          32'b0;
 
 wire ctrl_data_ready;

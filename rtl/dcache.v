@@ -45,12 +45,18 @@ reg	[19:0]	tag	[0:63];
 assign cpu_data_ready = cpu_addr_valid & valid[cpu_addr[11:6]] & (cpu_addr[31:12] == tag[cpu_addr[11:6]]);
 assign cpu_read_data = x[cpu_addr[11:6]][cpu_addr[5:2]];
 
-assign mem_addr_valid = (cpu_addr_valid & ~cpu_data_ready) | mem_data_valid; 
 
-assign mem_addr = mem_data_valid ? {tag[cpu_addr[11:6]], 12'b0} :
-                mem_addr_valid ? cpu_addr : 0;
-                
-assign mem_data_valid = cpu_addr_valid & dirty[cpu_addr];
+reg [1:0] state;
+reg [31:0] addr_latch;
+reg [31:0] data_latch;
+reg data_waiting;
+
+wire [31:0] addr = data_waiting ? addr_latch : cpu_addr;
+
+assign mem_addr_valid = state == 2'b01;
+assign mem_addr = mem_data_valid ? {tag[cpu_addr[11:6]], cpu_addr[11:6], 6'b0} : addr_latch;
+
+assign mem_data_valid = state == 2'b01 & dirty[addr[11:6]];
 assign mem_write_data = mem_data_valid ? {	x[cpu_addr[11:6]][15],
                                                 x[cpu_addr[11:6]][14],
                                                 x[cpu_addr[11:6]][13],
@@ -66,64 +72,70 @@ assign mem_write_data = mem_data_valid ? {	x[cpu_addr[11:6]][15],
                                                 x[cpu_addr[11:6]][3],
                                                 x[cpu_addr[11:6]][2],
                                                 x[cpu_addr[11:6]][1],
-                                                x[cpu_addr[11:6]][0]} : 0;
+                                                x[cpu_addr[11:6]][0]} : 0 ;
 
-always @(posedge clk)
-begin
-	if (cpu_data_valid & valid[cpu_addr[11:6]] & (tag[cpu_addr[11:6]] == cpu_addr[31:12]))
-	begin
-		case (cpu_mem_op)
-			3'b101:
-			begin
-				case (cpu_addr[1:0])
-					2'b00: x[cpu_addr[11:6]][cpu_addr[5:2]][7:0] <= cpu_write_data[7:0];
-					2'b01: x[cpu_addr[11:6]][cpu_addr[5:2]][15:8] <= cpu_write_data[7:0];
-					2'b10: x[cpu_addr[11:6]][cpu_addr[5:2]][23:16] <= cpu_write_data[7:0];
-					2'b11: x[cpu_addr[11:6]][cpu_addr[5:2]][31:24] <= cpu_write_data[7:0];
-				endcase
-			end
-			3'b110:
-			begin
-				case (cpu_addr[1])
-					1'b0: x[cpu_addr[11:6]][cpu_addr[5:2]][15:0] <= cpu_write_data[15:0];
-					1'b1: x[cpu_addr[11:6]][cpu_addr[5:2]][31:16] <= cpu_write_data[15:0];
-				endcase
-			end
-			3'b111: x[cpu_addr[11:6]][cpu_addr[5:2]] <= cpu_write_data;
-			default:;
-		endcase
+always @(posedge clk) begin
+        state <= 2'b00;
+        addr_latch <= 0;
+        data_latch <= 0;
+        data_waiting <= 0;
 
-//		x[cpu_addr[11:6]][cpu_addr[5:2]] <= cpu_write_data;
-		dirty[cpu_addr[11:6]] <= 1;
-	end
-	else if (cpu_addr_valid & mem_addr_valid)
-	begin
-                if (dirty[cpu_addr]) begin
-                        dirty[cpu_addr[11:6]] <= 0;
+        case (state)
+        2'b00: begin // IDLE
+                if (cpu_addr_valid & (tag[cpu_addr[11:6]] != cpu_addr[31:12])) begin
+                        state <= 2'b01;
+                        addr_latch <= cpu_addr;
+                        data_waiting <= cpu_data_valid;
+                        data_latch <= cpu_write_data;
                 end
-
+        end
+        2'b01: begin // READING from main memory
+                if (dirty[addr[11:6]]) begin
+                        dirty[addr[11:6]] <= 0;
+                end
                 if (mem_data_ready) begin
-                        x[cpu_addr[11:6]][0] <= mem_read_data[31:0];
-                        x[cpu_addr[11:6]][1] <= mem_read_data[63:32];
-                        x[cpu_addr[11:6]][2] <= mem_read_data[95:64];
-                        x[cpu_addr[11:6]][3] <= mem_read_data[127:96];
-                        x[cpu_addr[11:6]][4] <= mem_read_data[159:128];
-                        x[cpu_addr[11:6]][5] <= mem_read_data[191:160];
-                        x[cpu_addr[11:6]][6] <= mem_read_data[223:192];
-                        x[cpu_addr[11:6]][7] <= mem_read_data[255:224];
-                        x[cpu_addr[11:6]][8] <= mem_read_data[287:256];
-                        x[cpu_addr[11:6]][9] <= mem_read_data[319:288];
-                        x[cpu_addr[11:6]][10] <= mem_read_data[351:320];
-                        x[cpu_addr[11:6]][11] <= mem_read_data[383:352];
-                        x[cpu_addr[11:6]][12] <= mem_read_data[415:384];
-                        x[cpu_addr[11:6]][13] <= mem_read_data[447:416];
-                        x[cpu_addr[11:6]][14] <= mem_read_data[479:448];
-                        x[cpu_addr[11:6]][15] <= mem_read_data[511:480];
+                        state <= 2'b00;
 
-                        tag[cpu_addr[11:6]] <= cpu_addr[31:12];
-                        valid[cpu_addr[11:6]] <= 1;
+                        x[addr[11:6]][0] <= mem_read_data[31:0];
+                        x[addr[11:6]][1] <= mem_read_data[63:32];
+                        x[addr[11:6]][2] <= mem_read_data[95:64];
+                        x[addr[11:6]][3] <= mem_read_data[127:96];
+                        x[addr[11:6]][4] <= mem_read_data[159:128];
+                        x[addr[11:6]][5] <= mem_read_data[191:160];
+                        x[addr[11:6]][6] <= mem_read_data[223:192];
+                        x[addr[11:6]][7] <= mem_read_data[255:224];
+                        x[addr[11:6]][8] <= mem_read_data[287:256];
+                        x[addr[11:6]][9] <= mem_read_data[319:288];
+                        x[addr[11:6]][10] <= mem_read_data[351:320];
+                        x[addr[11:6]][11] <= mem_read_data[383:352];
+                        x[addr[11:6]][12] <= mem_read_data[415:384];
+                        x[addr[11:6]][13] <= mem_read_data[447:416];
+                        x[addr[11:6]][14] <= mem_read_data[479:448];
+                        x[addr[11:6]][15] <= mem_read_data[511:480];
+
+                        if (data_waiting) begin
+				x[addr[11:6]][addr[5:2]][7:0] <= data_latch[7:0];
+				x[addr[11:6]][addr[5:2]][15:8] <= data_latch[15:8];
+				x[addr[11:6]][addr[5:2]][23:16] <= data_latch[23:16];
+				x[addr[11:6]][addr[5:2]][31:24] <= data_latch[31:24];
+                                dirty[addr[11:6]] <= 1;
+                        end
+
+
+
+                        tag[addr[11:6]] <= addr[31:12];
+                        valid[addr[11:6]] <= 1;
+                end else begin
+                        state <= 2'b01;
+                        addr_latch <= addr_latch;
+                        data_waiting <= data_waiting;
+                        data_latch <= data_latch;
                 end
-	end
+        end
+        default: begin
+                state <= 2'b00;
+        end
+        endcase
 end
 
 endmodule
