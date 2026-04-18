@@ -4,33 +4,31 @@
 
 rtl/ contains verilog descriptions for the following systems:
 
-Extension Checklist (goal: rv32gc):
+Extension Checklist (goal: rv32imac):
 
 [x] rvi
 [ ] rvm
 [ ] rva
-[ ] rvf
-[ ] rvd
 [ ] rvc
 [ ] User Mode
 [ ] Supervisor Mode
-[ ] Machine Mode
+[x] Machine Mode
 
 Design Roadmap:
 
 1. rv32i single-stage
-2. rvc
-3. ucode for rvm, rvf, and rva
+2. rvm
+3. rvc
 4. separate frontend and backend in 2 stages
-5. transfer rvm, rvf, and rva into pipelined exec. units
+5. transfer rvm, rva into pipelined exec. units
 6. pipeline frontend/tomasulo
-7. optimize to hell
 
 Memory Layout:
 
 0x0000-0x7fff:	Flash program memory		(r xc)
 0x8000-0xbfff:	Random access memory		(rwxc)
 0xc000-0xc00c:	Timer (mtime and mtimecmp)	(rw  )
+0xc00f:         UART                            (rw  )
 
 
 Cache:

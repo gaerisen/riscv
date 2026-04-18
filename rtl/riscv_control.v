@@ -92,12 +92,12 @@ assign instr_access_fault = (pc_[31:15] != 0);
 assign load_address_misaligned = ~dmem_op[2] & (	((dmem_op[1:0] == 2) & addr[0]) |
 							((dmem_op[1:0] == 3) & (addr[1] | addr[0])));
 
-assign load_access_fault = ~dmem_op[2] & (addr > 32'hc00c);
+assign load_access_fault = ~dmem_op[2] & (addr > 32'hc00f);
 
 assign store_address_misaligned = dmem_op[2] & (	((dmem_op[1:0] == 2) & addr[0]) |
 							((dmem_op[1:0] == 3) & (addr[1] | addr[0])));
 
-assign store_access_fault = dmem_op[2] & ((addr < 32'h8000) | (addr > 32'hc00c));
+assign store_access_fault = dmem_op[2] & ((addr < 32'h8000) | (addr > 32'hc00f));
 
 // Exception trap logic
 
