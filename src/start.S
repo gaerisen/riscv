@@ -11,6 +11,29 @@
 
 _start:
         nop
+        li sp, 0x8000
+        li a0, 0xdeadbeef
+        li a1, 0x1000
+        sb a0, 34(sp)
+        add sp, sp, a1
+        lw a0, 32(sp)
+        sub sp, sp, a1
+        lw a0, 32(sp)
+
+
+bruh:
+        j bruh
+        
+        
+
+
+
+
+
+
+
+
+        nop
         la gp, _heap_start
         la sp, _stack_top
         la a0, _vec

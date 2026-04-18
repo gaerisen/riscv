@@ -8,7 +8,7 @@ module riscv_hart
 	input	wire		i_data_ready,
 	input	wire	[31:0]	i_data,
 
-	output	wire	[2:0]	d_mem_op,
+	output	wire	[3:0]	d_mem_mask,
 	output	wire		d_addr_valid,
 	output	wire	[31:0]	d_addr,
 	input	wire		d_data_ready,
@@ -42,6 +42,7 @@ wire	[31:0]	jump_target;
 wire	[4:0]	rd;
 wire	[31:0]	csr_wb;
 wire	[31:0]	irf_wb;
+wire    [2:0]   d_mem_op;
 
 // Main operation registers
 
@@ -176,6 +177,9 @@ riscv_datapath datapath
 );
 
 assign d_data_valid = d_mem_op[2];
+assign d_mem_mask = d_data_valid ?
+        {{2{d_mem_op[1] & d_mem_op[0]}}, d_mem_op[1], 1'b1} : 0;
+
 
 // Writeback
 

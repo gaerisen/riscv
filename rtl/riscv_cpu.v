@@ -27,7 +27,7 @@ wire [31:0] d_read_data;
 wire d_data_valid;
 wire [31:0] d_write_data;
 
-wire [2:0] d_mem_op;
+wire [3:0] d_mem_mask;
 
 wire timer_irq = 0;
 
@@ -45,7 +45,7 @@ riscv_hart hart0
 	.i_data(i_data),
 
 	// Dcache port
-	.d_mem_op(d_mem_op),
+	.d_mem_mask(d_mem_mask),
 
 	.d_addr_valid(d_addr_valid),
 	.d_addr(d_addr),
@@ -98,7 +98,7 @@ dcache dmem
 (
 	.clk(clk),
 
-	.cpu_mem_op(d_mem_op),
+	.cpu_mem_mask(d_mem_mask),
 
 	// CPU address port
 	.cpu_addr_valid(d_cacheable),

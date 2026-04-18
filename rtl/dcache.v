@@ -6,7 +6,7 @@ module dcache
 	/* CPU-Cache interface */
 	/* =================== */
 
-	input	wire	[2:0]	cpu_mem_op,
+	input	wire	[3:0]	cpu_mem_mask,
 
 	// Read/Write address port
 	input	wire		cpu_addr_valid,
@@ -45,18 +45,18 @@ reg	[19:0]	tag	[0:63];
 assign cpu_data_ready = cpu_addr_valid & valid[cpu_addr[11:6]] & (cpu_addr[31:12] == tag[cpu_addr[11:6]]);
 assign cpu_read_data = x[cpu_addr[11:6]][cpu_addr[5:2]];
 
-
-reg [1:0] state;
+reg state;
 reg [31:0] addr_latch;
 reg [31:0] data_latch;
+reg [3:0] mask_latch;
 reg data_waiting;
 
 wire [31:0] addr = data_waiting ? addr_latch : cpu_addr;
 
-assign mem_addr_valid = state == 2'b01;
+assign mem_addr_valid = state == 1'b1;
 assign mem_addr = mem_data_valid ? {tag[cpu_addr[11:6]], cpu_addr[11:6], 6'b0} : addr_latch;
 
-assign mem_data_valid = state == 2'b01 & dirty[addr[11:6]];
+assign mem_data_valid = state == 1'b1 & dirty[addr[11:6]];
 assign mem_write_data = mem_data_valid ? {	x[cpu_addr[11:6]][15],
                                                 x[cpu_addr[11:6]][14],
                                                 x[cpu_addr[11:6]][13],
@@ -74,27 +74,46 @@ assign mem_write_data = mem_data_valid ? {	x[cpu_addr[11:6]][15],
                                                 x[cpu_addr[11:6]][1],
                                                 x[cpu_addr[11:6]][0]} : 0 ;
 
+wire [31:0] line_write_data = cpu_write_data << {cpu_addr[1:0], 2'b0};
+wire [31:0] line_write_data_latch = data_latch << {addr_latch[1:0], 2'b0};
+
 always @(posedge clk) begin
-        state <= 2'b00;
+        state <= 1'b0;
         addr_latch <= 0;
         data_latch <= 0;
+        mask_latch <= 0;
         data_waiting <= 0;
 
         case (state)
-        2'b00: begin // IDLE
+        1'b0: begin // IDLE
                 if (cpu_addr_valid & (tag[cpu_addr[11:6]] != cpu_addr[31:12])) begin
-                        state <= 2'b01;
+                        state <= 1'b1;
                         addr_latch <= cpu_addr;
                         data_waiting <= cpu_data_valid;
                         data_latch <= cpu_write_data;
+                        mask_latch <= cpu_mem_mask;
+                end
+                else if (cpu_addr_valid & cpu_data_valid) begin
+                        if (cpu_mem_mask[0]) begin
+                                x[cpu_addr[11:6]][cpu_addr[5:2]][7:0] <= line_write_data[7:0];
+                        end
+                        if (cpu_mem_mask[1]) begin
+                                x[cpu_addr[11:6]][cpu_addr[5:2]][15:8] <= line_write_data[15:8];
+                        end
+                        if (cpu_mem_mask[2]) begin
+                                x[cpu_addr[11:6]][cpu_addr[5:2]][23:16] <= line_write_data[23:16];
+                        end
+                        if (cpu_mem_mask[3]) begin
+                                x[cpu_addr[11:6]][cpu_addr[5:2]][31:24] <= line_write_data[31:24];
+                        end
                 end
         end
-        2'b01: begin // READING from main memory
+        1'b1: begin // READING from main memory
                 if (dirty[addr[11:6]]) begin
                         dirty[addr[11:6]] <= 0;
                 end
                 if (mem_data_ready) begin
-                        state <= 2'b00;
+                        state <= 1'b0;
 
                         x[addr[11:6]][0] <= mem_read_data[31:0];
                         x[addr[11:6]][1] <= mem_read_data[63:32];
@@ -114,26 +133,30 @@ always @(posedge clk) begin
                         x[addr[11:6]][15] <= mem_read_data[511:480];
 
                         if (data_waiting) begin
-				x[addr[11:6]][addr[5:2]][7:0] <= data_latch[7:0];
-				x[addr[11:6]][addr[5:2]][15:8] <= data_latch[15:8];
-				x[addr[11:6]][addr[5:2]][23:16] <= data_latch[23:16];
-				x[addr[11:6]][addr[5:2]][31:24] <= data_latch[31:24];
+                                if (mask_latch[0]) begin
+			        	x[addr[11:6]][addr[5:2]][7:0] <= line_write_data_latch[7:0];
+                                end
+                                if (mask_latch[1]) begin
+        				x[addr[11:6]][addr[5:2]][15:8] <= line_write_data_latch[15:8];
+                                end
+                                if (mask_latch[2]) begin
+                                        x[addr[11:6]][addr[5:2]][23:16] <= line_write_data_latch[23:16];
+                                end
+                                if (mask_latch[3]) begin
+                                        x[addr[11:6]][addr[5:2]][31:24] <= line_write_data_latch[31:24];
+                                end
                                 dirty[addr[11:6]] <= 1;
                         end
-
-
 
                         tag[addr[11:6]] <= addr[31:12];
                         valid[addr[11:6]] <= 1;
                 end else begin
-                        state <= 2'b01;
+                        state <= 1'b1;
                         addr_latch <= addr_latch;
                         data_waiting <= data_waiting;
                         data_latch <= data_latch;
+                        mask_latch <= mask_latch;
                 end
-        end
-        default: begin
-                state <= 2'b00;
         end
         endcase
 end
