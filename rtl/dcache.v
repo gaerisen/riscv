@@ -43,7 +43,7 @@ reg	[63:0]	dirty;
 reg	[19:0]	tag	[0:63];
 
 assign cpu_data_ready = cpu_addr_valid & valid[cpu_addr[11:6]] & (cpu_addr[31:12] == tag[cpu_addr[11:6]]);
-assign cpu_read_data = x[cpu_addr[11:6]][cpu_addr[5:2]];
+assign cpu_read_data = cpu_data_ready ? x[cpu_addr[11:6]][cpu_addr[5:2]] : 0;
 
 reg state;
 reg [31:0] addr_latch;
@@ -74,9 +74,6 @@ assign mem_write_data = mem_data_valid ? {	x[cpu_addr[11:6]][15],
                                                 x[cpu_addr[11:6]][1],
                                                 x[cpu_addr[11:6]][0]} : 0 ;
 
-wire [31:0] line_write_data = cpu_write_data << {cpu_addr[1:0], 2'b0};
-wire [31:0] line_write_data_latch = data_latch << {addr_latch[1:0], 2'b0};
-
 always @(posedge clk) begin
         state <= 1'b0;
         addr_latch <= 0;
@@ -90,21 +87,21 @@ always @(posedge clk) begin
                         state <= 1'b1;
                         addr_latch <= cpu_addr;
                         data_waiting <= cpu_data_valid;
-                        data_latch <= cpu_write_data;
-                        mask_latch <= cpu_mem_mask;
+                        data_latch <= cpu_write_data << {cpu_addr[1:0], 3'b0};
+                        mask_latch <= cpu_mem_mask << cpu_addr[1:0];
                 end
                 else if (cpu_addr_valid & cpu_data_valid) begin
                         if (cpu_mem_mask[0]) begin
-                                x[cpu_addr[11:6]][cpu_addr[5:2]][7:0] <= line_write_data[7:0];
+                                x[cpu_addr[11:6]][cpu_addr[5:2]][7:0] <= cpu_write_data[7:0];
                         end
                         if (cpu_mem_mask[1]) begin
-                                x[cpu_addr[11:6]][cpu_addr[5:2]][15:8] <= line_write_data[15:8];
+                                x[cpu_addr[11:6]][cpu_addr[5:2]][15:8] <= cpu_write_data[15:8];
                         end
                         if (cpu_mem_mask[2]) begin
-                                x[cpu_addr[11:6]][cpu_addr[5:2]][23:16] <= line_write_data[23:16];
+                                x[cpu_addr[11:6]][cpu_addr[5:2]][23:16] <= cpu_write_data[23:16];
                         end
                         if (cpu_mem_mask[3]) begin
-                                x[cpu_addr[11:6]][cpu_addr[5:2]][31:24] <= line_write_data[31:24];
+                                x[cpu_addr[11:6]][cpu_addr[5:2]][31:24] <= cpu_write_data[31:24];
                         end
                 end
         end
@@ -134,16 +131,16 @@ always @(posedge clk) begin
 
                         if (data_waiting) begin
                                 if (mask_latch[0]) begin
-			        	x[addr[11:6]][addr[5:2]][7:0] <= line_write_data_latch[7:0];
+			        	x[addr[11:6]][addr[5:2]][7:0] <= data_latch[7:0];
                                 end
                                 if (mask_latch[1]) begin
-        				x[addr[11:6]][addr[5:2]][15:8] <= line_write_data_latch[15:8];
+        				x[addr[11:6]][addr[5:2]][15:8] <= data_latch[15:8];
                                 end
                                 if (mask_latch[2]) begin
-                                        x[addr[11:6]][addr[5:2]][23:16] <= line_write_data_latch[23:16];
+                                        x[addr[11:6]][addr[5:2]][23:16] <= data_latch[23:16];
                                 end
                                 if (mask_latch[3]) begin
-                                        x[addr[11:6]][addr[5:2]][31:24] <= line_write_data_latch[31:24];
+                                        x[addr[11:6]][addr[5:2]][31:24] <= data_latch[31:24];
                                 end
                                 dirty[addr[11:6]] <= 1;
                         end
