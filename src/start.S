@@ -14,7 +14,7 @@ _start:
         li sp, 0x8000
         li a0, 0xdeadbeef
         li a1, 0x1000
-        sb a0, 32(sp)
+        sb a0, 35(sp)
         add sp, sp, a1
         lw a0, 32(sp)
         sub sp, sp, a1
