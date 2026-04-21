@@ -14,12 +14,20 @@ _start:
         li sp, 0x8000
         li a0, 0xdeadbeef
         li a1, 0x1000
-        sh a0, 34(sp)
+        sb a0, 32(sp)
         add sp, sp, a1
         lw a0, 32(sp)
         sub sp, sp, a1
         lw a0, 32(sp)
+        la sp, _stdout
+        li a0, 'c'
+        sb a0, 0(sp)
 
+        li a0, 1
+        slli a0, a0, 3
+        csrw mstatus, a0
+        slli a0, a0, 8
+        csrw mie, a0
 
 bruh:
         j bruh

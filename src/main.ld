@@ -38,3 +38,4 @@ SECTIONS
 ENTRY(_start)
 
 PROVIDE(_stack_top = 0xc000);
+PROVIDE(_stdout = 0xc00f);
