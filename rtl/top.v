@@ -1,32 +1,28 @@
-module top ();
+module top (
+        input   wire            clock,
+        input   wire            reset,
 
-reg	clock;
-reg	mem_clock;
-reg	reset;
+        input   wire            irq,
+        output  wire            irq_ack,
+
+        input   wire    [7:0]   serial_input,
+        output  wire    [7:0]   serial_output
+);
+
+reg     [1:0]   mem_ctr;
+wire mem_clock = mem_ctr[1];
 reg	rtc_clk;
 reg	rtc_dly;
 
 initial
 begin
-	clock = 1;
-	mem_clock = 1;
-	reset = 0;
-
 	$dumpfile("wave.vcd");
 	$dumpvars(0, top);
 end
 
-always #10
-	clock <= !clock;
-
-always #40
-	mem_clock <= !mem_clock;
-
-always #320
-	rtc_clk <= !rtc_clk;
-
 always @(posedge clock)
 begin
+        mem_ctr <= mem_ctr + 1;
 	rtc_dly <= rtc_clk;
 end
 
@@ -37,6 +33,8 @@ wire	[63:0]	write_data;
 wire	[63:0]	read_data;
 
 assign rtc = rtc_clk ^ rtc_dly;
+
+assign serial_output = 8'bz;
 
 riscv_cpu cpu
 (
@@ -49,7 +47,11 @@ riscv_cpu cpu
 	.write_data(write_data),
 	.read_data(read_data),
 
-	.irq(0)
+	.irq(irq),
+        .irq_ack(irq_ack),
+
+        .serial_i(serial_input),
+        .serial_o(serial_output)
 );
 
 rom rom (

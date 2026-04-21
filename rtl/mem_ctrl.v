@@ -122,9 +122,9 @@ assign cpu_read_data = (state == `READY) ? {membuf[7], membuf[6], membuf[5],
                                         membuf[1], membuf[0]} : 0;
 
 assign ext_addr = (state == `RBURST | state == `WBURST) ?
-                        {curr_addr[31:6], burst_ctr, 3'b0} : 0;
+                        {curr_addr[31:6], burst_ctr, 3'b0} : 32'bz;
 
-assign ext_write_enable = state == `WBURST;
-assign ext_data_o = ext_write_enable ? membuf[burst_ctr] : 0;
+assign ext_write_enable = (state == `WBURST) ? 1 : 1'bz;
+assign ext_data_o = ext_write_enable ? membuf[burst_ctr] : 64'bz;
 
 endmodule

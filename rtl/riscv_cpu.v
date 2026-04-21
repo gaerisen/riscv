@@ -9,28 +9,25 @@ module riscv_cpu
 	output	wire	[63:0]	write_data,
 	input	wire	[63:0]	read_data,
 
-	input	wire		irq
+	input	wire		irq,
+        output  wire            irq_ack,
+
+        input   wire    [7:0]   serial_i,
+        output  wire    [7:0]   serial_o
 );
 
 wire i_addr_valid;
 wire [31:0] i_addr;
-
 wire i_data_ready;
 wire [31:0] i_data;
-
 wire d_addr_valid;
 wire [31:0] d_addr;
-
 wire d_data_ready;
 wire [31:0] d_read_data;
-
 wire d_data_valid;
 wire [31:0] d_write_data;
-
 wire [3:0] d_mem_mask;
-
 wire timer_irq = 0;
-
 
 riscv_hart hart0
 (
@@ -58,6 +55,7 @@ riscv_hart hart0
 
 	// Interrupt port
 	.hardware_irq(irq),
+        .hardware_irq_ack(irq_ack),
 	.timer_irq(timer_irq)
 );
 
@@ -65,7 +63,6 @@ wire icache_addr_valid;
 wire [31:0] icache_addr;
 wire icache_data_ready;
 wire [511:0] icache_data;
-
 wire dcache_addr_valid;
 wire [31:0] dcache_addr;
 wire dcache_data_ready;
@@ -164,5 +161,20 @@ mem_ctrl mem_ctrl (
         .ext_write_enable(write_enable),
         .ext_data_o(write_data)
 );
+
+reg [7:0] uart;
+
+always @(posedge clk) begin
+        if (irq) begin
+                uart <= serial_i;
+        end
+end
+
+wire uart_select = d_addr_valid & d_addr == 32'hc00f;
+
+assign d_data_ready = (uart_select & ~d_data_valid) ? 1 : 1'bz;
+assign d_read_data = (uart_select & ~d_data_valid) ? {24'b0, uart} : 32'bz;
+
+assign serial_o = (uart_select & d_data_valid) ? d_write_data[7:0] : 8'bz;
 
 endmodule

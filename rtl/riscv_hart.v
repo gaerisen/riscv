@@ -18,6 +18,7 @@ module riscv_hart
 	output	wire	[31:0]	d_write_data,
 
 	input	wire		hardware_irq,
+        output  wire            hardware_irq_ack,
 	input	wire		timer_irq
 );
 
@@ -101,6 +102,7 @@ riscv_control control
 	.mret_target(mret_target)
 );
 
+assign hardware_irq_ack = hardware_irq & trap;
 
 // Fetch logic
 

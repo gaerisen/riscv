@@ -42,8 +42,9 @@ reg	[63:0]	valid;
 reg	[63:0]	dirty;
 reg	[19:0]	tag	[0:63];
 
-assign cpu_data_ready = cpu_addr_valid & valid[cpu_addr[11:6]] & (cpu_addr[31:12] == tag[cpu_addr[11:6]]);
-assign cpu_read_data = cpu_data_ready ? x[cpu_addr[11:6]][cpu_addr[5:2]] : 0;
+assign cpu_data_ready = (cpu_addr_valid & valid[cpu_addr[11:6]] & (cpu_addr[31:12] == tag[cpu_addr[11:6]])) ? 1
+                                : 1'bz;
+assign cpu_read_data = cpu_data_ready ? x[cpu_addr[11:6]][cpu_addr[5:2]] : 32'bz;
 
 reg state;
 reg [31:0] addr_latch;
