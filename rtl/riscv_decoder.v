@@ -32,11 +32,19 @@ module riscv_decoder (
         output  reg             ecall,
         output  reg             mret,
         output  reg             wfi,
+        
+        // Special instruction flags
+        output  reg             jump,
+        output  reg             branch,
+        output  reg             store,
+        output  reg             load,
+
+        // ALU control outputs
+        output  reg     [7:0]   funct3,
+        output  reg     [127:0] funct7,
 
         // Data outputs
         output  reg     [31:0]  pc_o,
-        output  reg     [7:0]   funct3,
-        output  reg     [127:0] funct7,
         output  reg     [31:0]  imm,
         output  reg     [4:0]   rd,
         output  reg     [31:0]  alu_in1,
@@ -76,9 +84,14 @@ always @(posedge clk) begin
                 ecall <= 0;
                 mret <= 0;
                 wfi <= 0;
-                pc_o <= 0;
+                jump <= 0;
+                branch <= 0;
+                store <= 0;
+                load <= 0;
                 funct3 <= {7'b0, 1'b1}; // ADDI
                 funct7 <= 0;
+                pc_o <= 0;
+                rd <= 0;
                 imm <= 0;
                 alu_in1 <= 0;
                 alu_in2 <= 0;
@@ -116,6 +129,16 @@ always @(posedge clk) begin
                 ecall <=	`SYSTEM & funct3[0] & (instr[31:20] == 12'h0);
                 mret <=		`SYSTEM & funct3[0] & (instr[31:20] == 12'h302);
                 wfi <=		`SYSTEM & funct3[0] & (instr[31:20] == 12'h105);
+
+                jump <= `JAL | `JALR;
+                branch <= `BRANCH;
+                store <= `STORE;
+                load <= `LOAD;
+
+                funct7 <= is_r ? (1 << instr[31:20]) : 0;
+                funct3 <= (is_r | is_i | is_s | is_b) ?
+                                (1 << instr[14:12]) : 0;
+
 
                 alu_in1 <=	(`BRANCH | `ALUI | `ALUR) ?	rs1_val :
                                 (`JAL | `JALR | `AUIPC) ?	pc_i :

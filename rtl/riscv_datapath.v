@@ -12,8 +12,6 @@
 
 module riscv_datapath
 (
-	input	wire		clk,
-
 	// PC and instr input
 	input	wire	[31:0]	pc,
 	input	wire	[31:0]	instr,
