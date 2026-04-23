@@ -31,7 +31,6 @@ module riscv_datapath
 
 	// CSR read-write port
 	output	wire	[11:0]	csr,
-	output	wire	[4095:0]	csr_,
 	input	wire	[31:0]	csr_value,
 	output	wire	[31:0]	csr_wb,
 

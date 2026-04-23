@@ -36,7 +36,6 @@ wire	[31:0]	nextpc;
 wire	[4:0]	rs1;
 wire	[4:0]	rs2;
 wire	[11:0]	csr;
-wire	[4095:0]	csr_;
 wire	[31:0]	csr_value;
 wire		jump;
 wire	[31:0]	jump_target;
@@ -74,7 +73,6 @@ riscv_control control
 
 	// CSR read/write port
 	.csr(csr),
-	.csr_(csr_),
 	.csr_value(csr_value),
 	.csr_wb(csr_wb),
 
@@ -158,7 +156,6 @@ riscv_datapath datapath
 
 	// csr read/write port
 	.csr(csr),
-	.csr_(csr_),
 	.csr_value(csr_value),
 	.csr_wb(csr_wb),
 
