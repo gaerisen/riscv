@@ -26,12 +26,6 @@ module riscv_datapath
 	output	wire		mret,
 	output	wire		wfi,
 
-	// Register read port
-	output	wire	[4:0]	rs1,
-	output	wire	[4:0]	rs2,
-	input	wire	[31:0]	rs1_value,
-	input	wire	[31:0]	rs2_value,
-
 	// CSR read-write port
 	output	wire	[11:0]	csr,
 	input	wire	[31:0]	csr_value,
@@ -180,5 +174,22 @@ assign irf_wb =	`LOAD ?							ld :
 									32'b0;
 
 assign csr_wb =	csru;
+*/
+
+wire [4:0] rd_mem_to_wb = 0;
+
+always @(posedge clk, posedge rst)
+begin
+	if (rst)
+	begin
+		for (integer i = 0; i < 32; i++)
+		begin
+			irf[i] <= 32'b0;
+		end
+	end else if (rd_mem_to_wb != 5'b0)
+	begin
+		irf[rd_mem_to_wb] <= irf_wb;
+	end
+end
 
 endmodule

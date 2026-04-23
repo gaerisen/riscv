@@ -18,14 +18,6 @@ module riscv_decoder (
         input   wire    [31:0]  pc_i,
         input   wire    [31:0]  instr,
 
-        // Register read port
-        output  wire    [4:0]   rs1,
-        output  wire    [4:0]   rs2,
-        output  wire    [11:0]  csr,
-        input   wire    [31:0]  rs1_val,
-        input   wire    [31:0]  rs2_val,
-        input   wire    [31:0]  csr_val,
-
         // Control outputs
         output  reg             illegal_instr,
         output  reg             ebreak,

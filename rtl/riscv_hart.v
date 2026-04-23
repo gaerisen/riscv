@@ -149,12 +149,6 @@ riscv_datapath datapath
 	.mret(mret),
 	.wfi(wfi),
 
-	// irf read port
-	.rs1(rs1),
-	.rs2(rs2),
-	.rs1_value(irf[rs1]),
-	.rs2_value(irf[rs2]),
-
 	// csr read/write port
 	.csr(csr),
 	.csr_value(csr_value),
@@ -182,19 +176,6 @@ assign d_mem_mask = d_data_valid ?
 
 
 // Writeback
-
-always @(posedge clk, posedge rst)
-begin
-	if (rst)
-	begin
-		for (i = 0; i < 32; i++)
-		begin
-			irf[i] <= 32'b0;
-		end
-	end else if ((rd != 5'b0) & i_data_ready)
-	begin
-		irf[rd] <= irf_wb;
-	end
-end
-
+/*
+*/
 endmodule
