@@ -136,6 +136,7 @@ end
 riscv_datapath datapath
 (
 	.clk(clk),
+        .rst(rst),
 
 	// instruction/pc input
 	.pc(pc),
