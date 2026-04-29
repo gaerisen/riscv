@@ -52,6 +52,7 @@ always @(posedge clk) begin
                         funct3[2] | funct3[6] ?	csru_in1 | csru_in2 :
                         funct3[3] | funct3[7] ?	csru_in1 & ~csru_in2 :
                                                 32'b0;
+
                 bcu <=	funct3[0] ?	alu_in1 == alu_in2 :
                         funct3[1] ?	alu_in1 != alu_in2 :
                         funct3[4] ?	alu_in1 < alu_in2 :

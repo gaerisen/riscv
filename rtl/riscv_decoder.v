@@ -146,10 +146,10 @@ always @(posedge clk) begin
                                                 `BRANCH | `LOAD | `STORE | `ALUI |
                                                 `ALUR | `FENCE | `SYSTEM );
 
-                ebreak <=	`SYSTEM & funct3[0] & (instr[31:20] == 12'h1);
-                ecall <=	`SYSTEM & funct3[0] & (instr[31:20] == 12'h0);
-                mret <=		`SYSTEM & funct3[0] & (instr[31:20] == 12'h302);
-                wfi <=		`SYSTEM & funct3[0] & (instr[31:20] == 12'h105);
+                ebreak <=	`SYSTEM & (instr[14:12] == 0) & (instr[31:20] == 12'h1);
+                ecall <=	`SYSTEM & (instr[14:12] == 0) & (instr[31:20] == 12'h0);
+                mret <=		`SYSTEM & (instr[14:12] == 0) & (instr[31:20] == 12'h302);
+                wfi <=		`SYSTEM & (instr[14:12] == 0) & (instr[31:20] == 12'h105);
 
                 jump <= `JAL | `JALR;
                 branch <= `BRANCH;
@@ -158,7 +158,8 @@ always @(posedge clk) begin
 
                 funct7 <= is_r ? (1 << instr[31:20]) : 0;
                 funct3 <= (is_r | is_i | is_s | is_b) ?
-                                (1 << instr[14:12]) : 0;
+                                (1 << instr[14:12]) : 
+                        (is_j | is_u) ? 1 : 0;
 
 
         end

@@ -130,7 +130,7 @@ assign alu_in1 =        alu_in1_is_rs1 ? irf[rs1] :
                 
 assign alu_in2 =        alu_in2_is_rs2 ? irf[rs2] :
                         alu_in2_is_imm ? imm : 
-                        jump ? 32'h4 : 0;
+                        jump_dec_to_exe ? 32'h4 : 0;
 
 assign agu_in1 =        agu_in1_is_rs1 ? irf[rs1] :
                         agu_in1_is_pc ? pc_dec_to_exe : 0;
