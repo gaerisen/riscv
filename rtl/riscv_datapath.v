@@ -32,7 +32,7 @@ module riscv_datapath
 	output	wire	[31:0]	csr_wb,
 
 	// Jump port
-	output	wire		jump,
+	output	reg		jump,
 	output	wire	[31:0]	jump_target,
 
 	// Memaccess port
@@ -143,6 +143,47 @@ assign csru_in2 =       csru_in2_is_rs1 ? irf[rs1] :
                         csru_in2_is_imm ? {27'b0, rs1} : 0;
 
 // TODO: put ALU here :)
+
+wire [31:0] pc_exe_to_mem;
+wire [31:0] alu;
+wire [31:0] agu;
+wire [31:0] csru;
+wire bcu;
+
+riscv_exe exe0 (
+        .clk(clk),
+        .rst(rst),
+
+        .pc_i(pc_dec_to_exe),
+
+        .funct3(funct3),
+        .funct7(funct7),
+
+        .alu_in1(alu_in1),
+        .alu_in2(alu_in2),
+        
+        .agu_in1(agu_in1),
+        .agu_in2(agu_in2),
+
+        .csru_in1(csru_in1),
+        .csru_in2(csru_in2),
+
+        .pc_o(pc_exe_to_mem),
+
+        .alu(alu),
+        .agu(agu),
+        .csru(csru),
+        .bcu(bcu)
+);
+
+always @(posedge clk)
+begin
+        jump <= jump_dec_to_exe |
+                (branch_dec_to_exe & bcu);
+        
+end
+
+assign jump_target = jump ? agu : 0;
 
 // Memory access logic
 /*
