@@ -4,7 +4,6 @@ verilator \
         --cc rtl/*.v \
         --top-module top \
         --exe main.cpp \
-        --trace \
         --report-unoptflat \
         --timing
 

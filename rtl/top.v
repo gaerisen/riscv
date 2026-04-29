@@ -9,11 +9,11 @@ module top (
         output  wire    [7:0]   serial_output
 );
 
-initial
+/* initial
 begin
 	$dumpfile("wave.vcd");
 	$dumpvars(0, top);
-end
+end */
 
 assign serial_output = 8'bz;
 
