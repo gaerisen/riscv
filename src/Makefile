@@ -1,9 +1,5 @@
-<<<<<<< HEAD:src/Makefile
 ROOT = $(shell pwd)
 INCDIR = $(ROOT)/include
-=======
-INCDIR = include
->>>>>>> 4f9692d150ead91f729748a3c9dd1fd544ff990a:sw/Makefile
 
 PREFIX = riscv32-unknown-elf-
 
@@ -18,7 +14,6 @@ LDFLAGS = -T $(LDSCRIPT) -nostdlib -nostartfiles -static
 
 TARGET = boot
 
-<<<<<<< HEAD:src/Makefile
 MODULES = $(shell find . -name Config.mk)
 
 OBJ :=
@@ -45,7 +40,8 @@ $(TARGET).bin: $(TARGET).elf
 $(TARGET).hex: $(TARGET).bin
 	od -An -vtx1 $^ > $@
 
-flash.hex: $(TARGET).hex head -n 2048 $^ > $@
+flash.hex: $(TARGET).hex
+	head -n 2048 $^ > $@
 
 ram.hex: $(TARGET).hex
 	tail -n +2049 $^ > $@
