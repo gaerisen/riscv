@@ -1,0 +1,1 @@
+OBJ += bin/init.o

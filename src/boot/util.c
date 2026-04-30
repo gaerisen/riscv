@@ -10,3 +10,12 @@ int strlen(const char *s)
 
         return i;
 }
+
+void memcpy(u8 *from, u8 *to, u32 bytes)
+{
+        u32 i;
+        for (i = 0; i < bytes; i++) {
+                to[i] = from[i];
+        }
+        return;
+}

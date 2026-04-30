@@ -8,15 +8,13 @@
 
 .globl ecall
 ecall:
-        addi sp, sp, -4
-        lw a7, 0(sp)
-
-        mv a7, a0
         ecall
-        lw a7, 0(sp)
-
-        addi sp, sp, 4
         ret
+
+.globl mret
+mret:
+        csrw mepc, a0
+        mret
 
 .globl enable_irq
 enable_irq:

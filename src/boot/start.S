@@ -13,7 +13,7 @@ _start:
         nop
 
         li a0, 1
-        slli a0, a0, 7
+        slli a0, a0, 3
         csrw mstatus, a0
 
         la gp, _heap_start
@@ -27,10 +27,11 @@ _halt:
 
 .globl _vec
 _vec:
-        addi sp, sp, -124
+        csrrw sp, mscratch, sp // Swap proc sp with kernel sp
 
-        sw x1, 120(sp)
-        sw x2, 116(sp)
+        addi sp, sp, -120
+
+        sw x1, 116(sp)
         sw x3, 112(sp)
         sw x4, 108(sp)
         sw x5, 104(sp)
@@ -63,13 +64,13 @@ _vec:
 
         csrr a0, mcause
         mv a1, a7
-        call handle_interrupt
+        call trap
+
         csrr a0, mepc
         addi a0, a0, 4
         csrw mepc, a0
-        
-        lw x1, 120(sp)
-        lw x2, 116(sp)
+
+        lw x1, 116(sp)
         lw x3, 112(sp)
         lw x4, 108(sp)
         lw x5, 104(sp)
@@ -100,6 +101,8 @@ _vec:
         lw x30, 4(sp)
         lw x31, 0(sp)
 
-        addi sp, sp, 124
+        addi sp, sp, 120
+
+        csrrw sp, mscratch, sp // Swap proc sp with kernel sp
 
         mret
