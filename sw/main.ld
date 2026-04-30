@@ -18,7 +18,7 @@ SECTIONS
                 *(.rodata)
                 *(.rodata.*)
                 . = ALIGN(4);
-        } > FLASH
+        } > RAM
 
         .data :
         {
@@ -39,3 +39,4 @@ ENTRY(_start)
 
 PROVIDE(_stack_top = 0xc000);
 PROVIDE(_stdout = 0xc00f);
+PROVIDE(_stdin = 0xc00f);
