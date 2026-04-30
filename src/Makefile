@@ -1,3 +1,6 @@
+ROOT = $(shell pwd)
+INCDIR = $(ROOT)/include
+
 PREFIX = riscv32-unknown-elf-
 
 CC = $(PREFIX)gcc
@@ -5,23 +8,28 @@ OBJCOPY = $(PREFIX)objcopy
 OBJDUMP = $(PREFIX)objdump
 
 LDSCRIPT = main.ld
-CFLAGS = -march=rv32izicsr -mabi=ilp32 -ffreestanding -O0
+CFLAGS = -march=rv32izicsr -mabi=ilp32 -ffreestanding -O0 -I$(INCDIR)
 ASFLAGS = $(CFLAGS)
 LDFLAGS = -T $(LDSCRIPT) -nostdlib -nostartfiles -static
 
-CSRC = main.c
-ASMSRC = start.S alias.S
-SRC = $(CSRC) $(ASMSRC)
+TARGET = boot
 
-OBJ = $(ASMSRC:%.S=%.o) $(CSRC:%.c=%.o)
+MODULES = $(shell find . -name Config.mk)
 
-TARGET = mem
+OBJ :=
+
+include $(MODULES)
+
+.PHONY: all clean cleaner $(SUBDIRS)
 
 all: flash.hex ram.hex
 	cp $^ ../obj_dir/
 
+%.o: %.c
+	$(CC) $(CFLAGS) -c $^ -o $@
 
-$(OBJ): $(SRC)
+%.o: %.S
+	$(CC) $(ASFLAGS) -c $^ -o $@
 
 $(TARGET).elf: $(OBJ)
 	$(CC) $(LDFLAGS) $^ -o $@
@@ -38,9 +46,8 @@ flash.hex: $(TARGET).hex
 ram.hex: $(TARGET).hex
 	tail -n +2049 $^ > $@
 
-
 dump:
 	$(OBJDUMP) -D $(TARGET).elf
 
 clean:
-	rm *.elf *.bin *.hex *.o
+	rm *.elf *.bin *.hex $(OBJ)

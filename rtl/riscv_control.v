@@ -222,7 +222,7 @@ begin
 		end
 		else if (interrupt_trap)
 		begin
-			mcause <= {1'b0, 27'b0, interrupt_cause};	
+			mcause <= {1'b1, 27'b0, interrupt_cause};	
 			mepc <= pc;
 			mstatus[7] <= mstatus[3];
 			mstatus[3] <= 0;

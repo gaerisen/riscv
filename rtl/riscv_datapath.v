@@ -161,10 +161,10 @@ assign alu =	funct3[0] ?	(funct7[32] ?	alu_in1 - alu_in2 :
 
 assign bcu =	funct3[0] ?	alu_in1 == alu_in2 :
 		funct3[1] ?	alu_in1 != alu_in2 :
-		funct3[4] ?	alu_in1 < alu_in2 :
-		funct3[5] ?	alu_in1 >= alu_in2 :
-		funct3[6] ?	$signed(alu_in1) < $signed(alu_in2) :
-		funct3[7] ?	$signed(alu_in1) >= $signed(alu_in2) :
+		funct3[4] ?	$signed(alu_in1) < $signed(alu_in2) :
+		funct3[5] ?	$signed(alu_in1) >= $signed(alu_in2) :
+		funct3[6] ?	alu_in1 < alu_in2 :
+		funct3[7] ?	alu_in1 >= alu_in2 :
 				1'b0;
 
 assign agu =	agu_in1 + agu_in2;
