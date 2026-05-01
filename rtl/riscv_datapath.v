@@ -152,9 +152,9 @@ assign alu =	funct3[0] ?	(funct7[32] ?	alu_in1 - alu_in2 :
 		funct3[1] ?	alu_in1 << alu_in2 :
 		funct3[2] ?	{31'b0, alu_in1 < alu_in2} :
 		funct3[3] ?	{31'b0, $signed(alu_in1) < $signed(alu_in2)} :
-		funct3[4] ?	(funct7[32] ?	alu_in1 >>> alu_in2 :
+		funct3[4] ?	alu_in1 ^ alu_in2 :
+		funct3[5] ?	(funct7[32] ?	alu_in1 >>> alu_in2 :
 						alu_in1 >> alu_in2 ) :
-		funct3[5] ?	alu_in1 ^ alu_in2 :
 		funct3[6] ?	alu_in1 | alu_in2 :
 		funct3[7] ?	alu_in1 & alu_in2 :
 				32'b0;
