@@ -1,5 +1,7 @@
 #include <verilated.h>
-#include <stdio.h>
+#include <iostream>
+#include <iomanip>
+#include <fstream>
 #include "Vtop.h"
 #include <time.h>
 #include <stdlib.h>
@@ -26,7 +28,13 @@ int main(int argc, char** argv, char** env)
         top->clock = 0;
         top->reset = 0;
 
-        printf("Simulation Start:\n\n");
+        std::ofstream f0("run.log", std::ios::out);
+        if (!f0.is_open()) {
+                std::cout << "Failed to open log file" << std::endl;
+                return 1;
+        }
+
+        std::cout << "=== Simulation Start === " << std::endl;
 
         set_conio_terminal_mode();
 
@@ -35,9 +43,32 @@ int main(int argc, char** argv, char** env)
                 if (top->serial_output != '\0' && top->clock) {
                         write(1, &(top->serial_output), 1);
                 }
+
 		elapsedtime++;
                 top->clock = !top->clock;
 		top->eval();
+
+                if (top->clock) {
+                        f0 << "pc: ";
+                        f0 << std::setw(11) << std::hex;
+                        f0 << top->pc_dbg << '\t';
+
+                        f0 << "sp: ";
+                        f0 << std::setw(11) << std::hex;
+                        f0 << top->sp_dbg << '\t';
+
+                        if (top->trap_dbg) {
+                                f0 << "TRAP";
+                        }
+                        if (top->mret_dbg) {
+                                f0 << "MRET";
+                        }
+                        if (top->jump_dbg) {
+                                f0 << "JUMP";
+                        }
+
+                        f0 << std::endl;
+                }
 
                 if (kbhit()) {
                         top->serial_input = getch();

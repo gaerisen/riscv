@@ -1,4 +1,12 @@
 module top (
+`ifdef DEBUG
+        output  wire    [31:0]  pc_dbg,
+        output  wire    [31:0]  sp_dbg,
+
+        output  wire            trap_dbg,
+        output  wire            mret_dbg,
+        output  wire            jump_dbg,
+`endif
         input   wire            clock,
         input   wire            reset,
 
@@ -19,6 +27,13 @@ assign serial_output = 8'bz;
 
 riscv_cpu cpu
 (
+`ifdef DEBUG
+        .pc_dbg(pc_dbg),
+        .sp_dbg(sp_dbg),
+        .trap_dbg(trap_dbg),
+        .mret_dbg(mret_dbg),
+        .jump_dbg(jump_dbg),
+`endif
 	.clk(clock),
 	.rst(reset),
 

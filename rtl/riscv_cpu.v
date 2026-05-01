@@ -1,5 +1,13 @@
 module riscv_cpu
 (
+`ifdef DEBUG
+        output  wire    [31:0]  pc_dbg,
+        output  wire    [31:0]  sp_dbg,
+
+        output  wire            trap_dbg,
+        output  wire            mret_dbg,
+        output  wire            jump_dbg,
+`endif
 	input	wire		clk,
 	input	wire		rst,
 
@@ -23,6 +31,14 @@ wire timer_irq = 0;
 
 riscv_hart hart0
 (
+`ifdef DEBUG
+        .pc_dbg(pc_dbg),
+        .sp_dbg(sp_dbg),
+        .trap_dbg(trap_dbg),
+        .mret_dbg(mret_dbg),
+        .jump_dbg(jump_dbg),
+`endif
+
 	.clk(clk),
 	.rst(rst),
 

@@ -1,5 +1,14 @@
 module riscv_hart
 (
+`ifdef DEBUG
+        output  wire    [31:0]  pc_dbg,
+        output  wire    [31:0]  sp_dbg,
+
+        output  wire            trap_dbg,
+        output  wire            mret_dbg,
+        output  wire            jump_dbg,
+`endif
+
 	input	wire		clk,
 	input	wire		rst,
 
@@ -44,6 +53,16 @@ wire	[4:0]	rd;
 wire	[31:0]	csr_wb;
 wire	[31:0]	irf_wb;
 wire    [2:0]   d_mem_op;
+
+`ifdef DEBUG
+        assign pc_dbg = pc;
+        assign sp_dbg = irf[2];
+
+        assign trap_dbg = trap;
+        assign mret_dbg = mret;
+        assign jump_dbg = jump;
+`endif
+
 
 // Main operation registers
 
