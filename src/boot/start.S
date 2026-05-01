@@ -15,12 +15,8 @@
 _start:
         nop
 
-        la sp, _kernel_end
-        la sp, _heap_start
-        la sp, _stack_top
-
         li a0, 1
-        slli a0, a0, 3
+        slli a0, a0, 7
         csrw mstatus, a0
 
         la gp, _heap_start
@@ -77,7 +73,6 @@ _vec:
         sw t6, 124(gp)
 
         csrr a0, mepc   // Store process pc
-        addi a0, a0, 4
         sw a0, 0(gp)
 
         csrr a0, mscratch // Store process sp 
@@ -92,13 +87,17 @@ _vec:
         mv a1, a7
         call trap // trap will return a ptr to the proc to drop into
 
+        addi sp, sp, 8  // Destroy the trap stack before state load
+
+.globl _drop_into_userspace
+_drop_into_userspace:
+
+        csrw mscratch, sp // Scratch kernel sp
+
         mv gp, a0
 
         lw a0, 0(gp) // Load process pc into mepc
         csrw mepc, a0
-
-        addi sp, sp, 8  // Destroy the stack before state load
-        csrw mscratch, sp // Scratch kernel sp
 
         lw ra, 4(gp)    // Load regs
         lw tp, 16(gp)

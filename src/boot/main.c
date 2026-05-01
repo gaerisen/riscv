@@ -7,9 +7,11 @@
 extern u8 _heap_start;
 extern u8 _kernel_end;
 
+extern void _drop_into_userspace(proc *p);
+
 u32 current_proc;
 
-proc ptable[32];
+proc ptable[4];
 u32 proc_mask = 0;
 
 int main()
@@ -17,7 +19,7 @@ int main()
         u32 ktextsize = (u32)&_kernel_end;
         u32 kdatasize = (u32)(&_heap_start - 0x8000);
 
-        puts("Kernel size: ", 13);
+        puts(".text size: ", 12);
         putnum(ktextsize);
         puts("\n\r", 2);
         puts(".data size: ", 12);
@@ -28,17 +30,23 @@ int main()
 
         current_proc = 0;
         ptable[0].pc = (u32)&init;
+        ptable[0].irf[1] = 0xa000 + 0x100;
+
+        _drop_into_userspace(ptable);
 
         return 0;
 }
 
-void trap(int mcause, int callnum)
+proc *trap(int mcause, int callnum)
 {
         if (mcause >> 31) { // Interrupt
                 char c = getc();
                 if (c == 13) {
                         putc('\n');
                         putc('\r');
+                } else if (c == '~') {
+                        puts("Got halt from init. Goodbye\n\r", 29);
+                        while (1);
                 } else {
                         putc(getc());
                 }
@@ -48,5 +56,5 @@ void trap(int mcause, int callnum)
                         break;
                 }
         }
-        return;
+        return &(ptable[current_proc]);
 }
