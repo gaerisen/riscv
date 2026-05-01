@@ -11,11 +11,6 @@ ecall:
         ecall
         ret
 
-.globl mret
-mret:
-        csrw mepc, a0
-        mret
-
 .globl enable_irq
 enable_irq:
         addi sp, sp, -4

@@ -5,7 +5,6 @@
 
 u32 current_proc;
 
-proc os_proc;
 proc ptable[32];
 u32 proc_mask = 0;
 
@@ -18,11 +17,6 @@ int main()
         current_proc = 0;
         ptable[0].pc = (u32)&init;
 
-        __asm__ ("la sp, _heap_start");
-        __asm__ ("addi sp, sp, 0x100");
-
-        mret(ptable + 0);
-        
         return 0;
 }
 
