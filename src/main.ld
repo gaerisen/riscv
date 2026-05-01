@@ -13,6 +13,8 @@ SECTIONS
                 . = ALIGN(4);
         } > FLASH
 
+        PROVIDE(_kernel_end = .);
+
         .rodata :
         {
                 *(.rodata)

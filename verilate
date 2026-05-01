@@ -6,6 +6,7 @@ verilator \
         --top-module top \
         --exe main.cpp \
         --report-unoptflat \
+        --trace \
         --timing
 
 STATUS=$?

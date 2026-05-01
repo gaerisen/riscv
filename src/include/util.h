@@ -5,5 +5,6 @@
 
 int strlen(const char *s);
 void memcpy(u8 *from, u8 *to, u32 bytes);
+void putnum(u32 num);
 
 #endif

@@ -15,6 +15,10 @@
 _start:
         nop
 
+        la sp, _kernel_end
+        la sp, _heap_start
+        la sp, _stack_top
+
         li a0, 1
         slli a0, a0, 3
         csrw mstatus, a0

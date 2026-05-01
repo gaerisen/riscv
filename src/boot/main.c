@@ -1,7 +1,11 @@
 #include "tty.h"
+#include "types.h"
 #include "sys.h"
 #include "proc.h"
 #include "bin/init.h"
+
+extern u8 _heap_start;
+extern u8 _kernel_end;
 
 u32 current_proc;
 
@@ -10,7 +14,15 @@ u32 proc_mask = 0;
 
 int main()
 {
-        puts("RiscyOS v0.0.1", 16);
+        u32 ktextsize = (u32)&_kernel_end;
+        u32 kdatasize = (u32)(&_heap_start - 0x8000);
+
+        puts("Kernel size: ", 13);
+        putnum(ktextsize);
+        puts("\n\r", 2);
+        puts(".data size: ", 12);
+        putnum(kdatasize);
+        puts("\n\r", 2);
 
         proc_mask = 1;
 

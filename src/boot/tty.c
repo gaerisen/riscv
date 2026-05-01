@@ -3,6 +3,8 @@
 extern char _stdin;
 extern char _stdout;
 
+const char hex_lut[16] = "0123456789abcdef";
+
 void putc(char c)
 {
         _stdout = c;
@@ -19,6 +21,20 @@ int puts(const char *s, unsigned int len)
         }
 
         return 0;
+}
+
+void putnum(u32 num)
+{
+        u32 tmp;
+        puts("0x", 2);
+        for (int i = 28; i >= 0; i -= 4) {
+                tmp = num >> i;
+                putc(hex_lut[tmp]);
+                tmp <<= i;
+                num -= tmp;
+        }
+
+        return;
 }
 
 char getc()
