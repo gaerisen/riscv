@@ -20,8 +20,7 @@ _start:
         csrw mstatus, a0
 
         la gp, _heap_start
-        mv sp, gp
-        addi sp, sp, 0x400
+        li sp, 0x9000
         la a0, _vec
         csrw mtvec, a0
         call main
@@ -35,21 +34,21 @@ _vec:
 
         addi sp, sp, -8 // Store gp and a0
         sw gp, 0(sp)
-        sw a0, 4(sp)
+        sw t0, 4(sp)
 
         la gp, ptable           // Load gp with the address of the proc struct
-        la a0, current_proc     // corresponding to what we just trapped from
-        lw a0, 0(a0)
-        slli a0, a0, 8
-        add gp, gp, a0
+        la t0, current_proc     // corresponding to what we just trapped from
+        lw t0, 0(t0)
+        slli t0, t0, 8
+        add gp, gp, t0
 
         sw ra, 4(gp)    // Store all regs in the chosen proc
         sw tp, 16(gp)
-        sw t0, 20(gp)
         sw t1, 24(gp)
         sw t2, 28(gp)
         sw fp, 32(gp)
         sw s1, 36(gp)
+        sw a0, 40(gp)
         sw a1, 44(gp)
         sw a2, 48(gp)
         sw a3, 52(gp)
@@ -72,19 +71,20 @@ _vec:
         sw t5, 120(gp)
         sw t6, 124(gp)
 
-        csrr a0, mepc   // Store process pc
-        sw a0, 0(gp)
+        csrr t0, mepc   // Store process pc
+        sw t0, 0(gp)
 
-        csrr a0, mscratch // Store process sp 
-        sw a0, 8(gp)
+        csrr t0, mscratch // Store process sp 
+        sw t0, 8(gp)
 
-        lw a0, 0(sp)    // Store the copies of gp and a0 we saved to stack
-        sw a0, 12(gp)
-        lw a0, 4(sp)
-        sw a0, 40(gp)
+        lw t0, 0(sp)    // Store the copies of gp and t0 we saved to stack
+        sw t0, 12(gp)
+        lw t0, 4(sp)
+        sw t0, 20(gp)
 
         csrr a0, mcause // setup trap(int mcause, int syscall_num);
         mv a1, a7
+        addi a2, gp, 40
         call trap // trap will return a ptr to the proc to drop into
 
         addi sp, sp, 8  // Destroy the trap stack before state load
@@ -100,6 +100,7 @@ _drop_into_userspace:
         csrw mepc, a0
 
         lw ra, 4(gp)    // Load regs
+        lw sp, 8(gp)
         lw tp, 16(gp)
         lw t0, 20(gp)
         lw t1, 24(gp)

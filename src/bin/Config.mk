@@ -1,1 +1,2 @@
-OBJ += bin/init.o
+OBJ += bin/shell.o \
+       bin/hi.o
