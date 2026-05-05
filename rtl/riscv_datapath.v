@@ -12,7 +12,8 @@
 
 module riscv_datapath
 (
-	input	wire		clk,
+        input   wire            clk,
+        input   wire            rst,
 
 	// PC and instr input
 	input	wire	[31:0]	pc,
@@ -25,20 +26,13 @@ module riscv_datapath
 	output	wire		mret,
 	output	wire		wfi,
 
-	// Register read port
-	output	wire	[4:0]	rs1,
-	output	wire	[4:0]	rs2,
-	input	wire	[31:0]	rs1_value,
-	input	wire	[31:0]	rs2_value,
-
 	// CSR read-write port
 	output	wire	[11:0]	csr,
-	output	wire	[4095:0]	csr_,
 	input	wire	[31:0]	csr_value,
 	output	wire	[31:0]	csr_wb,
 
 	// Jump port
-	output	wire		jump,
+	output	reg		jump,
 	output	wire	[31:0]	jump_target,
 
 	// Memaccess port
@@ -53,15 +47,8 @@ module riscv_datapath
 	output	wire	[31:0]	irf_wb
 );
 
-wire	[31:0]	opcode;
 wire	[7:0]	funct3;
 wire	[127:0]	funct7;
-wire		is_r;
-wire		is_i;
-wire		is_s;
-wire		is_b;
-wire		is_u;
-wire		is_j;
 wire	[31:0]	imm;
 wire	[31:0]	alu_in1;
 wire	[31:0]	alu_in2;
@@ -69,132 +56,137 @@ wire	[31:0]	agu_in1;
 wire	[31:0]	agu_in2;
 wire	[31:0]	csru_in1;
 wire	[31:0]	csru_in2;
-wire	[31:0]	alu;
-wire	[31:0]	agu;
-wire		bcu;
-wire	[31:0]	csru;
-wire	[31:0]	ld;
 
-// Predecode logic
+wire jump_dec_to_exe;
+wire branch_dec_to_exe;
+wire store_dec_to_exe;
+wire load_dec_to_exe;
 
-assign opcode = 32'b1 << instr[6:2];
+wire [31:0] pc_dec_to_exe;
+wire [4:0] rd_dec_to_exe;
 
-assign is_r = `ALUR;
-assign is_i = `JALR | `LOAD | `ALUI | `SYSTEM;
-assign is_s = `STORE;
-assign is_b = `BRANCH;
-assign is_u = `LUI | `AUIPC;
-assign is_j = `JAL;
+reg [31:0] irf [0:31];
 
-assign csr = `SYSTEM ?				instr[31:20] : 12'b0;
-assign rs2 = (is_r | is_s | is_b) ?		instr[24:20] : 5'b0;
-assign rs1 = (is_r | is_i | is_s | is_b) ?	instr[19:15] : 5'b0;
-assign rd = (is_r | is_i | is_u | is_j) ?	instr[11:7] : 5'b0;
+wire alu_in1_is_rs1;
+wire alu_in1_is_pc;
+wire alu_in2_is_rs2;
+wire alu_in2_is_imm;
+               
+wire agu_in1_is_rs1;
+wire agu_in1_is_pc;
+wire agu_in2_is_imm;
+               
+wire csru_in1_is_csr;
+wire csru_in2_is_rs1;
+wire csru_in2_is_imm;
 
-assign imm[31] =	instr[31];
+wire [4:0] rs1;
+wire [4:0] rs2;
 
-assign imm[30:20] =	is_u ?	instr[30:20] :
-				{{11{instr[31]}}};
+riscv_decoder decoder0 (
+        .clk(clk),
+        .rst(rst),
 
-assign imm[19:12] =	(is_u | is_j) ?	instr[19:12] :
-					{{8{instr[31]}}};
+        .pc_i(pc),
+        .instr(instr),
 
-assign imm[11] =	is_b ?	instr[7] :
-			is_u ?	1'b0 :
-			is_j ?	instr[20] :
-				instr[31];
+        .illegal_instr(illegal_instruction),
+        .ebreak(breakpoint),
+        .ecall(ecall),
+        .mret(mret),
+        .wfi(wfi),
 
-assign imm[10:5] =	is_u ?	6'b0 :
-				instr[30:25];
+        .jump(jump_dec_to_exe),
+        .branch(branch_dec_to_exe),
+        .store(store_dec_to_exe),
+        .load(load_dec_to_exe),
 
-assign imm[4:1] =	(is_i | is_j) ?	instr[24:21] :
-			(is_s | is_b) ?	instr[11:8] :
-			4'b0;
+        .alu_in1_is_rs1(alu_in1_is_rs1),
+        .alu_in1_is_pc(alu_in1_is_pc),
+        .alu_in2_is_rs2(alu_in2_is_rs2),
+        .alu_in2_is_imm(alu_in2_is_imm),
 
-assign imm[0] =		is_i ?	instr[20] :
-			is_s ?	instr[7] :
-				1'b0;
+        .agu_in1_is_rs1(agu_in1_is_rs1),
+        .agu_in1_is_pc(agu_in1_is_pc),
+        .agu_in2_is_imm(agu_in2_is_imm),
 
-// Decode logic
+        .csru_in1_is_csr(csru_in1_is_csr),
+        .csru_in2_is_rs1(csru_in2_is_rs1),
+        .csru_in2_is_imm(csru_in2_is_imm),
 
-assign funct3 = 8'b1 << ((is_u | is_j | `JALR) ? 0 : instr[14:12]);
-assign funct7 = 128'b1 << (is_r ? instr[31:25] : 0);
-assign csr_ = 4096'b1 << (`SYSTEM ? instr[31:20] : 0);
+        .funct3(funct3),
+        .funct7(funct7),
 
-assign alu_in1 =	(`BRANCH | `ALUI | `ALUR) ?	rs1_value :
-			(`JAL | `JALR | `AUIPC) ?	pc :
-							32'h0;
+        .pc_o(pc_dec_to_exe),
+        .imm(imm),
+        .rs1(rs1),
+        .rs2(rs2),
+        .csr(csr),
+        .rd(rd_dec_to_exe)
+);
 
-assign alu_in2 =	(`ALUR | `BRANCH) ?		rs2_value :
-			(`LUI | `AUIPC | `ALUI) ?	imm :
-			(`JAL | `JALR) ?		32'h4 :
-							32'h0;
+assign alu_in1 =        alu_in1_is_rs1 ? irf[rs1] :
+                        alu_in1_is_pc ? pc_dec_to_exe : 0;
+                
+assign alu_in2 =        alu_in2_is_rs2 ? irf[rs2] :
+                        alu_in2_is_imm ? imm : 
+                        jump_dec_to_exe ? 32'h4 : 0;
 
-assign agu_in1 =	(`JALR | `STORE | `LOAD) ?	rs1_value :
-			(`JAL | `BRANCH) ?		pc :
-							32'h0;
+assign agu_in1 =        agu_in1_is_rs1 ? irf[rs1] :
+                        agu_in1_is_pc ? pc_dec_to_exe : 0;
 
-assign agu_in2 =	(`JALR | `STORE | `LOAD | `JAL | `BRANCH) ?	imm :
-									32'h0;
+assign agu_in2 =        agu_in2_is_imm ? imm : 0;
 
-assign csru_in1 =	`SYSTEM ?	csr_value :
-					32'b0;
+assign csru_in1 =       csru_in1_is_csr ? csr_value : 0;
 
-assign csru_in2 =	`SYSTEM ? (	(funct3[1] | funct3[2] | funct3[3]) ?	rs1_value :
-					(funct3[5] | funct3[6] | funct3[7]) ?	{27'b0, rs1} :
-										32'b0 ) :
-				32'b0;
+assign csru_in2 =       csru_in2_is_rs1 ? irf[rs1] :
+                        csru_in2_is_imm ? {27'b0, rs1} : 0;
 
-// Execute logic
+// TODO: put ALU here :)
 
-assign alu =	funct3[0] ?	(funct7[32] ?	alu_in1 - alu_in2 :
-						alu_in1 + alu_in2 ) :
-		funct3[1] ?	alu_in1 << alu_in2 :
-		funct3[2] ?	{31'b0, alu_in1 < alu_in2} :
-		funct3[3] ?	{31'b0, $signed(alu_in1) < $signed(alu_in2)} :
-		funct3[4] ?	(funct7[32] ?	alu_in1 >>> alu_in2 :
-						alu_in1 >> alu_in2 ) :
-		funct3[5] ?	alu_in1 ^ alu_in2 :
-		funct3[6] ?	alu_in1 | alu_in2 :
-		funct3[7] ?	alu_in1 & alu_in2 :
-				32'b0;
+wire [31:0] pc_exe_to_mem;
+wire [31:0] alu;
+wire [31:0] agu;
+wire [31:0] csru;
+wire bcu;
 
-assign bcu =	funct3[0] ?	alu_in1 == alu_in2 :
-		funct3[1] ?	alu_in1 != alu_in2 :
-		funct3[4] ?	alu_in1 < alu_in2 :
-		funct3[5] ?	alu_in1 >= alu_in2 :
-		funct3[6] ?	$signed(alu_in1) < $signed(alu_in2) :
-		funct3[7] ?	$signed(alu_in1) >= $signed(alu_in2) :
-				1'b0;
+riscv_exe exe0 (
+        .clk(clk),
+        .rst(rst),
 
-assign agu =	agu_in1 + agu_in2;
+        .pc_i(pc_dec_to_exe),
 
-assign csru =	funct3[1] | funct3[5] ? csru_in2 :
-		funct3[2] | funct3[6] ?	csru_in1 | csru_in2 :
-		funct3[3] | funct3[7] ?	csru_in1 & ~csru_in2 :
-					32'b0;
+        .funct3(funct3),
+        .funct7(funct7),
 
-// Trap jumps/exceptions
+        .alu_in1(alu_in1),
+        .alu_in2(alu_in2),
+        
+        .agu_in1(agu_in1),
+        .agu_in2(agu_in2),
 
-assign jump =	((`BRANCH & bcu) | `JAL | `JALR);
+        .csru_in1(csru_in1),
+        .csru_in2(csru_in2),
 
-assign jump_target =	jump ?	agu :
-				32'b0;
+        .pc_o(pc_exe_to_mem),
 
-assign illegal_instruction =	~(instr[1] & instr[0]) |
-				~(	`LUI | `AUIPC | `JAL | `JALR |
-					`BRANCH | `LOAD | `STORE | `ALUI |
-					`ALUR | `FENCE | `SYSTEM );
+        .alu(alu),
+        .agu(agu),
+        .csru(csru),
+        .bcu(bcu)
+);
 
-assign breakpoint =	`SYSTEM & funct3[0] & csr_[12'h1];
-assign ecall =		`SYSTEM & funct3[0] & csr_[12'h0];
-assign mret =		`SYSTEM & funct3[0] & csr_[12'h302];
-assign wfi =		`SYSTEM & funct3[0] & csr_[12'h105];
+always @(posedge clk)
+begin
+        jump <= jump_dec_to_exe |
+                (branch_dec_to_exe & bcu);
+        
+end
+
+assign jump_target = jump ? agu : 0;
 
 // Memory access logic
-
-assign is_mem_op = (`STORE | `LOAD);
-
+/*
 assign mem_addr = (`STORE | `LOAD) ?	agu :
 					32'b0;
 
@@ -223,5 +215,22 @@ assign irf_wb =	`LOAD ?							ld :
 									32'b0;
 
 assign csr_wb =	csru;
+*/
+
+wire [4:0] rd_mem_to_wb = 0;
+
+always @(posedge clk, posedge rst)
+begin
+	if (rst)
+	begin
+		for (integer i = 0; i < 32; i++)
+		begin
+			irf[i] <= 32'b0;
+		end
+	end else if (rd_mem_to_wb != 5'b0)
+	begin
+		irf[rd_mem_to_wb] <= irf_wb;
+	end
+end
 
 endmodule

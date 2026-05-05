@@ -5,7 +5,6 @@ module riscv_control
 
 	// CSR read/write port
 	input	wire	[11:0]	csr,
-	input	wire	[4095:0]	csr_,
 	output	wire	[31:0]	csr_value,
 	input	wire	[31:0]	csr_wb,
 
@@ -149,20 +148,20 @@ assign mret_target =	mepc;
 
 assign mstatus_ =	{56'b0, mstatus[7], 3'b0, mstatus[3], 3'b0};
 
-assign csr_value =	csr_[12'h300] ?			mstatus_[31:0] :
-			csr_[12'h301] ?			32'h40000100 :
-			csr_[12'h304] ?			mie :
-			csr_[12'h305] ?			mtvec :
-			csr_[12'h310] ?			mstatus_[63:32] :
-			csr_[12'h320] ?			mcountinhibit :
-			csr_[12'h340] ?			mscratch :
-			csr_[12'h341] ?			mepc :
-			csr_[12'h342] ?			mcause :
-			csr_[12'h344] ?			mip :
-			csr_[12'hb00] ?			mcycle[31:0] :
-			csr_[12'hb02] ?			minstret[31:0] :
-			csr_[12'hb80] ?			mcycle[63:32] :
-			csr_[12'hb82] ?			minstret[63:32] :
+assign csr_value =	csr == 12'h300 ?			mstatus_[31:0] :
+			csr == 12'h301 ?			32'h40000100 :
+			csr == 12'h304 ?			mie :
+			csr == 12'h305 ?			mtvec :
+			csr == 12'h310 ?			mstatus_[63:32] :
+			csr == 12'h320 ?			mcountinhibit :
+			csr == 12'h340 ?			mscratch :
+			csr == 12'h341 ?			mepc :
+			csr == 12'h342 ?			mcause :
+			csr == 12'h344 ?			mip :
+			csr == 12'hb00 ?			mcycle[31:0] :
+			csr == 12'hb02 ?			minstret[31:0] :
+			csr == 12'hb80 ?			mcycle[63:32] :
+			csr == 12'hb82 ?			minstret[63:32] :
 			32'h0;
 
 always @(posedge clk, posedge rst)
@@ -205,7 +204,7 @@ begin
 		begin
 			mip[7] <= 1;
 		end
-		else if (csr_[12'h344])
+		else if (csr == 12'h344)
 		begin
 			mip <= csr_wb;
 		end
@@ -232,15 +231,15 @@ begin
 			mstatus[3] <= mstatus[7];			// Update mie from mpie
 			mstatus[7] <= 1;				// set mpie
 		end
-		else if (csr_[12'h342])
+		else if (csr == 12'h342)
 		begin
 			mcause <= csr_wb;
 		end
-		else if (csr_[12'h300])
+		else if (csr == 12'h300)
 		begin
 			mstatus[31:0] <= csr_wb;
 		end
-		else if (csr_[12'h341])
+		else if (csr == 12'h341)
 		begin
 			mepc <= csr_wb;
 		end
@@ -248,11 +247,11 @@ begin
 
 		// Cycle counter
 
-		if (csr_[12'hb00])
+		if (csr == 12'hb00)
 		begin
 			mcycle[31:0] <= csr_wb;
 		end
-		else if (csr_[12'hb80])
+		else if (csr == 12'hb80)
 		begin
 			mcycle[63:32] <= csr_wb;
 		end
@@ -264,11 +263,11 @@ begin
 
 		// Instruction retire counter
 
-		if (csr_[12'hb02])
+		if (csr == 12'hb02)
 		begin
 			minstret[31:0] <= csr_wb;
 		end
-		else if (csr_[12'hb82])
+		else if (csr == 12'hb82)
 		begin
 			minstret[63:32] <= csr_wb;
 		end
@@ -282,11 +281,11 @@ begin
 		
 		for (i = 3; i < 32; i++)
 		begin
-			if (csr_[{7'hb0, i[4:0]}])
+			if (csr == {7'hb0, i[4:0]})
 			begin
 				mhpmcounter[i][31:0] <= csr_wb;
 			end
-			else if (csr_[{7'hb8, i[4:0]}])
+			else if (csr == {7'hb8, i[4:0]})
 			begin
 				mhpmcounter[i][63:32] <= csr_wb;
 			end

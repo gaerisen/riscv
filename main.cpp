@@ -26,6 +26,8 @@ int main(int argc, char** argv, char** env)
         top->clock = 0;
         top->reset = 0;
 
+        printf("Simulation Start:\n\n");
+
         set_conio_terminal_mode();
 
 	while (1)
