@@ -34,7 +34,7 @@ assign rs2_next = instr.r.rs2;
 assign rd_next = instr.r.rd;
 
 // Extract opcode
-assign ctrl_next.opcode = instr.r.opcode;
+assign ctrl_next.opcode = opcode_e'(instr.r.opcode);
 
 // Combinational decode step
 always_comb
@@ -113,7 +113,7 @@ begin
                         ctrl_next.alu_src2 = IMM;
 
                         ctrl_next.branch = 1;
-                        ctrl_next.branch_op = instr.b.funct3;
+                        ctrl_next.branch_op = branch_funct3_e'(instr.b.funct3);
                 end
 
                 LOAD: begin
@@ -124,7 +124,7 @@ begin
                         ctrl_next.alu_src2 = IMM;
 
                         ctrl_next.load = 1;
-                        ctrl_next.load_op = instr.i.funct3;
+                        ctrl_next.load_op = load_funct3_e'(instr.i.funct3);
                 end
 
                 STORE: begin
@@ -136,7 +136,7 @@ begin
                         ctrl_next.alu_src2 = IMM;
 
                         ctrl_next.store = 1;
-                        ctrl_next.store_op = instr.s.funct3;
+                        ctrl_next.store_op = store_funct3_e'(instr.s.funct3);
 
                         ctrl_next.wb = 1;
                         ctrl_next.wb_src = MEM;
@@ -145,25 +145,26 @@ begin
                 ALUI: begin
                         imm_next[11:0] = instr.i.imm11_0;
 
-                        ctrl_next.alu_op = instr.i.funct3;
+                        ctrl_next.alu_op = alu_funct3_e'(instr.i.funct3);
                         ctrl_next.alu_src1 = RS1;
                         ctrl_next.alu_src2 = IMM;
 
                         ctrl_next.wb = 1;
-                        ctrl_next.wb = ALU;
+                        ctrl_next.wb_src = ALU;
                 end
 
                 ALUR: begin
-                        ctrl_next.alu_op = instr.i.funct3;
+                        ctrl_next.alu_op = alu_funct3_e'(instr.i.funct3);
                         ctrl_next.alu_src1 = RS1;
                         ctrl_next.alu_src2 = RS2;
 
                         ctrl_next.wb = 1;
-                        ctrl_next.wb = ALU;
+                        ctrl_next.wb_src = ALU;
                 end
 
                 FENCE:;         // Single-core system; leaving as NOP for now
                 SYSTEM:;        // TODO: Add ctrl signalling
+                default:;       // Default to NOP
         endcase 
 end
 

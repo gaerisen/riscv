@@ -50,16 +50,16 @@ package rv32;
         /*====================================================================*/
         /*              SOURCE ENUMS                                          */
         /*====================================================================*/
-        typedef enum logic {
+        typedef enum logic [1:0] {
                 RS1,
-                PC
+                PC,
+                ZERO
         } alu_src1_e;
 
         typedef enum logic [1:0] {
                 RS2,
                 IMM,
-                FOUR,
-                ZERO
+                FOUR
         } alu_src2_e;
 
         typedef enum logic [1:0] {
