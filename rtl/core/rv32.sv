@@ -56,10 +56,9 @@ package rv32;
                 ZERO
         } alu_src1_e;
 
-        typedef enum logic [1:0] {
+        typedef enum logic {
                 RS2,
-                IMM,
-                FOUR
+                IMM
         } alu_src2_e;
 
         typedef enum logic [1:0] {
@@ -134,6 +133,7 @@ package rv32;
                 opcode_e opcode;
 
                 alu_funct3_e alu_op;
+                alu_funct7_e alu_alt;
                 alu_src1_e alu_src1;
                 alu_src2_e alu_src2;
 
