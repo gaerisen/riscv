@@ -45,7 +45,7 @@ package rv32;
         typedef enum logic [6:0] {
                 ALT     = 7'b01_00000,
                 NORM    = 7'b00_00000
-        } funct7_e;
+        } alu_funct7_e;
 
         /*====================================================================*/
         /*              SOURCE ENUMS                                          */
