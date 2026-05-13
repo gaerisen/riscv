@@ -17,7 +17,6 @@ import rv32::*;
         output ctrl_t ctrl_o
 );
 
-
 instr_t instr;
 logic [4:0] rs1_next;
 logic [4:0] rs2_next;
@@ -49,8 +48,12 @@ begin
         ctrl_next.load = 0;
         ctrl_next.store = 0;
         ctrl_next.wb = 0;
+        ctrl_next.wb_src = ALU;
+        ctrl_next.branch_op = BEQ;
+        ctrl_next.load_op = LW;
+        ctrl_next.store_op = SW;
 
-        unique case (instr.r.opcode)
+        unique case (opcode_e'(instr.r.opcode))
                 LUI: begin
                         imm_next[31:12] = instr.u.imm31_12;
                         
@@ -164,8 +167,7 @@ begin
 
                 FENCE:;         // Single-core system; leaving as NOP for now
                 SYSTEM:;        // TODO: Add ctrl signalling
-                default:;       // Default to NOP
-        endcase 
+        endcase // instr.r.opcode
 end
 
 // Save outputs to pipeline registers
