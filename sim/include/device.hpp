@@ -1,10 +1,10 @@
 #ifndef DEVICE_HPP
 #define DEVICE_HPP
 
-#include "Vtop.h"
+#include "Vdecoder.h"
 
 struct device {
-        Vtop* dut;
+        Vdecoder* dut;
 
         int cycles;
 

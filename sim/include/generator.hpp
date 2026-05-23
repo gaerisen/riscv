@@ -3,6 +3,7 @@
 
 #include <vector>
 #include "types.hpp"
+#include "field.hpp"
 
 // Generator struct
 //
@@ -18,16 +19,19 @@
 // RIR needs set_range(int lo, int hi)
 // RFM needs set_mask(int mask)
 
-
-struct field;
+namespace sim {
 
 struct generator {
         int field_mask;
         std::vector<struct field> fields;
 
+        generator();
+
         int add_field(int, int, field_mode_e);
 
         unsigned int generate();
 };
+
+} // namespace sim
 
 #endif // GENERATOR_HPP

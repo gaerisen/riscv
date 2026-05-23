@@ -2,7 +2,7 @@
 
 device::device()
 {
-        dut = new Vtop;
+        dut = new Vdecoder;
         dut->clk = 0;
         dut->rst = 0;
         cycles = 0;
@@ -10,7 +10,7 @@ device::device()
 
 device::~device()
 {
-        dut->finish();
+        dut->final();
         delete dut;
 }
 
