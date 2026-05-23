@@ -3,20 +3,16 @@
 
 #include "Vtop.h"
 
-namespace rv32 {
-
-struct Device {
+struct device {
         Vtop* dut;
 
         int cycles;
 
-        Device();
-        ~Device();
+        device();
+        ~device();
 
         void pulse();
         void reset(int);
 };
-
-}
 
 #endif // DEVICE_HPP

@@ -1,8 +1,6 @@
-#include "Device.hpp"
+#include "device.hpp"
 
-namespace rv32 {
-
-Device::Device()
+device::device()
 {
         dut = new Vtop;
         dut->clk = 0;
@@ -10,13 +8,13 @@ Device::Device()
         cycles = 0;
 }
 
-Device::~Device()
+device::~device()
 {
         dut->finish();
         delete dut;
 }
 
-void Device::pulse()
+void device::pulse()
 {
         dut->clk = 1;
         dut->eval();
@@ -27,7 +25,7 @@ void Device::pulse()
         return;
 }
 
-void Device::reset(int n)
+void device::reset(int n)
 {
         dut->rst = 1;
 
@@ -38,6 +36,4 @@ void Device::reset(int n)
         dut->rst = 0;
 
         return;
-}
-
 }
