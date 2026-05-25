@@ -28,6 +28,9 @@ struct generator {
         generator();
 
         int add_field(int, int, field_mode_e);
+        int add_field(int, int, int); // defined
+        int add_field(int, int, int*, size_t); // lut
+        int add_field(int, int, int, int); // range
 
         unsigned int generate();
 };

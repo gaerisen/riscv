@@ -34,11 +34,8 @@ int main(int argc, char *argv[])
                 int idx;
                 unsigned int instr;
 
-                idx = gen.add_field(2, 0, DEFINED);
-                gen.fields.at(idx).set_val(0b11);
-
-                idx = gen.add_field(6, 2, RAND_LUT);
-                gen.fields.at(idx).set_lut(opcodes, 11);
+                idx = gen.add_field(2, 0, 0b11);
+                idx = gen.add_field(6, 2, opcodes, 11);
 
                 for (int i = 0; i < 32; i++) {
                         instr = gen.generate();
