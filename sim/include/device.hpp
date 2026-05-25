@@ -7,11 +7,12 @@ namespace sim
 {
 
 struct device {
-        Vtop* dut;
+        std::shared_ptr<VerilatedContext> ctx;
+        std::unique_ptr<Vtop> dut;
 
         int cycles;
 
-        device();
+        device(std::shared_ptr<VerilatedContext>);
         ~device();
 
         void pulse();

@@ -7,7 +7,8 @@ namespace sim
 {
 
 struct decoder : public device {
-        decoder();
+
+        decoder(std::shared_ptr<VerilatedContext> ctx);
         ~decoder();
 
         void flush(int);

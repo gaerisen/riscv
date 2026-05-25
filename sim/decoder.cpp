@@ -3,18 +3,18 @@
 namespace sim
 {
 
-decoder::decoder()
+decoder::decoder(std::shared_ptr<VerilatedContext> ctx):
+        device(ctx)
 {
-        dut = new Vtop;
-        dut->clk = 0;
-        dut->rst = 0;
-        dut->flush = 0;
         dut->stall = 0;
+        dut->flush = 0;
         dut->instr_i = 0;
-        cycles = 0;
 }
 
-decoder::~decoder() {}
+decoder::~decoder()
+{
+        dut->final();
+}
 
 void decoder::stall(int n)
 {

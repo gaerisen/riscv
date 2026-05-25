@@ -1,22 +1,24 @@
 TARGET ?= top
 
-SOURCES := pkg/rv32.sv rtl/$(TARGET).sv
+RTL_SRC := pkg/rv32.sv rtl/$(TARGET).sv
 
 VERILATOR_ROOT ?= $(shell verilator --getenv VERILATOR_ROOT)
 VINC = $(VERILATOR_ROOT)/include
 
 .PHONY: all
-all: run
+all: main
 
 # Compile RTL
 
-obj_dir/Vtop.mk:
+obj_dir/Vtop.mk: $(RTL_SRC)
 	verilator --cc -Irtl \
 		--top-module $(TARGET) \
 		--prefix Vtop \
 		--Mdir obj_dir \
 		-y rtl/ \
-		$(SOURCES)
+		--trace \
+		--report-unoptflat \
+		$(RTL_SRC)
 
 obj_dir/Vtop__ALL.a: obj_dir/Vtop.mk
 	make -C obj_dir -j$(nproc) -f Vtop.mk
@@ -24,24 +26,28 @@ obj_dir/Vtop__ALL.a: obj_dir/Vtop.mk
 
 # Compile TB
 
-SRC = sim/main.cpp sim/generator.cpp sim/field.cpp sim/device.cpp sim/decoder.cpp
-OBJ = $(SRC:.cpp=.o)
+TB_SRC = sim/main.cpp \
+	 sim/generator.cpp \
+	 sim/field.cpp \
+	 sim/device.cpp \
+	 sim/decoder.cpp
+
+TB_OBJ = $(TB_SRC:.cpp=.o)
 
 CXXFLAGS = -I$(VINC) -Isim/include -Iobj_dir -std=c++17
 
-%.o: %.cpp
-	$(CXX) $(CXXFLAGS) -c $< -o $@
-
+$(TB_OBJ): $(TB_SRC)
 
 # Link
 
-run: obj_dir/Vtop__ALL.a $(OBJ)
-	$(CXX) $(OBJ) obj_dir/Vtop__ALL.a \
+main: obj_dir/Vtop__ALL.a $(TB_OBJ)
+	$(CXX) $(TB_OBJ) obj_dir/Vtop__ALL.a \
 	       	$(VINC)/verilated.cpp \
 		$(VINC)/verilated_threads.cpp \
+		$(VINC)/verilated_vcd_c.cpp \
 	       -lpthread -o $@
 
 
 .PHONY: clean
 clean:
-	rm -rf obj_dir $(OBJ) run
+	rm -rf obj_dir $(TB_OBJ) main

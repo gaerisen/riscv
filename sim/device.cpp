@@ -3,12 +3,13 @@
 namespace sim
 {
 
-device::device()
+device::device(std::shared_ptr<VerilatedContext> ctx) :
+        ctx(ctx),
+        dut(std::make_unique<Vtop>(ctx.get(), "top")),
+        cycles(0)
 {
-        dut = new Vtop;
         dut->clk = 0;
         dut->rst = 0;
-        cycles = 0;
 }
 
 device::~device()
@@ -19,8 +20,11 @@ device::~device()
 void device::pulse()
 {
         dut->clk = 1;
+        ctx->timeInc(1);
         dut->eval();
+
         dut->clk = 0;
+        ctx->timeInc(1);
         dut->eval();
 
         cycles++;

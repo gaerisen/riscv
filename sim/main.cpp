@@ -2,31 +2,42 @@
 #include <iostream>
 #include <iomanip>
 #include <cstdlib>
-#include <cstdint>
 #include <ctime>
 
 #include "generator.hpp"
 #include "decoder.hpp"
 
+int i_ops[] = {
+        0b11001, // jalr
+        0b00000, // load
+        0b00100, // alui
+};
 
-int opcodes[] = {
+int u_ops[] = {
         0b01101, // lui
         0b00101, // auipc
-        0b11011, // jal
-        0b11001, // jalr
-        0b11000, // branch
-        0b00000, // load
-        0b01000, // store
-        0b00100, // alui
-        0b01100, // alur
-        0b00011, // fence
-        0b11100  // system
 };
+
+int get_i_imm(int);
+int get_s_imm(int);
+int get_b_imm(int);
+int get_u_imm(int);
+int get_j_imm(int);
 
 int main(int argc, char *argv[])
 {
-        struct sim::generator gen;
-        struct sim::decoder dut;
+        auto ctx = std::make_shared<VerilatedContext>();
+
+        ctx->traceEverOn(true);
+
+        struct sim::generator r_gen;
+        struct sim::generator i_gen;
+        struct sim::generator s_gen;
+        struct sim::generator b_gen;
+        struct sim::generator u_gen;
+        struct sim::generator j_gen;
+
+        struct sim::decoder dut(ctx);
 
         srand(time(0));
 
