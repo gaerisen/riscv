@@ -77,7 +77,7 @@ begin
                 end
 
                 JAL: begin
-                        imm_next[20] = instr.j.imm20;
+                        imm_next[31:20] = {12{instr.j.imm20}};
                         imm_next[19:12] = instr.j.imm19_12;
                         imm_next[11] = instr.j.imm11;
                         imm_next[10:1] = instr.j.imm10_1;
@@ -93,6 +93,7 @@ begin
                 end
 
                 JALR: begin
+                        imm_next[31:12] = {20{instr.i.imm11_0[11]}};
                         imm_next[11:0] = instr.i.imm11_0;
 
                         ctrl_next.alu_op = ADDSUB;
@@ -106,7 +107,7 @@ begin
                 end
 
                 BRANCH: begin
-                        imm_next[12] = instr.b.imm12;
+                        imm_next[31:12] = {20{instr.b.imm12}};
                         imm_next[11] = instr.b.imm11;
                         imm_next[10:5] = instr.b.imm10_5;
                         imm_next[4:1] = instr.b.imm4_1;
@@ -120,6 +121,7 @@ begin
                 end
 
                 LOAD: begin
+                        imm_next[31:12] = {20{instr.i.imm11_0[11]}};
                         imm_next[11:0] = instr.i.imm11_0;
 
                         ctrl_next.alu_op = ADDSUB;
@@ -131,6 +133,7 @@ begin
                 end
 
                 STORE: begin
+                        imm_next[31:12] = {20{instr.s.imm11_5[6]}};
                         imm_next[11:5] = instr.s.imm11_5;
                         imm_next[4:0] = instr.s.imm4_0;
 
@@ -146,6 +149,7 @@ begin
                 end
 
                 ALUI: begin
+                        imm_next[31:12] = {20{instr.i.imm11_0[11]}};
                         imm_next[11:0] = instr.i.imm11_0;
 
                         ctrl_next.alu_op = alu_funct3_e'(instr.i.funct3);
