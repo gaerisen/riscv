@@ -1,8 +1,11 @@
 #include "device.hpp"
 
+namespace sim
+{
+
 device::device()
 {
-        dut = new Vdecoder;
+        dut = new Vtop;
         dut->clk = 0;
         dut->rst = 0;
         cycles = 0;
@@ -11,7 +14,6 @@ device::device()
 device::~device()
 {
         dut->final();
-        delete dut;
 }
 
 void device::pulse()
@@ -37,3 +39,5 @@ void device::reset(int n)
 
         return;
 }
+
+} // namespace sim

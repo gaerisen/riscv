@@ -6,8 +6,8 @@
 #include <ctime>
 
 #include "generator.hpp"
+#include "decoder.hpp"
 
-struct sim::generator gen;
 
 int opcodes[] = {
         0b01101, // lui
@@ -25,10 +25,14 @@ int opcodes[] = {
 
 int main(int argc, char *argv[])
 {
+        struct sim::generator gen;
+        struct sim::decoder dut;
+
         srand(time(0));
 
         try {
                 int idx;
+                unsigned int instr;
 
                 idx = gen.add_field(2, 0, DEFINED);
                 gen.fields.at(idx).set_val(0b11);
@@ -37,7 +41,15 @@ int main(int argc, char *argv[])
                 gen.fields.at(idx).set_lut(opcodes, 11);
 
                 for (int i = 0; i < 32; i++) {
-                        std::cout << std::hex << gen.generate() << std::endl;
+                        instr = gen.generate();
+                        instr |= (i << 7);
+                        std::cout << std::hex << instr << std::endl;
+                        dut.set_instr(instr);
+                        dut.pulse();
+                        std::cout << "\trs1: " << dut.get_rs1() << std::endl;
+                        std::cout << "\trs2: " << dut.get_rs2() << std::endl;
+                        std::cout << "\trd: " << dut.get_rd() << std::endl;
+                        std::cout << "\timm: " << dut.get_imm() << std::endl;
                 }
         } catch (const std::runtime_error& e) {
                 std::cerr << "RUNTIME: " << e.what();

@@ -1,10 +1,13 @@
 #ifndef DEVICE_HPP
 #define DEVICE_HPP
 
-#include "Vdecoder.h"
+#include "Vtop.h"
+
+namespace sim
+{
 
 struct device {
-        Vdecoder* dut;
+        Vtop* dut;
 
         int cycles;
 
@@ -14,5 +17,7 @@ struct device {
         void pulse();
         void reset(int);
 };
+
+} // namespace sim
 
 #endif // DEVICE_HPP

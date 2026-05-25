@@ -24,7 +24,7 @@ obj_dir/Vtop__ALL.a: obj_dir/Vtop.mk
 
 # Compile TB
 
-SRC = sim/main.cpp sim/generator.cpp sim/field.cpp
+SRC = sim/main.cpp sim/generator.cpp sim/field.cpp sim/device.cpp sim/decoder.cpp
 OBJ = $(SRC:.cpp=.o)
 
 CXXFLAGS = -I$(VINC) -Isim/include -Iobj_dir -std=c++17
@@ -36,7 +36,9 @@ CXXFLAGS = -I$(VINC) -Isim/include -Iobj_dir -std=c++17
 # Link
 
 run: obj_dir/Vtop__ALL.a $(OBJ)
-	$(CXX) $^ $(VINC)/verilated.cpp $(VINC)/verilated_threads.cpp \
+	$(CXX) $(OBJ) obj_dir/Vtop__ALL.a \
+	       	$(VINC)/verilated.cpp \
+		$(VINC)/verilated_threads.cpp \
 	       -lpthread -o $@
 
 
