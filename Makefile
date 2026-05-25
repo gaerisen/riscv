@@ -1,5 +1,7 @@
 TARGET ?= top
 
+SOURCES := pkg/rv32.sv rtl/$(TARGET).sv
+
 VERILATOR_ROOT ?= $(shell verilator --getenv VERILATOR_ROOT)
 VINC = $(VERILATOR_ROOT)/include
 
@@ -8,11 +10,16 @@ all: run
 
 # Compile RTL
 
-obj_dir/V$(TARGET).mk:
-	verilator --cc --threads 1 -Irtl rtl/top.sv --top-module $(TARGET) --Mdir obj_dir
+obj_dir/Vtop.mk:
+	verilator --cc -Irtl \
+		--top-module $(TARGET) \
+		--prefix Vtop \
+		--Mdir obj_dir \
+		-y rtl/ \
+		$(SOURCES)
 
-obj_dir/V$(TARGET)__ALL.a: obj_dir/V$(TARGET).mk
-	make -C obj_dir -j$(nproc) -f V$(TARGET).mk
+obj_dir/Vtop__ALL.a: obj_dir/Vtop.mk
+	make -C obj_dir -j$(nproc) -f Vtop.mk
 
 
 # Compile TB
@@ -28,7 +35,7 @@ CXXFLAGS = -I$(VINC) -Isim/include -Iobj_dir -std=c++17
 
 # Link
 
-run: obj_dir/V$(TARGET)__ALL.a $(OBJ)
+run: obj_dir/Vtop__ALL.a $(OBJ)
 	$(CXX) $^ $(VINC)/verilated.cpp $(VINC)/verilated_threads.cpp \
 	       -lpthread -o $@
 
