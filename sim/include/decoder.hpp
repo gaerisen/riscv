@@ -24,4 +24,12 @@ struct decoder : public device {
 
 } // namespace sim
 
+int get_i_imm(int);
+int get_s_imm(int);
+int get_b_imm(int);
+int get_u_imm(int);
+int get_j_imm(int);
+
+void run_tests(struct sim::decoder&);
+
 #endif // DECODER_HPP
