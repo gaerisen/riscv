@@ -30,6 +30,6 @@ int get_b_imm(int);
 int get_u_imm(int);
 int get_j_imm(int);
 
-void run_tests(struct sim::decoder&);
+void run_decoder_tests(struct sim::decoder&);
 
 #endif // DECODER_HPP

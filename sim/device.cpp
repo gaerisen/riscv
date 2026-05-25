@@ -19,11 +19,11 @@ device::~device()
 
 void device::pulse()
 {
-        dut->clk = 1;
+        dut->clk = 0;
         ctx->timeInc(1);
         dut->eval();
 
-        dut->clk = 0;
+        dut->clk = 1;
         ctx->timeInc(1);
         dut->eval();
 

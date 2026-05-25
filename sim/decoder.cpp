@@ -15,9 +15,7 @@ decoder::decoder(std::shared_ptr<VerilatedContext> ctx):
 }
 
 decoder::~decoder()
-{
-        dut->final();
-}
+{}
 
 void decoder::stall(int n)
 {
@@ -122,7 +120,7 @@ int get_j_imm(int i)
         return imm;
 }
 
-void run_tests(struct sim::decoder& dut)
+void run_decoder_tests(struct sim::decoder& dut)
 {
         struct sim::generator r_gen;
         struct sim::generator i_gen;

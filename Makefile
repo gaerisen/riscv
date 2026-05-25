@@ -21,16 +21,16 @@ obj_dir/Vtop.mk: $(RTL_SRC)
 		$(RTL_SRC)
 
 obj_dir/Vtop__ALL.a: obj_dir/Vtop.mk
-	make -C obj_dir -j$(nproc) -f Vtop.mk
+	make -C obj_dir -j$(shell nproc) -f Vtop.mk
 
 
 # Compile TB
 
 TB_SRC = sim/main.cpp \
-	 sim/generator.cpp \
 	 sim/field.cpp \
+	 sim/generator.cpp \
 	 sim/device.cpp \
-	 sim/decoder.cpp
+	 sim/$(TARGET).cpp
 
 TB_OBJ = $(TB_SRC:.cpp=.o)
 

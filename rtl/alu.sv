@@ -24,6 +24,12 @@ logic [31:0] in2;
 logic [31:0] result_next;
 logic branch_next;
 
+initial
+begin
+        $dumpfile("alu.vcd");
+        $dumpvars(0, alu);
+end
+
 always_comb
 begin
         unique case(ctrl_i.alu_src1)
@@ -49,8 +55,8 @@ begin
                 endcase
         end
         SLL: result_next = in1 << in2;
-        SLT: result_next = $signed(in1) < $signed(in2);
-        SLTU: result_next = in1 < in2;
+        SLT: result_next = {31'b0, $signed(in1) < $signed(in2)};
+        SLTU: result_next = {31'b0, in1 < in2};
         XOR: result_next = in1 ^ in2;
         SR: begin
                 unique case(ctrl_i.alu_alt)
