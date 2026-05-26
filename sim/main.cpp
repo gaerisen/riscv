@@ -4,19 +4,19 @@
 #include <cstdlib>
 #include <ctime>
 
-#include "alu.hpp"
+#include "decoder.hpp"
 
 int main(int argc, char *argv[])
 {
         auto ctx = std::make_shared<VerilatedContext>();
         ctx->traceEverOn(true);
 
-        struct sim::alu dut(ctx);
+        struct sim::decoder dut(ctx);
         srand(time(0));
 
         try {
 
-                dut.run_tests(1000);
+                dut.run_tests(32);
 
         } catch (const std::runtime_error& e) {
                 std::cerr << "RUNTIME: " << e.what();

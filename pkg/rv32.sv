@@ -149,12 +149,12 @@ package rv32;
         } ctrl_t;
 
         typedef struct packed {
-                logic illegal,
-                logic ecall,
-                logic ebreak,
-                logic mret,
-                logic sret,
-                logic wfi
+                logic illegal;
+                logic ecall;
+                logic ebreak;
+                logic mret;
+                logic sret;
+                logic wfi;
         } system_t;
 
 endpackage: rv32

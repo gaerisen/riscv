@@ -16,10 +16,14 @@ struct decoder : public device {
 
         void set_instr(unsigned int i) { dut->instr_i = i; }
 
-        unsigned int get_rs1() { return dut->rs1_o; }
-        unsigned int get_rs2() { return dut->rs2_o; }
-        unsigned int get_rd() { return dut->rd_o; }
-        unsigned int get_imm() { return dut->imm_o; }
+        int get_rs1() { return dut->rs1_o; }
+        int get_rs2() { return dut->rs2_o; }
+        int get_rd() { return dut->rd_o; }
+        int get_imm() { return dut->imm_o; }
+        int get_ctrl() { return dut->ctrl_o; }
+        int get_system() { return dut->system_o; }
+
+        void run_tests(int);
 };
 
 } // namespace sim
@@ -29,7 +33,5 @@ int get_s_imm(int);
 int get_b_imm(int);
 int get_u_imm(int);
 int get_j_imm(int);
-
-void run_decoder_tests(struct sim::decoder&);
 
 #endif // DECODER_HPP

@@ -14,6 +14,8 @@ import rv32::*;
         output logic [31:0] imm_o,
         output logic [4:0] rd_o,
 
+        output system_t system_o,
+
         output ctrl_t ctrl_o
 );
 
@@ -22,6 +24,7 @@ logic [4:0] rs1_next;
 logic [4:0] rs2_next;
 logic [31:0] imm_next;
 logic [4:0] rd_next;
+system_t system_next;
 ctrl_t ctrl_next;
 
 // Pack raw instruction into union struct
@@ -32,8 +35,11 @@ assign rs1_next = instr.r.rs1;
 assign rs2_next = instr.r.rs2;
 assign rd_next = instr.r.rd;
 
-// Extract opcode
-assign ctrl_next.opcode = opcode_e'(instr.r.opcode);
+initial
+begin
+        $dumpfile("decoder.vcd");
+        $dumpvars(0, decoder);
+end
 
 // Combinational decode step
 always_comb
@@ -50,10 +56,19 @@ begin
         ctrl_next.wb = 0;
         ctrl_next.wb_src = ALU;
         ctrl_next.branch_op = BEQ;
-        ctrl_next.load_op = LW;
-        ctrl_next.store_op = SW;
+        ctrl_next.load_op = LB;
+        ctrl_next.store_op = SB;
+        system_next.illegal = 0;
+        system_next.ecall = 0;
+        system_next.ebreak = 0;
+        system_next.mret = 0;
+        system_next.sret = 0;
+        system_next.wfi = 0;
 
-        unique case (opcode_e'(instr.r.opcode))
+        unique0 case (opcode_e'(instr.r.opcode)) // unique0 flags down instances
+                                                // of multiple cases, but allows
+                                                // for 0, allowing our illegal
+                                                // fallback set above
                 LUI: begin
                         imm_next[31:12] = instr.u.imm31_12;
                         
@@ -104,6 +119,9 @@ begin
 
                         ctrl_next.wb = 1;
                         ctrl_next.wb_src = PC4;
+
+                        if (instr.i.funct3 != 3'b000)
+                                system_next.illegal = 1;
                 end
 
                 BRANCH: begin
@@ -118,6 +136,9 @@ begin
 
                         ctrl_next.branch = 1;
                         ctrl_next.branch_op = branch_funct3_e'(instr.b.funct3);
+
+                        if (instr.b.funct3[2:1] == 2'b01)
+                                system_next.illegal = 1;
                 end
 
                 LOAD: begin
@@ -130,6 +151,13 @@ begin
 
                         ctrl_next.load = 1;
                         ctrl_next.load_op = load_funct3_e'(instr.i.funct3);
+
+                        ctrl_next.wb = 1;
+                        ctrl_next.wb_src = MEM;
+
+                        if (instr.i.funct3 == 3'b011 |
+                                instr.i.funct3[2:1] == 2'b11)
+                                system_next.illegal = 1;
                 end
 
                 STORE: begin
@@ -144,8 +172,8 @@ begin
                         ctrl_next.store = 1;
                         ctrl_next.store_op = store_funct3_e'(instr.s.funct3);
 
-                        ctrl_next.wb = 1;
-                        ctrl_next.wb_src = MEM;
+                        if (instr.s.funct3[2] | instr.s.funct3[1:0] == 2'b11)
+                                system_next.illegal = 1;
                 end
 
                 ALUI: begin
@@ -169,8 +197,34 @@ begin
                         ctrl_next.wb_src = ALU;
                 end
 
-                FENCE:;         // Single-core system; leaving as NOP for now
-                SYSTEM:;        // TODO: Add ctrl signalling
+                FENCE: begin    // TODO: Make this not NOP
+                        if (instr.i.funct3 != 0)
+                                system_next.illegal = 1;
+                end
+
+                SYSTEM: begin   // TODO: Add Zicsr support
+                        if (instr.r.funct3 != 0 |
+                                instr.r.rd != 0 |
+                                instr.r.rs1 != 0)
+                                system_next.illegal = 1;
+
+                        if (instr.r.rs2 == 0 & instr.r.funct7 == 0)
+                                system_next.ecall = 1;
+                        else if (instr.r.rs2 == 1 & instr.r.funct7 == 0)
+                                system_next.ebreak = 1;
+                        else if (instr.r.rs2 == 2 & instr.r.funct7 == 8)
+                                system_next.mret = 1;
+                        else if (instr.r.rs2 == 2 & instr.r.funct7 == 24)
+                                system_next.sret = 1;
+                        else if (instr.r.rs2 == 5 & instr.r.funct7 == 8)
+                                system_next.wfi = 1;
+                        else
+                                system_next.illegal = 1;
+                end
+
+                default:
+                        system_next.illegal = 1; // ctrl word is NOP via starter logic
+                                        // above case
         endcase // instr.r.opcode
 end
 
@@ -178,14 +232,15 @@ end
 always_ff @(posedge clk or posedge rst)
 begin
         if (rst | flush) begin
-                ctrl_o.opcode <= ALUI;
                 ctrl_o.alu_op <= ADDSUB;
+                system_o <= 0;
                 rs1_o <= 0;
                 rs2_o <= 0;
                 imm_o <= 0;
                 rd_o <= 0;
         end else if (~stall) begin
                 ctrl_o <= ctrl_next;
+                system_o <= system_next;
                 rs1_o <= rs1_next;
                 rs2_o <= rs2_next;
                 imm_o <= imm_next;

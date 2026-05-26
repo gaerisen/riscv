@@ -187,24 +187,24 @@ void alu::run_tests(int cycles)
 
                 std::cout << std::endl;
 
-                dut->ctrl_i = ctrl;
-                dut->rs1_value = rs1;
-                dut->rs2_value = rs2;
-                dut->imm = imm;
-                dut->pc = pc;
+                set_ctrl(ctrl);
+                set_rs1val(rs1);
+                set_rs2val(rs2);
+                set_imm(imm);
+                set_pc(pc);
 
                 pulse();
                 
-                if (expected != dut->result_o) {
-                        std::cout << "ALU gave " << dut->result_o
+                if (expected != get_result()) {
+                        std::cout << "ALU gave " << get_result()
                                 << "; expected " << expected << std::endl;
 
                 }
                 else
                         std::cout << "ALU passed." << std::endl;
 
-                if (expected_branch != dut->branch_o)
-                        std::cout << "Branch gave " << dut->branch_o
+                if (expected_branch != get_branch())
+                        std::cout << "Branch gave " << get_branch();
                                 << "; expected " << expected_branch << std::endl;
                 else
                         std::cout << "Branch passed." << std::endl;

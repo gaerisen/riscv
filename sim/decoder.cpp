@@ -3,8 +3,48 @@
 #include <iostream>
 #include <iomanip>
 
+// Instruction parsing macros
+#define opcode(x) (x & 0b1111111)
+#define rd(x) ((x & (0b11111 << 7)) >> 7)
+#define f3(x) ((x & (0b111 << 12)) >> 12)
+#define rs1(x) ((x & (0b11111 << 15)) >> 15)
+#define rs2(x) ((x & (0b11111 << 20)) >> 20)
+#define f7(x) ((x & (0b1111111 << 25)) >> 25)
+
+// Ctrl word parsing macros
+#define op(x) ((x & (0b11111 << 24)) >> 24)
+#define src1(x) ((x & (0b11 << 22)) >> 22)
+#define src2(x) ((x & (0b1 << 21)) >> 21)
+#define af3(x) ((x & (0b111 << 16)) >> 16)
+#define bf3(x) ((x & (0b111 << 13)) >> 13)
+#define lf3(x) ((x & (0b111 << 10)) >> 10)
+#define sf3(x) ((x & (0b111 << 7)) >> 7)
+#define f7_ctrl(x) ((x & (0b1 << 5)) >> 5)
+
+// System word parsing macros
+#define illegal(x) ((x & 0b100000) >> 5)
+#define ecall(x) ((x & 0b10000) >> 4)
+#define ebreak(x) ((x & 0b1000) >> 3)
+#define mret(x) ((x & 0b100) >> 2)
+#define sret(x) ((x & 0b10) >> 1)
+#define wfi(x) (x & 0b1)
+
 namespace sim
 {
+
+int opcodes[] = {
+        0b01101, // lui
+        0b00101, // auipc
+        0b11011, // jal
+        0b11001, // jalr
+        0b11000, // branch
+        0b00000, // load
+        0b01000, // store
+        0b00100, // alui
+        0b01100, // alur
+        0b00011, // fence 
+        0b11100  // system
+};
 
 decoder::decoder(std::shared_ptr<VerilatedContext> ctx):
         device(ctx)
@@ -43,18 +83,187 @@ void decoder::flush(int n)
         return;
 }
 
-} // namespace sim
-  //
-int i_ops[] = {
-        0b11001, // jalr
-        0b00000, // load
-        0b00100, // alui
-};
+// Feeds the decoder `cycles` randomly generated instructions (with valid
+// opcodes) and warns the user of any mismatches between the RTL's result and
+// the result of the model contained in the function
+void decoder::run_tests(int cycles)
+{
+        struct sim::generator gen;
+        unsigned int instr;
 
-int u_ops[] = {
-        0b01101, // lui
-        0b00101, // auipc
-};
+        gen.add_field(1, 0, 3);
+        gen.add_field(6, 2, opcodes, 11);
+        gen.add_field(11, 7, 0, 31);
+        gen.add_field(14, 12, 0, 7);
+        gen.add_field(19, 15, 0, 31);
+        gen.add_field(24, 20, 0, 31);
+        gen.add_field(31, 25, 0);
+
+        reset(5);
+
+        std::cout << "=== Begin Decoder Test ===" << std::endl;
+
+        for (int i = 0; i < cycles; i++) {
+                instr = gen.generate();
+
+                std::cout << "Test #" << i+1 << ": " << std::hex << instr <<
+                        " - ";
+
+                int op = 0b00001;
+                int in1 = 0, in2 = 1, wb = 0;
+                int af3 = 0, bf3 = 0, lf3 = 0, sf3 = 0, f7 = 0;
+                int illegal = 0, ecall = 0, ebreak = 0, mret = 0, sret = 0, wfi = 0;
+                int rs1 = rs1(instr), rs2 = rs2(instr), rd = rd(instr);
+                int imm = 0;
+
+                switch(opcode(instr)) {
+                case 0b0110111: 
+                        std::cout << "lui";
+                        op = 0b00001;
+                        imm = get_u_imm(instr);
+                        break;
+                case 0b0010111: 
+                        std::cout << "auipc";
+                        op = 0b00001;
+                        in1 = 2;
+                        imm = get_u_imm(instr);
+                        break;
+                case 0b1101111: 
+                        std::cout << "jal";
+                        op = 0b01001;
+                        in1 = 2; wb = 2;
+                        imm = get_j_imm(instr);
+                        break;
+                case 0b1100111: 
+                        std::cout << "jalr";
+                        op = 0b01001;
+                        in1 = 1; wb = 2;
+                        if (f3(instr) != 0)
+                                illegal = 1;
+                        imm = get_i_imm(instr);
+                        break;
+                case 0b1100011: 
+                        std::cout << "branch";
+                        op = 0b10000;
+                        in1 = 2; in2 = 1;
+                        bf3 = f3(instr);
+                        if (bf3 == 2 || bf3 == 3)
+                                illegal = 1;
+                        imm = get_b_imm(instr);
+                        break;
+                case 0b0000011: 
+                        std::cout << "load";
+                        op = 0b00101;
+                        in1 = 1; wb = 1;
+                        lf3 = f3(instr);
+                        if (lf3 == 3 || lf3 > 5)
+                                illegal = 1;
+                        imm = get_i_imm(instr);
+                        break;
+                case 0b0100011: 
+                        std::cout << "store";
+                        op = 0b00010;
+                        in1 = 1;
+                        sf3 = f3(instr);
+                        if (sf3 > 2)
+                                illegal = 1;
+                        imm = get_s_imm(instr);
+                        break;
+                case 0b0010011: 
+                        std::cout << "alui";
+                        op = 0b00001;
+                        in1 = 1;
+                        af3 = f3(instr);
+                        imm = get_i_imm(instr);
+                        break;
+                case 0b0110011: 
+                        std::cout << "alur";
+                        op = 0b00001;
+                        in1 = 1; in2 = 0;
+                        af3 = f3(instr);
+                        break;
+                case 0b0001111: 
+                        std::cout << "fence";
+                        op = 0b00000;
+                        if (f3(instr) != 0)
+                                illegal = 1;
+                        break;
+                case 0b1110011: 
+                        std::cout << "system";
+                        op = 0b00000;
+                        if (f3(instr) != 0)
+                                illegal = 1;
+                        break;
+                default:
+                        throw std::runtime_error("Bad opcode");
+                }
+
+                std::cout << "\n\t";
+
+                set_instr(instr);
+                pulse();
+
+                // Control word checks
+                if (op(get_ctrl()) != op)
+                        std::cout << "op failed: " << op(get_ctrl()) << " " << op
+                                << "\n\t";
+
+                if (af3(get_ctrl()) != af3)
+                        std::cout << "af3 failed: " << af3(get_ctrl()) << " " << af3
+                                << "\n\t";
+
+                if (bf3(get_ctrl()) != bf3)
+                        std::cout << "bf3 failed: " << bf3(get_ctrl()) << " " << bf3
+                                << "\n\t";
+
+                if (lf3(get_ctrl()) != lf3)
+                        std::cout << "lf3 failed: " << lf3(get_ctrl()) << " " << lf3
+                                << "\n\t";
+
+                if (sf3(get_ctrl()) != sf3)
+                        std::cout << "sf3 failed: " << sf3(get_ctrl()) << " " << sf3
+                                << "\n\t";
+
+                if (src1(get_ctrl()) != in1)
+                        std::cout << "in1 failed: " << src1(get_ctrl()) << " " << in1
+                                << "\n\t";
+
+                if (src2(get_ctrl()) != in2)
+                        std::cout << "in2 failed: " << src2(get_ctrl()) << " " << in2
+                                << "\n\t";
+
+                // System word checks
+                if (illegal(get_system()) != illegal)
+                        std::cout << "illegal failed: " << illegal(get_system()) << " " << illegal
+                                << "\n\t";
+
+                // Operand checks
+                if (get_imm() != imm)
+                        std::cout << "imm failed: " << get_imm() << " " << imm
+                                << "\n\t";
+
+                if (get_rs1() != rs1)
+                        std::cout << "rs1 failed: " << get_rs1() << " " << rs1
+                                << "\n\t";
+
+                if (get_rs2() != rs2)
+                        std::cout << "rs2 failed: " << get_rs2() << " " << rs2
+                                << "\n\t";
+
+                if (get_rd() != rd)
+                        std::cout << "rd failed: " << get_rd() << " " << rd
+                                << "\n\t";
+
+
+                std::cout << std::dec << std::endl;
+        }
+
+        std::cout << "=== Testing Complete ===" << std::endl;
+        
+        return;
+}
+
+} // namespace sim
 
 int get_i_imm(int i)
 {
@@ -120,211 +329,3 @@ int get_j_imm(int i)
         return imm;
 }
 
-void run_decoder_tests(struct sim::decoder& dut)
-{
-        struct sim::generator r_gen;
-        struct sim::generator i_gen;
-        struct sim::generator s_gen;
-        struct sim::generator b_gen;
-        struct sim::generator u_gen;
-        struct sim::generator j_gen;
-
-        unsigned int instr;
-
-        unsigned int rs1_mask = 31 << 15;
-        unsigned int rs2_mask = 31 << 20;
-        unsigned int rd_mask = 31 << 7;
-
-        r_gen.add_field(2, 0, 0b11);
-        r_gen.add_field(6, 2, 0b01100);
-        r_gen.add_field(11, 7, 0, 31);
-        r_gen.add_field(19, 15, 0, 31);
-        r_gen.add_field(24, 20, 0, 31);
-
-        dut.reset(5);
-
-        std::cout << "=== R-type ===" << std::endl;
-
-        for (int i = 0; i < 32; i++) {
-                instr = r_gen.generate();
-
-                std::cout << std::hex << instr << std::endl;
-
-                dut.set_instr(instr);
-                dut.pulse();
-
-                if ((rs1_mask & instr) >> 15 != dut.get_rs1()) {
-                        std::cout << "\trs1: " << ((rs1_mask & instr) >> 15);
-                        std::cout << "\t" << dut.get_rs1() << std::endl;
-                }
-
-                if ((rs2_mask & instr) >> 20 != dut.get_rs2()) {
-                        std::cout << "\trs2: " << ((rs2_mask & instr) >> 20);
-                        std::cout << "\t" << dut.get_rs2() << std::endl;
-                }
-
-                if ((rd_mask & instr) >> 7 != dut.get_rd()) {
-                        std::cout << "\trd: " << ((rd_mask & instr) >> 7);
-                        std::cout << "\t" << dut.get_rd() << std::endl;
-                }
-        }
-
-        i_gen.add_field(2, 0, 0b11);
-        i_gen.add_field(6, 2, i_ops, 3);
-        i_gen.add_field(11, 7, 0, 31);
-        i_gen.add_field(19, 15, 0, 31);
-        i_gen.add_field(31, 20, 0, 4095);
-
-        dut.reset(5);
-
-        std::cout << "\n=== I-type ===" << std::endl;
-
-        for (int i = 0; i < 32; i++) {
-                instr = i_gen.generate();
-
-                std::cout << std::hex << instr << std::endl;
-
-                dut.set_instr(instr);
-                dut.pulse();
-
-                if ((rs1_mask & instr) >> 15 != dut.get_rs1()) {
-                        std::cout << "\trs1: " << ((rs1_mask & instr) >> 15);
-                        std::cout << "\t" << dut.get_rs1() << std::endl;
-                }
-
-                if ((rd_mask & instr) >> 7 != dut.get_rd()) {
-                        std::cout << "\trd: " << ((rd_mask & instr) >> 7);
-                        std::cout << "\t" << dut.get_rd() << std::endl;
-                }
-
-                if (get_i_imm(instr) != dut.get_imm()) {
-                        std::cout << "\timm: " << get_i_imm(instr);
-                        std::cout << "\t" << dut.get_imm() << std::endl;
-                }
-        }
-
-        s_gen.add_field(2, 0, 0b11);
-        s_gen.add_field(6, 2, 0b01000);
-        s_gen.add_field(11, 7, 0, 31);
-        s_gen.add_field(19, 15, 0, 31);
-        s_gen.add_field(24, 20, 0, 31);
-        s_gen.add_field(31, 25, 0, 127);
-
-        dut.reset(5);
-        std::cout << "\n=== S-type ===" << std::endl;
-
-        for (int i = 0; i < 32; i++) {
-                instr = s_gen.generate();
-
-                std::cout << std::hex << instr << std::endl;
-
-                dut.set_instr(instr);
-                dut.pulse();
-
-                if ((rs1_mask & instr) >> 15 != dut.get_rs1()) {
-                        std::cout << "\trs1: " << ((rs1_mask & instr) >> 15);
-                        std::cout << "\t" << dut.get_rs1() << std::endl;
-                }
-
-                if ((rs2_mask & instr) >> 20 != dut.get_rs2()) {
-                        std::cout << "\trs2: " << ((rs2_mask & instr) >> 20);
-                        std::cout << "\t" << dut.get_rs2() << std::endl;
-                }
-
-                if (get_s_imm(instr) != dut.get_imm()) {
-                        std::cout << "\timm: " << get_s_imm(instr);
-                        std::cout << "\t" << dut.get_imm() << std::endl;
-                }
-        }
-
-
-        u_gen.add_field(2, 0, 0b11);
-        u_gen.add_field(6, 2, u_ops, 2);
-        u_gen.add_field(11, 7, 0, 31);
-        u_gen.add_field(31, 12, 0, 1048575);
-
-        dut.reset(5);
-        std::cout << "\n=== U-type ===" << std::endl;
-
-        for (int i = 0; i < 32; i++) {
-                instr = u_gen.generate();
-
-                std::cout << std::hex << instr << std::endl;
-
-                dut.set_instr(instr);
-                dut.pulse();
-
-                if ((rd_mask & instr) >> 7 != dut.get_rd()) {
-                        std::cout << "\trd: " << ((rd_mask & instr) >> 7);
-                        std::cout << "\t" << dut.get_rd() << std::endl;
-                }
-
-                if (get_u_imm(instr) != dut.get_imm()) {
-                        std::cout << "\timm: " << get_u_imm(instr);
-                        std::cout << "\t" << dut.get_imm() << std::endl;
-                }
-        }
-
-        b_gen.add_field(2, 0, 0b11);
-        b_gen.add_field(6, 2, 0b11000);
-        b_gen.add_field(11, 7, 0, 31);
-        b_gen.add_field(19, 15, 0, 31);
-        b_gen.add_field(24, 20, 0, 31);
-        b_gen.add_field(31, 25, 0, 127);
-
-        dut.reset(5);
-        std::cout << "\n=== B-type ===" << std::endl;
-
-        for (int i = 0; i < 32; i++) {
-                instr = b_gen.generate();
-
-                std::cout << std::hex << instr << std::endl;
-
-                dut.set_instr(instr);
-                dut.pulse();
-
-                if ((rs1_mask & instr) >> 15 != dut.get_rs1()) {
-                        std::cout << "\trs1: " << ((rs1_mask & instr) >> 15);
-                        std::cout << "\t" << dut.get_rs1() << std::endl;
-                }
-
-                if ((rs2_mask & instr) >> 20 != dut.get_rs2()) {
-                        std::cout << "\trs2: " << ((rs2_mask & instr) >> 20);
-                        std::cout << "\t" << dut.get_rs2() << std::endl;
-                }
-
-                if (get_b_imm(instr) != dut.get_imm()) {
-                        std::cout << "\timm: " << get_b_imm(instr);
-                        std::cout << "\t" << dut.get_imm() << std::endl;
-                }
-        }
-
-        j_gen.add_field(2, 0, 0b11);
-        j_gen.add_field(6, 2, 0b11011);
-        j_gen.add_field(11, 7, 0, 31);
-        j_gen.add_field(31, 12, 0, 1048575);
-
-        dut.reset(5);
-        std::cout << "\n=== J-type ===" << std::endl;
-
-        for (int i = 0; i < 32; i++) {
-                instr = j_gen.generate();
-
-                std::cout << std::hex << instr << std::endl;
-
-                dut.set_instr(instr);
-                dut.pulse();
-
-                if ((rd_mask & instr) >> 7 != dut.get_rd()) {
-                        std::cout << "\trd: " << ((rd_mask & instr) >> 7);
-                        std::cout << "\t" << dut.get_rd() << std::endl;
-                }
-
-                if (get_j_imm(instr) != dut.get_imm()) {
-                        std::cout << "\timm: " << get_j_imm(instr);
-                        std::cout << "\t" << dut.get_imm() << std::endl;
-                }
-        }
-        
-        return;
-}
