@@ -97,7 +97,7 @@ void decoder::run_tests(int cycles)
         gen.add_field(14, 12, 0, 7);
         gen.add_field(19, 15, 0, 31);
         gen.add_field(24, 20, 0, 31);
-        gen.add_field(31, 25, 0);
+        gen.add_field(31, 25, 0, 127);
 
         reset(5);
 
@@ -188,10 +188,14 @@ void decoder::run_tests(int cycles)
                         if (f3(instr) != 0)
                                 illegal = 1;
                         break;
-                case 0b1110011: 
+                case 0b1110011: // Incomplete coverage of illegal cases
                         std::cout << "system";
                         op = 0b00000;
                         if (f3(instr) != 0)
+                                illegal = 1;
+                        if (rs1(instr) != 0)
+                                illegal = 1;
+                        if (rd(instr) != 0)
                                 illegal = 1;
                         break;
                 default:

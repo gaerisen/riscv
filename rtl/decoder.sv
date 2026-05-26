@@ -189,6 +189,10 @@ begin
                 end
 
                 ALUR: begin
+                        if (instr.r.funct7 != NORM |
+                                instr.r.funct7 != ALT)
+                                system_next.illegal = 1;
+
                         ctrl_next.alu_op = alu_funct3_e'(instr.i.funct3);
                         ctrl_next.alu_src1 = RS1;
                         ctrl_next.alu_src2 = RS2;
