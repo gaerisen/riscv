@@ -50,7 +50,7 @@ begin
 
         if (system_word.mret)
                 pc_next = mepc;
-
+        
         if (!i_data_ready)      // Stall until imem is ready
                 pc_next = pc_o;
 end
