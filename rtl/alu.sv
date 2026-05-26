@@ -27,7 +27,7 @@ logic branch_next;
 initial
 begin
         $dumpfile("alu.vcd");
-        $dumpvars(0, alu);
+        $dumpvars(1, alu);
 end
 
 always_comb
@@ -41,7 +41,7 @@ begin
 
         unique case(ctrl_i.alu_src2)
         RS2: in2 = rs2_value;
-        IMM: in2 = pc;
+        IMM: in2 = imm;
         default: in2 = 0;
         endcase
 
@@ -54,14 +54,14 @@ begin
                                                         // should actually do
                 endcase
         end
-        SLL: result_next = in1 << in2;
+        SLL: result_next = in1 << in2[4:0];
         SLT: result_next = {31'b0, $signed(in1) < $signed(in2)};
         SLTU: result_next = {31'b0, in1 < in2};
         XOR: result_next = in1 ^ in2;
         SR: begin
                 unique case(ctrl_i.alu_alt)
-                        ALT: result_next = in1 >>> in2;
-                        NORM: result_next = in1 >> in2;
+                        ALT: result_next = $signed(in1) >>> in2[4:0];
+                        NORM: result_next = in1 >> in2[4:0];
                         default: result_next = 0; // TODO: figure out what this
                                                         // should actually do
                 endcase

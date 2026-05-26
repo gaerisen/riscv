@@ -16,7 +16,7 @@ int main(int argc, char *argv[])
 
         try {
 
-                dut.run_tests();
+                dut.run_tests(1000);
 
         } catch (const std::runtime_error& e) {
                 std::cerr << "RUNTIME: " << e.what();

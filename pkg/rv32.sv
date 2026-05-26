@@ -51,20 +51,20 @@ package rv32;
         /*              SOURCE ENUMS                                          */
         /*====================================================================*/
         typedef enum logic [1:0] {
-                RS1,
-                PC,
-                ZERO
+                ZERO    = 2'b00,
+                RS1     = 2'b01,
+                PC      = 2'b10
         } alu_src1_e;
 
         typedef enum logic {
-                RS2,
-                IMM
+                RS2     = 1'b0,
+                IMM     = 1'b1
         } alu_src2_e;
 
         typedef enum logic [1:0] {
-                ALU,
-                MEM,
-                PC4
+                ALU     = 2'b00,
+                MEM     = 2'b01,
+                PC4     = 2'b10
         } wb_src_e;
 
         /*====================================================================*/
@@ -130,26 +130,31 @@ package rv32;
         /*              DECODED INSTRUCTION TYPEDEF                           */
         /*====================================================================*/
         typedef struct packed {
-                opcode_e opcode;
+                logic branch;
+                logic jump;
+                logic load;
+                logic store;
+                logic wb;
 
-                alu_funct3_e alu_op;
-                alu_funct7_e alu_alt;
                 alu_src1_e alu_src1;
                 alu_src2_e alu_src2;
+                wb_src_e wb_src;
 
-                logic branch;
+                alu_funct3_e alu_op;
                 branch_funct3_e branch_op;
-
-                logic jump;
-
-                logic load;
                 load_funct3_e load_op;
-
-                logic store;
                 store_funct3_e store_op;
 
-                logic wb;
-                wb_src_e wb_src;
+                alu_funct7_e alu_alt;
         } ctrl_t;
+
+        typedef struct packed {
+                logic illegal,
+                logic ecall,
+                logic ebreak,
+                logic mret,
+                logic sret,
+                logic wfi
+        } system_t;
 
 endpackage: rv32

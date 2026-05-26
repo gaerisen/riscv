@@ -23,7 +23,7 @@ struct alu : public device {
         int get_result();
         bool get_branch();
 
-        void run_tests();
+        void run_tests(int);
 };
 
 } // namespace sim

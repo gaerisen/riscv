@@ -66,7 +66,7 @@ unsigned int field::generate()
                 }
                 return lut[rand() % lut_len];
         case RAND_RANGE:
-                return range_lo + (rand() % (range_hi - range_lo));
+                return range_lo + (rand() % (range_hi - range_lo + 1));
         case RAND_MASK:
                 return rand() | mask;
         default:
