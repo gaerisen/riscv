@@ -8,3 +8,4 @@ obj_dir/
 *.vcd
 main
 compile_commands.json
+logs/

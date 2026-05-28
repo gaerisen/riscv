@@ -17,6 +17,8 @@ int main(int argc, char *argv[])
 
                 dut.run_tests(1000);
 
+                ctx->coveragep()->write("logs/coverage.dat");
+
         } catch (const std::runtime_error& e) {
                 std::cerr << "RUNTIME: " << e.what();
                 return 1;

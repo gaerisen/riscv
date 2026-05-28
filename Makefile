@@ -18,6 +18,7 @@ obj_dir/Vtop.mk: $(RTL_SRC)
 		-y rtl/ \
 		--trace \
 		--report-unoptflat \
+		--coverage \
 		$(RTL_SRC)
 
 obj_dir/Vtop__ALL.a: obj_dir/Vtop.mk
@@ -45,6 +46,7 @@ main: obj_dir/Vtop__ALL.a $(TB_OBJ)
 	       	$(VINC)/verilated.cpp \
 		$(VINC)/verilated_threads.cpp \
 		$(VINC)/verilated_vcd_c.cpp \
+		$(VINC)/verilated_cov.cpp \
 	       -lpthread -o $@
 
 
