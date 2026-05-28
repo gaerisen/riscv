@@ -1,17 +1,16 @@
 #include <verilated.h>
 #include <iostream>
-#include <iomanip>
 #include <cstdlib>
 #include <ctime>
 
-#include "decoder.hpp"
+#include "fetch.hpp"
 
 int main(int argc, char *argv[])
 {
         auto ctx = std::make_shared<VerilatedContext>();
         ctx->traceEverOn(true);
 
-        struct sim::decoder dut(ctx);
+        struct sim::fetch dut(ctx);
         srand(time(0));
 
         try {

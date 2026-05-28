@@ -12,9 +12,9 @@ import rv32::*;
         output logic [31:0] i_addr,
 
         // Jump/branch signals
-        input ctrl_t ctrl_word,
+        input jump,
+        input branch,
         input [31:0] alu_result,
-        input branch_result,
 
         // System control signals
         input system_t system_word,
@@ -39,13 +39,13 @@ begin
         instr_next = i_data_i;
         valid_next = i_data_ready;
 
-        if (ctrl_word.branch & branch_result)
+        if (branch)
                 pc_next = alu_result;
 
-        if (ctrl_word.jump)
+        if (jump)
                 pc_next = alu_result;
 
-        if (system_word.ecall | system_word.breakpoint | system_word.illegal)
+        if (system_word.ecall | system_word.ebreak | system_word.illegal)
                 pc_next = mtvec;
 
         if (system_word.mret)

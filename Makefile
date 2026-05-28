@@ -36,7 +36,7 @@ TB_OBJ = $(TB_SRC:.cpp=.o)
 
 CXXFLAGS = -I$(VINC) -Isim/include -Iobj_dir -std=c++17
 
-$(TB_OBJ): $(TB_SRC)
+$(TB_OBJ): $(TB_SRC) obj_dir/Vtop.mk
 
 # Link
 
