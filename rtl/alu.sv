@@ -32,17 +32,19 @@ end
 
 always_comb
 begin
+        in1 = RS1;
+        result_next = 0;
+        branch_next = 0;
+
         unique case(ctrl_i.alu_src1)
         RS1: in1 = rs1_value;
         PC: in1 = pc;
         ZERO: in1 = 0;
-        default: in1 = 0;
         endcase
 
         unique case(ctrl_i.alu_src2)
         RS2: in2 = rs2_value;
         IMM: in2 = imm;
-        default: in2 = 0;
         endcase
 
         unique case(ctrl_i.alu_op)
@@ -50,8 +52,6 @@ begin
                 unique case(ctrl_i.alu_alt)
                         ALT: result_next = in1 - in2;
                         NORM: result_next = in1 + in2;
-                        default: result_next = 0; // TODO: figure out what this
-                                                        // should actually do
                 endcase
         end
         SLL: result_next = in1 << in2[4:0];
@@ -60,15 +60,12 @@ begin
         XOR: result_next = in1 ^ in2;
         SR: begin
                 unique case(ctrl_i.alu_alt)
-                        ALT: result_next = $signed(in1) >>> in2[4:0];
+                        ALT: result_next = $unsigned($signed(in1) >>> in2[4:0]);
                         NORM: result_next = in1 >> in2[4:0];
-                        default: result_next = 0; // TODO: figure out what this
-                                                        // should actually do
                 endcase
         end
         OR: result_next = in1 | in2;
         AND: result_next = in1 & in2;
-        default: result_next = 0;
         endcase
 
         unique case(ctrl_i.branch_op)
@@ -92,4 +89,4 @@ begin
         end
 end
 
-endmodule;
+endmodule
