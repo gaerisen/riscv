@@ -19,12 +19,16 @@ struct fetch : public device {
         void set_i_data_i(int);
 
         void set_branch(bool);
+        void set_branch_taken(bool);
         void set_jump(bool);
         void set_system(int);
 
         void set_alu_result(int);
         void set_mtvec(int);
         void set_mepc(int);
+
+        void set_pc_dec(int in);
+        void set_pc_exe(int in);
 
         void run_tests(int);
 };

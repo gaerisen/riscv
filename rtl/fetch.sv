@@ -56,6 +56,8 @@ logic [31:0] instr_next;
 logic valid_next;
 logic flush_next;
 
+logic imem_stalling;
+
 // Prediction signals
 logic inst_is_jump;
 logic inst_is_jalr;
@@ -190,7 +192,7 @@ begin
         STREAMING: begin
                 // Entry point for all redirects; if imem isn't ready, hold
                 // i_addr at the redirect vector
-                if (~i_data_ready) begin
+                if (imem_stalling) begin
                         pc_next = pc_o;
                 end
 
@@ -293,7 +295,7 @@ end
 always_ff @(posedge clk or posedge rst)
 begin
         if (rst) begin
-                pc_o <= -4;
+                pc_o <= 0;
                 instr_o <= 0;
                 valid_o <= 0;
                 flush_o <= 0;
@@ -308,6 +310,8 @@ begin
 
                 state <= state_next;
         end
+
+        imem_stalling <= ~i_data_ready;
 end
 
 endmodule // fetch

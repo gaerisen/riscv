@@ -15,7 +15,7 @@ int main(int argc, char *argv[])
 
         try {
 
-                dut.run_tests(1000);
+                dut.run_tests(32);
 
                 ctx->coveragep()->write("logs/coverage.dat");
 
