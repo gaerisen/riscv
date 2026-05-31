@@ -11,9 +11,11 @@ struct fetch : public device {
         fetch(std::shared_ptr<VerilatedContext> ctx);
         ~fetch();
 
+        int get_i_addr();
         int get_pc();
         int get_instr();
         bool get_valid();
+        bool get_flush();
 
         void set_i_data_ready(int);
         void set_i_data_i(int);
@@ -30,7 +32,7 @@ struct fetch : public device {
         void set_pc_dec(int in);
         void set_pc_exe(int in);
 
-        void run_tests(int);
+        int run_tests(int);
 };
 
 } // namespace sim

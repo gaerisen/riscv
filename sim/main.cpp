@@ -11,13 +11,24 @@ int main(int argc, char *argv[])
         ctx->traceEverOn(true);
 
         struct sim::fetch dut(ctx);
-        srand(time(0));
+
+        unsigned long long int seed;
+
+        seed = time(0);
+        srand(seed);
+        seed = rand();
+
+        std::cout << "Seed: " << seed << std::endl;
+        srand(seed);
 
         try {
-
-                dut.run_tests(32);
-
-                ctx->coveragep()->write("logs/coverage.dat");
+                int status;
+                
+                for (int i = 0; i < 1024; i++) {
+                        status = dut.run_tests(128);
+                        if (status != 0) break;
+                        srand(++seed);
+                }
 
         } catch (const std::runtime_error& e) {
                 std::cerr << "RUNTIME: " << e.what();

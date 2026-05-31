@@ -68,7 +68,7 @@ unsigned int field::generate()
         case RAND_RANGE:
                 return range_lo + (rand() % (range_hi - range_lo + 1));
         case RAND_MASK:
-                return rand() | mask;
+                return rand() & mask;
         default:
                 throw std::runtime_error(
                                 "Attempted to generate a field with undefined"

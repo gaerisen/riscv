@@ -1,3 +1,5 @@
+`timescale 1ps / 1ps
+
 module fetch
 import rv32::*;
 #(
@@ -42,9 +44,11 @@ begin
 end
 
 typedef enum logic [2:0] {
-        WAITING_JALR = 0,
-        STREAMING = 1,
-        SPECULATING = 2
+        RESET,
+        WAITING_JALR,
+        STREAMING,
+        J_SPECULATING,
+        B_SPECULATING
 } state_e;
 
 state_e state;
@@ -69,7 +73,8 @@ logic [31:0] jump_target;
 
 logic b_predict_taken;
 
-logic mispredict;
+logic j_mispredict;
+logic b_mispredict;
 
 // Prediction registers
 logic [1:0] b_pred [0:B_PRED_SIZE-1];
@@ -82,8 +87,12 @@ logic [RAS_PTR_SIZE-1:0] ras_ptr_next;
 // Slam IMEM with whatever's next
 assign i_addr = pc_next;
 
-// Detect any kind of misprediction
-assign mispredict = (branch | jump) & (pc_from_dec != alu_result);
+// Detect mispredictions
+assign j_mispredict = (jump & (pc_from_dec != alu_result));
+
+assign b_mispredict = 
+                (branch & branch_taken & (pc_from_dec != alu_result)) |
+                (branch & ~branch_taken & (pc_from_dec != (pc_from_exe + 4)));
 
 
 //=================================
@@ -189,10 +198,17 @@ begin
         state_next = state;
 
         unique case (state)
+        RESET: begin
+                pc_next = 0;
+
+                if (~rst)
+                        state_next = STREAMING;
+        end
+
         STREAMING: begin
                 // Entry point for all redirects; if imem isn't ready, hold
                 // i_addr at the redirect vector
-                if (imem_stalling) begin
+                if (imem_stalling | rst) begin
                         pc_next = pc_o;
                 end
 
@@ -205,11 +221,11 @@ begin
                         if (b_predict_taken) begin
                                 pc_next = btb[pc_o[9:2]];
                         end
-                        state_next = SPECULATING;
+                        state_next = B_SPECULATING;
                 end
                 else if (inst_is_ret) begin
                         pc_next = ras[ras_ptr];
-                        state_next = SPECULATING;
+                        state_next = J_SPECULATING;
                 end
                 // Must come after ret check; only stall if nothing to predict
                 else if (inst_is_jalr) begin
@@ -226,40 +242,78 @@ begin
                 // Spec checks in case we entered from SPECULATING. If this
                 // condition never gets flagged, we know that speculation
                 // succeeded, so the above exit point to STREAMING works.
-                else if (mispredict) begin
+                else if (j_mispredict | b_mispredict) begin
                         pc_next = alu_result;
                         flush_next = 1;
                         state_next = STREAMING;
                 end
         end
 
-        SPECULATING: begin
+        J_SPECULATING: begin
                 // Speculation has failed
-                if (mispredict) begin
+                if (j_mispredict) begin
                         pc_next = alu_result;
                         flush_next = 1;
                         state_next = STREAMING;
                 end
                 // Speculation completed successfully
-                else if (jump | branch) begin
-                        state_next = STREAMING;
-                end
+                else begin
+                        if (branch) begin
+                                state_next = STREAMING;
+                        end
 
-                // After speculation checks, behave exactly like STREAMING:
-                else if (inst_is_jump) begin
-                        pc_next = jump_target;  // Directly calculated. No spec
-                end
-                else if (inst_is_b) begin
-                        if (b_predict_taken) begin
-                                pc_next = btb[pc_o[9:2]];
+                        // After speculation checks, behave exactly like STREAMING:
+                        if (inst_is_jump) begin
+                                pc_next = jump_target;  // Directly calculated. No spec
+                        end
+                        else if (inst_is_b) begin
+                                if (b_predict_taken) begin
+                                        pc_next = btb[pc_o[9:2]];
+                                end
+                                state_next = B_SPECULATING;
+                        end
+                        else if (inst_is_ret) begin
+                                pc_next = ras[ras_ptr];
+                                state_next = J_SPECULATING;
+                        end
+                        // Must come after ret check; only stall if nothing to predict
+                        else if (inst_is_jalr) begin
+                                state_next = WAITING_JALR;
                         end
                 end
-                else if (inst_is_ret) begin
-                        pc_next = ras[ras_ptr];
+        end
+
+        B_SPECULATING: begin
+                // Speculation has failed
+                if (b_mispredict) begin
+                        pc_next = alu_result;
+                        flush_next = 1;
+                        state_next = STREAMING;
                 end
-                // Must come after ret check; only stall if nothing to predict
-                else if (inst_is_jalr) begin
-                        state_next = WAITING_JALR;
+                // Speculation completed successfully
+                else begin
+                        if (branch) begin
+                                state_next = STREAMING;
+                        end
+
+                        // After speculation checks, behave exactly like STREAMING:
+                        if (inst_is_jump) begin
+                                pc_next = jump_target;  // Directly calculated. No spec
+                        end
+                        else if (inst_is_b) begin
+                                if (b_predict_taken) begin
+                                        pc_next = btb[pc_o[9:2]];
+                                end
+                                state_next = B_SPECULATING;
+                        end
+                        else if (inst_is_ret) begin
+                                pc_next = ras[ras_ptr];
+                                state_next = J_SPECULATING;
+                        end
+                        // Must come after ret check; only stall if nothing to predict
+                        else if (inst_is_jalr) begin
+                                state_next = WAITING_JALR;
+                        end
                 end
         end
         endcase
@@ -300,7 +354,7 @@ begin
                 valid_o <= 0;
                 flush_o <= 0;
 
-                state <= STREAMING;
+                state <= RESET;
         end
         else begin
                 pc_o <= pc_next;
