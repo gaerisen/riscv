@@ -63,7 +63,8 @@ begin
         ctrl_next.branch_op = BEQ;
         ctrl_next.load_op = LB;
         ctrl_next.store_op = SB;
-        ctrl_next.csr_op = CSRRW;
+        ctrl_next.csr_op = NONE;
+        ctrl_next.csr_src = NRS1;
         system_next.illegal = 0;
         system_next.ecall = 0;
         system_next.ebreak = 0;
@@ -230,20 +231,10 @@ begin
                                         system_next.illegal = 1; 
                         end
                         else begin
-                                unique case (csr_funct3_e'(instr.i.funct3))
-                                CSRRW: ctrl_next.alu_op = OR;
-                                CSRRS: ctrl_next.alu_op = OR;
-                                CSRRC: ctrl_next.alu_op = AND;
-                                endcase
+                                ctrl_next.csr_op = csr_op_e'(instr.i.funct3[1:0]);
+                                ctrl_next.csr_src = csr_src_e'(instr.i.funct3[2]);
 
                                 imm_next = {27'b0, instr.i.rs1};
-
-                                ctrl_next.alu_src1 = CSR;
-
-                                if (instr.i.funct3[2])
-                                        ctrl_next.alu_src2 = IMM;
-                                else
-                                        ctrl_next.alu_src2 = NRS1;
 
                                 ctrl_next.wb = 1;
                                 ctrl_next.wb_src = WB_CSR;

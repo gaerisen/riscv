@@ -25,7 +25,7 @@ ctrl_t ctrl_dec;
 system_t system_dec;
 logic [4:0] rs1;
 logic [4:0] rs2;
-logic [11:0] csr;
+logic [11:0] csrs;
 logic [31:0] rs1_read;
 logic [31:0] rs2_read;
 logic [31:0] csr_read;
@@ -41,24 +41,52 @@ logic [31:0] csr_value;
 logic [31:0] pc_exe;
 logic branch_taken;
 logic [31:0] result_exe;
-ctrl_t ctrl_exe;
 logic [4:0] rd_exe;
+logic [31:0] csr_result_exe;
+logic [11:0] csrd_exe;
+logic [31:0] csr_value_exe;
+ctrl_t ctrl_exe;
+system_t system_exe;
 
 // Memacc pipeline regs
 logic [31:0] pc_mem;
 logic [31:0] result_mem;
 logic [4:0] rd_mem;
+logic [31:0] csr_result_mem;
+logic [11:0] csrd_mem;
+logic [31:0] csr_value_mem;
 ctrl_t ctrl_mem;
+system_t system_mem;
 
 // Memacc->Writeback wires
 logic [31:0] wb_next;
 
+// Trap wires
+logic sys_redirect;
+logic [31:0] sys_vec;
+
 // Integer register file
 logic [31:0] irf [32] /*verilator public*/;
 
-//====================================
-//      PIPELINE
-//====================================
+// Control/status register file
+csrf csrf(
+        .*,
+
+        .csr_rd(ctrl_dec.csr_op != NONE),
+        .csrs_value(csr_read),
+
+        .csrd(csrd_mem),
+        .csr_wb(csr_result_mem),
+
+        .sys_word(system_mem)
+);
+
+//==============================================================================
+//                              PIPELINE
+//==============================================================================
+//======================================
+//      (1) Fetch
+//======================================
 
 fetch fetch (
         .*,
@@ -67,14 +95,16 @@ fetch fetch (
         .branch(ctrl_exe.branch),
         .alu_result(result_exe),
 
-        .sys_redirect(0),
-        .sys_vec(0),
-
         .pc_o(pc_fet),
         .instr_o(instr),
         .valid_o(valid),
         .flush_o(flush)
 );
+
+
+//======================================
+//      (2) Decode/IRF read
+//======================================
 
 decoder decoder (
         .*,
@@ -86,7 +116,7 @@ decoder decoder (
 
         .rs1_o(rs1),
         .rs2_o(rs2),
-        .csr_o(csr),
+        .csr_o(csrs),
         .imm_o(imm),
         .rd_o(rd_dec),
 
@@ -94,16 +124,12 @@ decoder decoder (
         .ctrl_o(ctrl_dec)
 );
 
-// Decode stage register forwarding
-// Include IRF read here; rs1 and rs2 are available quickly, so read is most
-// parallel with other operations here
 always_ff @(posedge clk or posedge rst)
 begin
         if (rst) begin
                 pc_dec <= 0;
                 rs1_read <= 0;
                 rs2_read <= 0;
-                csr_read <= 0;
         end
         else begin
                 pc_dec <= pc_fet;
@@ -112,7 +138,12 @@ begin
         end
 end
 
-// Operand forwarding/register read
+
+//======================================
+//      (3) Execute        
+//======================================
+
+// Operand forwarding
 always_comb
 begin
         if (rs1 == 0)
@@ -132,12 +163,20 @@ begin
                 rs2_value = result_mem;
         else
                 rs2_value = rs2_read;
+
+        if (csrs == csrd_exe)
+                csr_value = csr_result_exe;
+        else if (csrs == csrd_mem)
+                csr_value = csr_result_mem;
+        else
+                csr_value = csr_read;
 end
 
+// Main ALU for single-cycle arithmetic and logic
 alu alu (
         .*,
 
-        .stall(0), // If decoder stalls, alu will receive NOP, so no need
+        .stall(0),
 
         .ctrl_i(ctrl_dec),
         
@@ -145,20 +184,41 @@ alu alu (
         .branch_o(branch_taken)
 );
 
-// Execute stage register forwarding
+// Execution unit for Zicsr instructions
+csru csru (
+        .*,
+
+        .ctrl_i(ctrl_dec),
+
+        .csr_old(csr_value),
+
+        .csr_new(csr_result_exe)
+);
+
 always_ff @(posedge clk or posedge rst)
 begin
         if (rst | flush) begin
                 pc_exe <= 0;
                 ctrl_exe <= 0;
+                system_exe <= 0;
                 rd_exe <= 0;
+                csrd_exe <= 0;
+                csr_value_exe <= 0;
         end
         else begin
                 pc_exe <= pc_dec;
                 ctrl_exe <= ctrl_dec;
+                system_exe <= system_dec;
                 rd_exe <= rd_dec;
+                csrd_exe <= csrs; // Zicsr is atomic swap --> csrd = csrs
+                csr_value_exe <= csr_value;
         end
 end
+
+
+//======================================
+//      (4) Memory Access
+//======================================
 
 // Memacc stage register forwarding
 always_ff @(posedge clk or posedge rst)
@@ -166,19 +226,27 @@ begin
         if (rst | flush) begin
                 pc_mem <= 0;
                 ctrl_mem <= 0;
+                system_mem <= 0;
                 rd_mem <= 0;
                 result_mem <= 0;
+                csr_result_mem <= 0;
+                csrd_mem <= 0;
+                csr_value_mem <= 0;
         end
         else begin
                 pc_mem <= pc_exe;
                 ctrl_mem <= ctrl_exe;
+                system_mem <= system_exe;
                 rd_mem <= rd_exe;
                 result_mem <= result_exe;
+                csr_result_mem <= csr_result_exe;
+                csrd_mem <= csrd_exe;
+                csr_value_mem <= csr_value_exe;
         end
 end
 
 //======================================
-//      WRITEBACK/COMMIT
+//      (5) Writeback/Commit
 //======================================
 
 always_comb
@@ -197,7 +265,7 @@ begin
                         wb_next = pc_mem + 4;
                 end
                 WB_CSR: begin
-                        wb_next = csr_mem;
+                        wb_next = csr_value_mem;
                 end
                 endcase
         end
