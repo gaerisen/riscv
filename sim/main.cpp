@@ -3,17 +3,16 @@
 #include <cstdlib>
 #include <ctime>
 
-#include "fetch.hpp"
+#include "hart.hpp"
 
 int main(int argc, char *argv[])
 {
         auto ctx = std::make_shared<VerilatedContext>();
         ctx->traceEverOn(true);
 
-        struct sim::fetch dut(ctx);
+        struct sim::hart dut(ctx);
 
         unsigned long long int seed;
-
 
         try {
                 int status;
@@ -30,7 +29,6 @@ int main(int argc, char *argv[])
                         srand(++seed);
 //                } 
 
-                std::cout << "All done!" << std::endl;
 /*
                 srand(0x47e9b32b);
                 dut.run_tests(256); */

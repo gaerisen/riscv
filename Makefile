@@ -4,6 +4,7 @@ RTL_SRC := pkg/rv32.sv rtl/$(TARGET).sv
 
 VERILATOR_ROOT ?= $(shell verilator --getenv VERILATOR_ROOT)
 VINC = $(VERILATOR_ROOT)/include
+VLTSTDINC = $(VERILATOR_ROOT)/include/vltstd
 
 .PHONY: all
 all: main
@@ -35,7 +36,7 @@ TB_SRC = sim/main.cpp \
 
 TB_OBJ = $(TB_SRC:.cpp=.o)
 
-CXXFLAGS = -I$(VINC) -Isim/include -Iobj_dir -std=c++17
+CXXFLAGS = -I$(VINC) -I$(VLTSTDINC) -Isim/include -Iobj_dir -std=c++17
 
 $(TB_OBJ): $(TB_SRC) obj_dir/Vtop.mk
 

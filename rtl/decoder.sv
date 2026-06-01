@@ -1,3 +1,5 @@
+`timescale 1ps / 1ps
+
 module decoder
 import rv32::*;
 #(
@@ -235,14 +237,14 @@ end
 // Save outputs to pipeline registers
 always_ff @(posedge clk or posedge rst)
 begin
-        if (rst | flush) begin
+        if (rst | flush | stall) begin
                 ctrl_o.alu_op <= ADDSUB;
                 system_o <= 0;
                 rs1_o <= 0;
                 rs2_o <= 0;
                 imm_o <= 0;
                 rd_o <= 0;
-        end else if (~stall) begin
+        end else begin
                 ctrl_o <= ctrl_next;
                 system_o <= system_next;
                 rs1_o <= rs1_next;

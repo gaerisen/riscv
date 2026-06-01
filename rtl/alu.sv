@@ -1,3 +1,5 @@
+`timescale 1ps / 1ps
+
 module alu
 import rv32::*;
 #(
@@ -12,7 +14,7 @@ import rv32::*;
         input [31:0] rs1_value,
         input [31:0] rs2_value,
         input [31:0] imm,
-        input [31:0] pc,
+        input [31:0] pc_dec,
 
         output logic [31:0] result_o,
         output logic branch_o
@@ -32,13 +34,14 @@ end
 
 always_comb
 begin
-        in1 = RS1;
+        in1 = rs1_value;
+        in2 = rs2_value;
         result_next = 0;
         branch_next = 0;
 
         unique case(ctrl_i.alu_src1)
         RS1: in1 = rs1_value;
-        PC: in1 = pc;
+        PC: in1 = pc_dec;
         ZERO: in1 = 0;
         endcase
 

@@ -15,19 +15,19 @@ import rv32::*;
 
         // I-mem interface signals
         input i_data_ready,
-        input [31:0] i_data_i,
+        input [31:0] i_data,
 
         output logic [31:0] i_addr,
 
         // Jump/branch signals (From EXE; pc_o - 2)
-        input [31:0] pc_from_exe,
+        input [31:0] pc_exe,
         input jump,
         input branch,
         input branch_taken,
         input [31:0] alu_result,
 
         // System control signals (From DEC; pc_o - 1)
-        input [31:0] pc_from_dec,
+        input [31:0] pc_dec,
         input sys_redirect,
         input [31:0] sys_vec,
 
@@ -89,9 +89,9 @@ logic [RAS_PTR_SIZE-1:0] ras_ptr_next;
 assign i_addr = pc_next;
 
 // Detect mispredictions
-assign j_mispredict = (jump & (pc_from_dec != alu_result));
-assign b_mispredict_nt = (branch & branch_taken & (pc_from_dec != alu_result));
-assign b_mispredict_t = (branch & ~branch_taken & (pc_from_dec != (pc_from_exe + 4)));
+assign j_mispredict = (jump & (pc_dec != alu_result));
+assign b_mispredict_nt = (branch & branch_taken & (pc_dec != alu_result));
+assign b_mispredict_t = (branch & ~branch_taken & (pc_dec != (pc_exe + 4)));
 
 
 //=================================
@@ -167,19 +167,19 @@ begin
         end
         else begin
                 if (branch & branch_taken) begin
-                        unique case (b_pred[pc_from_exe[B_PRED_PTR_SIZE+1:2]])
-                        2'b00: b_pred[pc_from_exe[B_PRED_PTR_SIZE+1:2]] = 2'b01;
-                        2'b01: b_pred[pc_from_exe[B_PRED_PTR_SIZE+1:2]] = 2'b10;
-                        2'b10: b_pred[pc_from_exe[B_PRED_PTR_SIZE+1:2]] = 2'b11;
-                        2'b11: b_pred[pc_from_exe[B_PRED_PTR_SIZE+1:2]] = 2'b11;
+                        unique case (b_pred[pc_exe[B_PRED_PTR_SIZE+1:2]])
+                        2'b00: b_pred[pc_exe[B_PRED_PTR_SIZE+1:2]] = 2'b01;
+                        2'b01: b_pred[pc_exe[B_PRED_PTR_SIZE+1:2]] = 2'b10;
+                        2'b10: b_pred[pc_exe[B_PRED_PTR_SIZE+1:2]] = 2'b11;
+                        2'b11: b_pred[pc_exe[B_PRED_PTR_SIZE+1:2]] = 2'b11;
                         endcase
                 end
                 else if (branch & ~branch_taken) begin
-                        unique case (b_pred[pc_from_exe[B_PRED_PTR_SIZE+1:2]])
-                        2'b00: b_pred[pc_from_exe[B_PRED_PTR_SIZE+1:2]] = 2'b00;
-                        2'b01: b_pred[pc_from_exe[B_PRED_PTR_SIZE+1:2]] = 2'b00;
-                        2'b10: b_pred[pc_from_exe[B_PRED_PTR_SIZE+1:2]] = 2'b01;
-                        2'b11: b_pred[pc_from_exe[B_PRED_PTR_SIZE+1:2]] = 2'b10;
+                        unique case (b_pred[pc_exe[B_PRED_PTR_SIZE+1:2]])
+                        2'b00: b_pred[pc_exe[B_PRED_PTR_SIZE+1:2]] = 2'b00;
+                        2'b01: b_pred[pc_exe[B_PRED_PTR_SIZE+1:2]] = 2'b00;
+                        2'b10: b_pred[pc_exe[B_PRED_PTR_SIZE+1:2]] = 2'b01;
+                        2'b11: b_pred[pc_exe[B_PRED_PTR_SIZE+1:2]] = 2'b10;
                         endcase
                 end
         end
@@ -201,7 +201,7 @@ begin
                 // proves to be a problem, add signalling to only update with
                 // targets from jalr-not-rets
                 if (jump) begin
-                        btb[pc_from_exe[BTB_PTR_SIZE+1:2]] = alu_result;
+                        btb[pc_exe[BTB_PTR_SIZE+1:2]] = alu_result;
                 end
         end
 end
@@ -239,7 +239,7 @@ begin
                         flush_next = 1;
                 end
                 else if (b_mispredict_t) begin
-                        pc_next = pc_from_exe + 4;
+                        pc_next = pc_exe + 4;
                         flush_next = 1;
                 end
 
@@ -275,7 +275,7 @@ begin
 
         // Instruction validity detection
         valid_next = 1;
-        instr_next = i_data_i;
+        instr_next = i_data;
 
         if (~i_data_ready) begin
                 valid_next = 0;
