@@ -13,6 +13,7 @@ import rv32::*;
 
         input [31:0] rs1_value,
         input [31:0] rs2_value,
+        input [31:0] csr_value,
         input [31:0] imm,
         input [31:0] pc_dec,
 
@@ -40,14 +41,16 @@ begin
         branch_next = 0;
 
         unique case(ctrl_i.alu_src1)
-        RS1: in1 = rs1_value;
-        PC: in1 = pc_dec;
         ZERO: in1 = 0;
+        RS1: in1 = rs1_value;
+        NRS1: in1 = ~rs1_value;
+        PC: in1 = pc_dec;
         endcase
 
         unique case(ctrl_i.alu_src2)
         RS2: in2 = rs2_value;
         IMM: in2 = imm;
+        CSR: in2 = csr_value;
         endcase
 
         unique case(ctrl_i.alu_op)

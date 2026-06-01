@@ -86,6 +86,7 @@ decoder decoder (
 
         .rs1_o(rs1),
         .rs2_o(rs2),
+        .csr_o(csr),
         .imm_o(imm),
         .rd_o(rd_dec),
 

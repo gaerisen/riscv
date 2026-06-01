@@ -18,6 +18,12 @@ package rv32;
                 SYSTEM  = 7'b11100_11
         } opcode_e;
 
+        typedef enum logic [1:0] {
+                CSRRW   = 2'b01,
+                CSRRS   = 2'b10,
+                CSRRC   = 2'b11
+        } csr_funct3_e;
+
         typedef enum logic [2:0] {
                 BEQ     = 3'b000,       BGE     = 3'b101,
                 BNE     = 3'b001,       BLTU    = 3'b110,
@@ -54,18 +60,21 @@ package rv32;
         typedef enum logic [1:0] {
                 ZERO    = 2'b00,
                 RS1     = 2'b01,
-                PC      = 2'b10
+                CSR     = 2'b10,
+                PC      = 2'b11
         } alu_src1_e;
 
-        typedef enum logic {
-                RS2     = 1'b0,
-                IMM     = 1'b1
+        typedef enum logic [1:0] {
+                RS2     = 2'b00,
+                IMM     = 2'b01,
+                NRS1    = 2'b10
         } alu_src2_e;
 
         typedef enum logic [1:0] {
-                ALU     = 2'b00,
-                MEM     = 2'b01,
-                PC4     = 2'b10
+                WB_ALU     = 2'b00,
+                WB_MEM     = 2'b01,
+                WB_PC4     = 2'b10,
+                WB_CSR     = 2'b11
         } wb_src_e;
 
         /*====================================================================*/
@@ -141,6 +150,7 @@ package rv32;
                 alu_src2_e alu_src2;
                 wb_src_e wb_src;
 
+                csr_funct3_e csr_op;
                 alu_funct3_e alu_op;
                 branch_funct3_e branch_op;
                 load_funct3_e load_op;

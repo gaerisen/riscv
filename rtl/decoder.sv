@@ -13,6 +13,7 @@ import rv32::*;
 
         output logic [4:0] rs1_o,
         output logic [4:0] rs2_o,
+        output logic [11:0] csr_o,
         output logic [31:0] imm_o,
         output logic [4:0] rd_o,
 
@@ -24,6 +25,7 @@ import rv32::*;
 instr_t instr;
 logic [4:0] rs1_next;
 logic [4:0] rs2_next;
+logic [11:0] csr_next;
 logic [31:0] imm_next;
 logic [4:0] rd_next;
 system_t system_next;
@@ -36,6 +38,7 @@ assign instr = instr_i;
 assign rs1_next = instr.r.rs1;
 assign rs2_next = instr.r.rs2;
 assign rd_next = instr.r.rd;
+assign csr_next = instr.i.imm11_0;
 
 initial
 begin
@@ -56,10 +59,11 @@ begin
         ctrl_next.load = 0;
         ctrl_next.store = 0;
         ctrl_next.wb = 0;
-        ctrl_next.wb_src = ALU;
+        ctrl_next.wb_src = WB_ALU;
         ctrl_next.branch_op = BEQ;
         ctrl_next.load_op = LB;
         ctrl_next.store_op = SB;
+        ctrl_next.csr_op = CSRRW;
         system_next.illegal = 0;
         system_next.ecall = 0;
         system_next.ebreak = 0;
@@ -79,7 +83,7 @@ begin
                         ctrl_next.alu_src2 = IMM;
 
                         ctrl_next.wb = 1;
-                        ctrl_next.wb_src = ALU;
+                        ctrl_next.wb_src = WB_ALU;
                 end
 
                 AUIPC: begin
@@ -90,7 +94,7 @@ begin
                         ctrl_next.alu_src2 = IMM;
 
                         ctrl_next.wb = 1;
-                        ctrl_next.wb_src = ALU;
+                        ctrl_next.wb_src = WB_ALU;
                 end
 
                 JAL: begin
@@ -106,7 +110,7 @@ begin
                         ctrl_next.jump = 1;
 
                         ctrl_next.wb = 1;
-                        ctrl_next.wb_src = PC4;
+                        ctrl_next.wb_src = WB_PC4;
                 end
 
                 JALR: begin
@@ -120,7 +124,7 @@ begin
                         ctrl_next.jump = 1;
 
                         ctrl_next.wb = 1;
-                        ctrl_next.wb_src = PC4;
+                        ctrl_next.wb_src = WB_PC4;
 
                         if (instr.i.funct3 != 3'b000)
                                 system_next.illegal = 1;
@@ -155,7 +159,7 @@ begin
                         ctrl_next.load_op = load_funct3_e'(instr.i.funct3);
 
                         ctrl_next.wb = 1;
-                        ctrl_next.wb_src = MEM;
+                        ctrl_next.wb_src = WB_MEM;
 
                         if (instr.i.funct3 == 3'b011 |
                                 instr.i.funct3[2:1] == 2'b11)
@@ -187,11 +191,11 @@ begin
                         ctrl_next.alu_src2 = IMM;
 
                         ctrl_next.wb = 1;
-                        ctrl_next.wb_src = ALU;
+                        ctrl_next.wb_src = WB_ALU;
                 end
 
                 ALUR: begin
-                        if (instr.r.funct7 != NORM |
+                        if (instr.r.funct7 != NORM &
                                 instr.r.funct7 != ALT)
                                 system_next.illegal = 1;
 
@@ -200,7 +204,7 @@ begin
                         ctrl_next.alu_src2 = RS2;
 
                         ctrl_next.wb = 1;
-                        ctrl_next.wb_src = ALU;
+                        ctrl_next.wb_src = WB_ALU;
                 end
 
                 FENCE: begin    // TODO: Make this not NOP
@@ -208,24 +212,42 @@ begin
                                 system_next.illegal = 1;
                 end
 
-                SYSTEM: begin   // TODO: Add Zicsr support
-                        if (instr.r.funct3 != 0 |
-                                instr.r.rd != 0 |
-                                instr.r.rs1 != 0)
-                                system_next.illegal = 1;
+                SYSTEM: begin 
+                        if (instr.r.funct3 == 0) begin
+                                if (instr.r.rs1 != 0 | instr.r.rd != 0)
+                                        system_next.illegal = 1; 
+                                else if (instr.r.rs2 == 0 & instr.r.funct7 == 0)
+                                        system_next.ecall = 1;
+                                else if (instr.r.rs2 == 1 & instr.r.funct7 == 0)
+                                        system_next.ebreak = 1;
+                                else if (instr.r.rs2 == 2 & instr.r.funct7 == 8)
+                                        system_next.mret = 1;
+                                else if (instr.r.rs2 == 2 & instr.r.funct7 == 24)
+                                        system_next.sret = 1;
+                                else if (instr.r.rs2 == 5 & instr.r.funct7 == 8)
+                                        system_next.wfi = 1;
+                                else
+                                        system_next.illegal = 1; 
+                        end
+                        else begin
+                                unique case (csr_funct3_e'(instr.i.funct3))
+                                CSRRW: ctrl_next.alu_op = OR;
+                                CSRRS: ctrl_next.alu_op = OR;
+                                CSRRC: ctrl_next.alu_op = AND;
+                                endcase
 
-                        if (instr.r.rs2 == 0 & instr.r.funct7 == 0)
-                                system_next.ecall = 1;
-                        else if (instr.r.rs2 == 1 & instr.r.funct7 == 0)
-                                system_next.ebreak = 1;
-                        else if (instr.r.rs2 == 2 & instr.r.funct7 == 8)
-                                system_next.mret = 1;
-                        else if (instr.r.rs2 == 2 & instr.r.funct7 == 24)
-                                system_next.sret = 1;
-                        else if (instr.r.rs2 == 5 & instr.r.funct7 == 8)
-                                system_next.wfi = 1;
-                        else
-                                system_next.illegal = 1;
+                                imm_next = {27'b0, instr.i.rs1};
+
+                                ctrl_next.alu_src1 = CSR;
+
+                                if (instr.i.funct3[2])
+                                        ctrl_next.alu_src2 = IMM;
+                                else
+                                        ctrl_next.alu_src2 = NRS1;
+
+                                ctrl_next.wb = 1;
+                                ctrl_next.wb_src = WB_CSR;
+                        end
                 end
 
                 default:
@@ -242,6 +264,7 @@ begin
                 system_o <= 0;
                 rs1_o <= 0;
                 rs2_o <= 0;
+                csr_o <= 0;
                 imm_o <= 0;
                 rd_o <= 0;
         end else begin
@@ -249,6 +272,7 @@ begin
                 system_o <= system_next;
                 rs1_o <= rs1_next;
                 rs2_o <= rs2_next;
+                csr_o <= csr_next;
                 imm_o <= imm_next;
                 rd_o <= rd_next;
         end
