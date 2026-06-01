@@ -3,6 +3,8 @@
 #include "generator.hpp"
 #include <iomanip>
 #include <iostream>
+#include <fstream>
+#include <vector>
 
 #define byte(x) (x & 0b11111111)
 #define fvlsb(x) (x & 0b11111)
@@ -27,49 +29,7 @@ int opcodes[] = {
 //      0b11100  // system
 };
 
-/* addi x1, x0, 1       0x0
- * addi x2, x0, 1
- * jalr x1, x0, 0x40
- * nop
- * jalr x1, x0, 0x40    0x10
- * nop
- * jalr x1, x0, 0x40
- * nop
- * nop                  0x20
- * jalr x1, x0, 0x40
- * nop
- * nop
- * nop                  0x30
- * nop
- * nop
- * halt 
- * add x3, x1, x2       0x40
- * addi x1, x2, 0
- * addi x2, x3, 0
- * jalr x0, x1, 0x0
- */
-unsigned int program[] = {
-        0x00100113,
-        0x00100193,
-        0x040000e7,
-        0x00000013,
-        0x040000e7,
-        0x00000013,
-        0x040000e7,
-        0x00000013,
-        0x00000013,
-        0x040000e7,
-        0x00000013,
-        0x00000013,
-        0x00000013,
-        0x00000013,
-        0x00000013,
-        0xffffffff,
-        0x00310233,
-        0x00018113,
-        0x00020193,
-        0x00008067
-};
+void read_program(std::string, std::vector<unsigned char>&);
 
 namespace sim
 {
@@ -128,23 +88,17 @@ int hart::run_tests(int cycles)
 
         set_i_ready(1);
 
-        unsigned int instr;
+        std::vector<unsigned char> prog;
 
-        for (int i = 0; i < cycles; i++) {
-                instr = program[get_i_addr() >> 2];
+        read_program("program.bin", prog);
 
-                if (instr == 0xffffffff)
-                        break;
-                
-                set_i_data(instr);
-                pulse();
+        std::cout << std::hex;
+
+        for (auto v : prog) {
+                std::cout << v << " ";
         }
 
-        // Allow in-flight instructions to retire
-        set_i_ready(0);
-        for (int i = 0; i < 5; i++) {
-                pulse();
-        }
+        std::cout << std::dec << std::endl;
 
         print_regfile();
 
@@ -154,3 +108,12 @@ int hart::run_tests(int cycles)
 }
 
 } // namespace sim
+
+void read_program(std::string filename, std::vector<unsigned char>& vec)
+{
+        std::ifstream ifs(filename, std::ios::in | std::ios::binary);
+
+        while (ifs) {
+                vec.push_back(ifs.get());
+        }
+}

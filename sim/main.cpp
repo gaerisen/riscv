@@ -12,27 +12,11 @@ int main(int argc, char *argv[])
 
         struct sim::hart dut(ctx);
 
-        unsigned long long int seed;
+        srand(time(0));
 
         try {
-                int status;
 
-                seed = time(0); // Get current time
-                srand(seed);    // Set time as seed
-                seed = rand();  // Get random num as new seed
-                srand(seed);    // Set seed
-
-//                for (int i = 0; i < 128; i++) {
-                        std::cout << "\nSeed: " << seed << std::endl;
-                        status = dut.run_tests(1024);
-                        if (status != 0) return status;
-                        srand(++seed);
-//                } 
-
-/*
-                srand(0x47e9b32b);
-                dut.run_tests(256); */
-
+                dut.run_tests(0);
 
         } catch (const std::runtime_error& e) {
                 std::cerr << "RUNTIME: " << e.what();
