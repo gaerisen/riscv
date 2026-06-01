@@ -51,9 +51,6 @@ void fetch::set_jump(bool in) { dut->jump = in; }
 void fetch::set_branch(bool in) { dut->branch = in; }
 void fetch::set_branch_taken(bool in) { dut->branch_taken = in; }
 void fetch::set_alu_result(int in) { dut->alu_result = in; }
-void fetch::set_system(int in) { dut->system_word = in; }
-void fetch::set_mtvec(int in) { dut->mtvec = in; }
-void fetch::set_mepc(int in) { dut->mepc = in; }
 void fetch::set_pc_dec(int in) { dut->pc_from_dec = in; }
 void fetch::set_pc_exe(int in) { dut->pc_from_exe = in; }
 
