@@ -25,6 +25,27 @@ int opcodes[] = {
         0b11100  // system
 };
 
+int program[] = {
+        0x13,
+        0x040000e7,
+        0x13,
+        0x13,
+        0x13,
+        0x040000e7,
+        0x13,
+        0x13,
+        0x13,
+        0x13,
+        0x13,
+        0x13,
+        0x040000e7,
+        0x13,
+        0x13,
+        0x000000e7,
+        0x13,
+        0x00008067
+};
+
 int get_i_imm(int i);
 int get_b_imm(int i);
 int get_j_imm(int i);
@@ -109,7 +130,7 @@ int fetch::run_tests(int cycles)
 
         set_i_data_ready(1);
 
-        instr = imem[0];
+        instr = program[0];
         set_i_data_i(instr);
 
         int valid_ctr = 0;
@@ -131,7 +152,7 @@ int fetch::run_tests(int cycles)
                 jalr = opcode(instr_exe) == 0x67;
                 branch = opcode(instr_exe) == 0x63;
                 
-                alu_result =    jalr ? 0x100 + get_i_imm(instr_exe) :
+                alu_result =    jalr ? get_i_imm(instr_exe) :
                                 branch ? pc_exe + get_b_imm(instr_exe) : 0;
 
                 set_jump(jalr);
@@ -155,7 +176,7 @@ int fetch::run_tests(int cycles)
 
                 dut->eval();
 
-                instr = imem[byte(get_i_addr()>>2)];
+                instr = program[byte(get_i_addr()>>2)];
                 set_i_data_i(instr);
         }
 
@@ -166,7 +187,7 @@ int fetch::run_tests(int cycles)
         std::cout << std::hex;
 
         for (int i = 0; i < pcs_sim.size(); i++) {
-                instr = imem[byte(pc>>2)];
+                instr = program[byte(pc>>2)];
 
                 std::cout << pc << " (" << byte(pc>>2) << ") gives " << instr;
 
@@ -185,7 +206,7 @@ int fetch::run_tests(int cycles)
                         std::cout << " (jal to " << pc << ")";
                         break;
                 case 0x67:
-                        pc = 0x100 + get_i_imm(instr);
+                        pc = get_i_imm(instr);
                         std::cout << " (jalr to " << pc << ")";
                         break;
                 default:

@@ -98,21 +98,21 @@ assign b_mispredict_t = (branch & ~branch_taken & (pc_from_dec != (pc_from_exe +
 //      RETURN ADDRESS STACK
 //=================================
 
-// Flag any issued JALs
+// Flag any issued JAL(R)s
 assign inst_is_jump = (instr_o.j.opcode == JAL);
+assign inst_is_jalr = (instr_o.i.opcode == JALR);
 
-// Flag JALs with rd==ra/x1 (calls)
-assign inst_is_call = inst_is_jump & (instr_o.j.rd == 1);
+// Flag JAL(R)s with rd==ra/x1 (calls)
+assign inst_is_call = (inst_is_jump | inst_is_jalr) & (instr_o.j.rd == 1);
+
+// Flag JALRs with rs1==ra/x1 (rets)
+assign inst_is_ret = inst_is_jalr & (instr_o.i.rs1 == 1) &
+                        (instr_o.i.imm11_0 == 0);
 
 // Calculate jump targets
 assign jump_target = pc_o + {{12{instr_o.j.imm20}}, instr_o.j.imm19_12,
                                 instr_o.j.imm11, instr_o.j.imm10_1, 1'b0};
 
-// Flag any issued JALRs
-assign inst_is_jalr = (instr_o.i.opcode == JALR);
-
-assign inst_is_ret = inst_is_jalr & (instr_o.i.rs1 == 1) &
-                        (instr_o.i.imm11_0 == 0);
 
 // Push/pop on call/ret
 always_comb

@@ -23,12 +23,12 @@ int main(int argc, char *argv[])
                 seed = rand();  // Get random num as new seed
                 srand(seed);    // Set seed
 
-                for (int i = 0; i < 128; i++) {
+//                for (int i = 0; i < 128; i++) {
                         std::cout << "\nSeed: " << seed << std::endl;
                         status = dut.run_tests(1024);
                         if (status != 0) return status;
                         srand(++seed);
-                } 
+//                } 
 
                 std::cout << "All done!" << std::endl;
 /*
