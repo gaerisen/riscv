@@ -6,7 +6,9 @@ import rv32::*;
         parameter int RAS_SIZE = 8,
         parameter int RAS_PTR_SIZE = $clog2(RAS_SIZE),
         parameter int B_PRED_SIZE = 256,
-        parameter int B_PRED_PTR_SIZE = $clog2(B_PRED_SIZE)
+        parameter int B_PRED_PTR_SIZE = $clog2(B_PRED_SIZE),
+        parameter int BTB_SIZE = 256,
+        parameter int BTB_PTR_SIZE = $clog2(BTB_SIZE)
 )(
         input clk,
         input rst,
@@ -70,6 +72,7 @@ logic inst_is_ret;
 logic inst_is_b;
 
 logic [31:0] jump_target;
+logic [31:0] branch_target;
 
 logic b_predict_taken;
 
@@ -79,7 +82,8 @@ logic b_mispredict_t;
 
 // Prediction registers
 logic [1:0] b_pred [0:B_PRED_SIZE-1];
-logic [31:0] btb [0:B_PRED_SIZE-1];
+
+logic [31:0] btb [0:BTB_SIZE-1];
 
 logic [31:0] ras [0:RAS_SIZE-1];
 logic [RAS_PTR_SIZE-1:0] ras_ptr;
@@ -150,16 +154,19 @@ end
 // Flag any issued branches
 assign inst_is_b = (instr_o.b.opcode == BRANCH);
 
+// Calculate branch targets
+assign branch_target = pc_o + {{20{instr_o.b.imm12}}, instr_o.b.imm11,
+        instr_o.b.imm10_5, instr_o.b.imm4_1, 1'b0};
+
 // Read branch predictor high bit for current PC
 assign b_predict_taken = inst_is_b & b_pred[pc_o[9:2]][1];
 
-// Update predictor and BTB for every branch executed
+// Update predictor whenever a branch is resolved
 always_ff @(posedge clk or posedge rst)
 begin
         if (rst) begin
                 for (int i = 0; i < B_PRED_SIZE - 1; i++) begin
                         b_pred[i] <= 0;
-                        btb[i] <= 0;
                 end
         end
         else begin
@@ -170,8 +177,6 @@ begin
                         2'b10: b_pred[pc_from_exe[B_PRED_PTR_SIZE+1:2]] = 2'b11;
                         2'b11: b_pred[pc_from_exe[B_PRED_PTR_SIZE+1:2]] = 2'b11;
                         endcase
-                        
-                        btb[pc_from_exe[B_PRED_PTR_SIZE+1:2]] = alu_result;
                 end
                 else if (branch & ~branch_taken) begin
                         unique case (b_pred[pc_from_exe[B_PRED_PTR_SIZE+1:2]])
@@ -180,6 +185,27 @@ begin
                         2'b10: b_pred[pc_from_exe[B_PRED_PTR_SIZE+1:2]] = 2'b01;
                         2'b11: b_pred[pc_from_exe[B_PRED_PTR_SIZE+1:2]] = 2'b10;
                         endcase
+                end
+        end
+end
+
+//=================================
+//      BRANCH TARGET BUFFER
+//=================================
+
+always @(posedge clk or posedge rst)
+begin
+        if (rst) begin
+                for (int i = 0; i < BTB_SIZE - 1; i++) begin
+                        btb[i] <= 0;
+                end
+        end
+        else begin
+                // For now, we'll update for every successful jump. If this
+                // proves to be a problem, add signalling to only update with
+                // targets from jalr-not-rets
+                if (jump) begin
+                        btb[pc_from_exe[BTB_PTR_SIZE+1:2]] = alu_result;
                 end
         end
 end
