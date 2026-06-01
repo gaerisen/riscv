@@ -25,12 +25,17 @@ ctrl_t ctrl_dec;
 system_t system_dec;
 logic [4:0] rs1;
 logic [4:0] rs2;
+logic [11:0] csr;
+logic [31:0] rs1_read;
+logic [31:0] rs2_read;
+logic [31:0] csr_read;
 logic [31:0] imm;
 logic [4:0] rd_dec;
 
 // Decode->Execute wires
 logic [31:0] rs1_value;
 logic [31:0] rs2_value;
+logic [31:0] csr_value;
 
 // Execute pipeline regs
 logic [31:0] pc_exe;
@@ -48,41 +53,8 @@ ctrl_t ctrl_mem;
 // Memacc->Writeback wires
 logic [31:0] wb_next;
 
-//======================================
-//      REGISTER FILE (NAIVE)
-//======================================
-
+// Integer register file
 logic [31:0] irf [32] /*verilator public*/;
-
-always_comb
-begin
-        wb_next = 0;
-        
-        if (ctrl_mem.wb & rd_mem != 0) begin
-                unique case (ctrl_mem.wb_src)
-                ALU: begin
-                        wb_next = result_mem;
-                end
-                MEM: begin
-                        wb_next = 0; // TODO: Make this real when mem stage added
-                end
-                PC4: begin
-                        wb_next = pc_mem + 4;
-                end
-                endcase
-        end
-end
-
-always_ff @(posedge clk or posedge rst)
-begin
-        if (rst) begin
-                for (int i = 0; i < 32; i++)
-                        irf[i] <= 0;
-        end
-        else if (ctrl_mem.wb) begin
-                irf[rd_mem] <= wb_next;
-        end
-end
 
 //====================================
 //      PIPELINE
@@ -122,13 +94,20 @@ decoder decoder (
 );
 
 // Decode stage register forwarding
+// Include IRF read here; rs1 and rs2 are available quickly, so read is most
+// parallel with other operations here
 always_ff @(posedge clk or posedge rst)
 begin
         if (rst) begin
                 pc_dec <= 0;
+                rs1_read <= 0;
+                rs2_read <= 0;
+                csr_read <= 0;
         end
         else begin
                 pc_dec <= pc_fet;
+                rs1_read <= irf[rs1];
+                rs2_read <= irf[rs2];
         end
 end
 
@@ -142,7 +121,7 @@ begin
         else if (rs1 == rd_mem)
                 rs1_value = result_mem;
         else
-                rs1_value = irf[rs1];
+                rs1_value = rs1_read;
 
         if (rs2 == 0)
                 rs2_value = 0;
@@ -151,7 +130,7 @@ begin
         else if (rs2 == rd_mem)
                 rs2_value = result_mem;
         else
-                rs2_value = irf[rs2];
+                rs2_value = rs2_read;
 end
 
 alu alu (
@@ -196,5 +175,43 @@ begin
                 result_mem <= result_exe;
         end
 end
+
+//======================================
+//      WRITEBACK/COMMIT
+//======================================
+
+always_comb
+begin
+        wb_next = 0;
+        
+        if (ctrl_mem.wb & rd_mem != 0) begin
+                unique case (ctrl_mem.wb_src)
+                WB_ALU: begin
+                        wb_next = result_mem;
+                end
+                WB_MEM: begin
+                        wb_next = 0; // TODO: Make this real when mem stage added
+                end
+                WB_PC4: begin
+                        wb_next = pc_mem + 4;
+                end
+                WB_CSR: begin
+                        wb_next = csr_mem;
+                end
+                endcase
+        end
+end
+
+always_ff @(posedge clk or posedge rst)
+begin
+        if (rst) begin
+                for (int i = 0; i < 32; i++)
+                        irf[i] <= 0;
+        end
+        else if (ctrl_mem.wb) begin
+                irf[rd_mem] <= wb_next;
+        end
+end
+
 
 endmodule // core
