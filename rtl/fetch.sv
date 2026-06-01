@@ -74,7 +74,8 @@ logic [31:0] jump_target;
 logic b_predict_taken;
 
 logic j_mispredict;
-logic b_mispredict;
+logic b_mispredict_nt;
+logic b_mispredict_t;
 
 // Prediction registers
 logic [1:0] b_pred [0:B_PRED_SIZE-1];
@@ -89,10 +90,8 @@ assign i_addr = pc_next;
 
 // Detect mispredictions
 assign j_mispredict = (jump & (pc_from_dec != alu_result));
-
-assign b_mispredict = 
-                (branch & branch_taken & (pc_from_dec != alu_result)) |
-                (branch & ~branch_taken & (pc_from_dec != (pc_from_exe + 4)));
+assign b_mispredict_nt = (branch & branch_taken & (pc_from_dec != alu_result));
+assign b_mispredict_t = (branch & ~branch_taken & (pc_from_dec != (pc_from_exe + 4)));
 
 
 //=================================
@@ -212,6 +211,16 @@ begin
                         pc_next = pc_o;
                 end
 
+                // If misprediction detected, redirect and flush pipeline
+                else if (j_mispredict | b_mispredict_nt) begin
+                        pc_next = alu_result;
+                        flush_next = 1;
+                end
+                else if (b_mispredict_t) begin
+                        pc_next = pc_from_exe + 4;
+                        flush_next = 1;
+                end
+
                 // Next cases should all be mutually exclusive; each relies on a
                 // unique opcode in current inst. Any order works.
                 else if (inst_is_jump) begin
@@ -221,11 +230,11 @@ begin
                         if (b_predict_taken) begin
                                 pc_next = btb[pc_o[9:2]];
                         end
-                        state_next = B_SPECULATING;
+                        // state_next = B_SPECULATING;
                 end
                 else if (inst_is_ret) begin
                         pc_next = ras[ras_ptr];
-                        state_next = J_SPECULATING;
+                        // state_next = J_SPECULATING;
                 end
                 // Must come after ret check; only stall if nothing to predict
                 else if (inst_is_jalr) begin
@@ -242,8 +251,13 @@ begin
                 // Spec checks in case we entered from SPECULATING. If this
                 // condition never gets flagged, we know that speculation
                 // succeeded, so the above exit point to STREAMING works.
-                else if (j_mispredict | b_mispredict) begin
+                else if (j_mispredict | b_mispredict_nt) begin
                         pc_next = alu_result;
+                        flush_next = 1;
+                        state_next = STREAMING;
+                end
+                else if (b_mispredict_t) begin
+                        pc_next = pc_from_exe + 4;
                         flush_next = 1;
                         state_next = STREAMING;
                 end
@@ -285,7 +299,7 @@ begin
 
         B_SPECULATING: begin
                 // Speculation has failed
-                if (b_mispredict) begin
+                if (j_mispredict) begin
                         pc_next = alu_result;
                         flush_next = 1;
                         state_next = STREAMING;

@@ -14,21 +14,27 @@ int main(int argc, char *argv[])
 
         unsigned long long int seed;
 
-        seed = time(0);
-        srand(seed);
-        seed = rand();
-
-        std::cout << "Seed: " << seed << std::endl;
-        srand(seed);
 
         try {
                 int status;
-                
-                for (int i = 0; i < 1024; i++) {
-                        status = dut.run_tests(128);
-                        if (status != 0) break;
+
+                seed = time(0); // Get current time
+                srand(seed);    // Set time as seed
+                seed = rand();  // Get random num as new seed
+                srand(seed);    // Set seed
+
+                for (int i = 0; i < 8096; i++) {
+                        std::cout << "\nSeed: " << seed << std::endl;
+                        status = dut.run_tests(1024);
+                        if (status != 0) return status;
                         srand(++seed);
-                }
+                } 
+
+                std::cout << "All done!" << std::endl;
+/*
+                srand(0x47e9b32b);
+                dut.run_tests(256); */
+
 
         } catch (const std::runtime_error& e) {
                 std::cerr << "RUNTIME: " << e.what();

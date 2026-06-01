@@ -120,6 +120,14 @@ int fetch::run_tests(int cycles)
         for (int i = 0; i < cycles; i++) {
                 pulse();
 
+                if (get_flush()) {
+                        for (int j = 0; j < valid_ctr; j++)
+                                pcs_sim.pop_back();
+
+                        instr_exe = 0x13;
+                        instr_dec = 0x13;
+                }
+
                 set_pc_exe(pc_exe);
                 set_pc_dec(pc_dec);
 
@@ -137,14 +145,6 @@ int fetch::run_tests(int cycles)
                 pc = get_pc();
                 pc_exe = pc_dec;
                 pc_dec = pc;
-
-                if (get_flush()) {
-                        for (int j = 0; j < valid_ctr; j++)
-                                pcs_sim.pop_back();
-
-                        instr = 0x13;
-                        instr_dec = 0x13;
-                }
 
                 if (get_valid()) {
                         valid_ctr = (valid_ctr < 2) ? valid_ctr + 1 : 2;
@@ -202,6 +202,8 @@ int fetch::run_tests(int cycles)
 
         int num = (pcs_ideal.size() < pcs_sim.size()) ? pcs_ideal.size()
                         : pcs_sim.size();
+
+        num -= 2;
 
         int num_errors = 0;
 
