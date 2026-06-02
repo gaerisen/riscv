@@ -58,14 +58,12 @@ ctrl_t ctrl_exe;
 system_t system_exe;
 
 // Memacc pipeline regs
-logic [31:0] pc_mem;
-logic [31:0] result_mem;
 logic [4:0] rd_mem;
 logic [31:0] csr_result_mem;
 logic [11:0] csrd_mem;
-logic [31:0] csr_value_mem;
 ctrl_t ctrl_mem /*verilator public*/;
 system_t system_mem;
+logic [31:0] wb_mem;
 
 // Memacc->Writeback wires
 logic [31:0] wb_next;
@@ -129,14 +127,14 @@ begin
         if (rs1 == 0)
                 rs1_val_dec_next = 0;
         else if (ctrl_mem.irf_wb & (rs1 == rd_mem))
-                rs1_val_dec_next = result_mem;
+                rs1_val_dec_next = wb_mem;
 
         if (rs2 == 0)
                 rs2_val_dec_next = 0;
         else if (ctrl_mem.irf_wb & (rs2 == rd_mem))
-                rs2_val_dec_next = result_mem;
+                rs2_val_dec_next = wb_mem;
 
-        if (ctrl_mem.csr_op & (csrs == csrd_mem))
+        if (ctrl_mem.csr_wb & (csrs == csrd_mem))
                 csr_val_dec_next = csr_result_mem;
 end
 
@@ -204,20 +202,20 @@ begin
         if (rs1_dec == 0)
                 rs1_value = 0;
         else if (ctrl_exe.irf_wb & (rs1_dec == rd_exe))
-                rs1_value = result_exe;
+                rs1_value = wb_next;
         else if (ctrl_mem.irf_wb & (rs1_dec == rd_mem))
-                rs1_value = result_mem;
+                rs1_value = wb_mem;
 
         if (rs2_dec == 0)
                 rs2_value = 0;
         else if (ctrl_exe.irf_wb & (rs2_dec == rd_exe))
-                rs2_value = result_exe;
+                rs2_value = wb_next;
         else if (ctrl_mem.irf_wb & (rs2_dec == rd_mem))
-                rs2_value = result_mem;
+                rs2_value = wb_mem;
 
-        if (ctrl_exe.csr_op & (csrs_dec == csrd_exe))
+        if (ctrl_exe.csr_wb & (csrs_dec == csrd_exe))
                 csr_value = csr_result_exe;
-        else if (ctrl_mem.csr_op & (csrs_dec == csrd_mem))
+        else if (ctrl_mem.csr_wb & (csrs_dec == csrd_mem))
                 csr_value = csr_result_mem;
 end
 
@@ -269,56 +267,53 @@ end
 //      (4) Memory Access
 //======================================
 
+// Construct writeback value now so it's available for forwarding
+always_comb
+begin
+        wb_next = 0;
+        
+        if (ctrl_exe.irf_wb & rd_exe != 0) begin
+                unique case (ctrl_exe.wb_src)
+                WB_ALU: begin
+                        wb_next = result_exe;
+                end
+                WB_MEM: begin
+                        wb_next = 0; // TODO: Override this after memacc resolves
+                end
+                WB_PC4: begin
+                        wb_next = pc_exe + 4;
+                end
+                WB_CSR: begin
+                        wb_next = csr_value_exe;
+                end
+                endcase
+        end
+end
+
 // Memacc stage register forwarding
 always_ff @(posedge clk or posedge rst)
 begin
         if (rst | sys_redirect) begin
-                pc_mem <= 0;
                 ctrl_mem <= 0;
                 system_mem <= 0;
                 rd_mem <= 0;
-                result_mem <= 0;
                 csr_result_mem <= 0;
                 csrd_mem <= 0;
-                csr_value_mem <= 0;
+                wb_mem <= wb_next;
         end
         else begin
-                pc_mem <= pc_exe;
                 ctrl_mem <= ctrl_exe;
                 system_mem <= system_exe;
                 rd_mem <= rd_exe;
-                result_mem <= result_exe;
                 csr_result_mem <= csr_result_exe;
                 csrd_mem <= csrd_exe;
-                csr_value_mem <= csr_value_exe;
+                wb_mem <= wb_next;
         end
 end
 
 //======================================
 //      (5) Writeback/Commit
 //======================================
-
-always_comb
-begin
-        wb_next = 0;
-        
-        if (ctrl_mem.irf_wb & rd_mem != 0) begin
-                unique case (ctrl_mem.wb_src)
-                WB_ALU: begin
-                        wb_next = result_mem;
-                end
-                WB_MEM: begin
-                        wb_next = 0; // TODO: Make this real when mem stage added
-                end
-                WB_PC4: begin
-                        wb_next = pc_mem + 4;
-                end
-                WB_CSR: begin
-                        wb_next = csr_value_mem;
-                end
-                endcase
-        end
-end
 
 always_ff @(posedge clk or posedge rst)
 begin
@@ -327,7 +322,7 @@ begin
                         irf[i] <= 0;
         end
         else if (ctrl_mem.irf_wb & !sys_redirect) begin // Traps must prevent next wb
-                irf[rd_mem] <= wb_next;
+                irf[rd_mem] <= wb_mem;
         end
 end
 
