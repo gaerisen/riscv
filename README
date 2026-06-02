@@ -1,43 +1,8 @@
----------
-| riscv |
----------
+riscv
 
-rtl/ contains verilog descriptions for the following systems:
+An educational* core in SystemVerilog with Verilator/C++ unit tests.
 
-Extension Checklist (goal: rv32imac):
+*this is code for it doesn't work and maybe never will.
 
-[x] rvi
-[ ] rvm
-[ ] rva
-[ ] rvc
-[ ] User Mode
-[ ] Supervisor Mode
-[x] Machine Mode
-
-Design Roadmap:
-
-1. rv32i single-stage
-2. rvm
-3. rvc
-4. separate frontend and backend in 2 stages
-5. transfer rvm, rva into pipelined exec. units
-6. pipeline frontend/tomasulo
-
-Memory Layout:
-
-0x0000-0x7fff:	Flash program memory		(r xc)
-0x8000-0xbfff:	Random access memory		(rwxc)
-0xc000-0xc00c:	Timer (mtime and mtimecmp)	(rw  )
-0xc00f:         UART                            (rw  )
-
-
-Cache:
-
-Instruction and data cache are both 4 KiB direct-mapped caches with 64 byte lines. Read hits are carried out immediately, with misses creating 1 cycle of latency.
-
-Write hits are also carried out immediately. The data cache is write-allocate, so write misses introduce 1 cycle of latency to retrieve old data from main memory. The data cache is also write-through, so all writes become visible to other harts 1 cycle after the write is completed. Write-through does not delay program execution.
-
-The caches interface with the hart and with main memory through a simple handshake mechanism (valid and ready signals for addresses and data), meaning, in theory, the system should work with any amount of latency in cache and memory operation (untested).
-
-src/ contains test code in RISC-V ASM and C. Hopefully this will one day be a
-bare-bones operating system, including a shell and some cool programs.
+Target architecture: Rv32imac, f/d maybe. Full Tomasulo-scheme OoO execution.
+Current architecture: Impossible to tell.

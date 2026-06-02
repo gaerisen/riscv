@@ -9,3 +9,4 @@ obj_dir/
 main
 compile_commands.json
 logs/
+tests/
