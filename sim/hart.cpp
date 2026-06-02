@@ -98,18 +98,33 @@ int hart::run_tests(int cycles)
         }
 
 
+        unsigned int last_block;
         unsigned int instr;
+        unsigned int addr = 0;
+
+        int miss_done = 0;
+
         int status = 1;
 
         for (int i = 0; i < cycles; i++) {
+                last_block = addr >> 8;
+
+                addr = get_i_addr();
+
                 // Construct instruction from bytes
-                instr = prog.at(get_i_addr() + 3);
+                instr = prog.at(addr + 3);
                 instr <<= 8;
-                instr |= prog.at(get_i_addr() + 2);
+                instr |= prog.at(addr + 2);
                 instr <<= 8;
-                instr |= prog.at(get_i_addr() + 1);
+                instr |= prog.at(addr + 1);
                 instr <<= 8;
-                instr |= prog.at(get_i_addr() + 0);
+                instr |= prog.at(addr + 0);
+
+                // Simulate cache misses
+                if (last_block != addr >> 8)
+                        miss_done = i + 10;
+
+                set_i_ready(i > miss_done);
 
                 set_i_data(instr);
 

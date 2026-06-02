@@ -176,4 +176,16 @@ package rv32;
                 logic wfi;
         } system_t;
 
+        /*====================================================================*/
+        /*              STORE BUFFER TYPES                                    */
+        /*====================================================================*/
+        typedef struct packed {
+                logic [31:0] addr;
+                logic [7:0] byte3;
+                logic [7:0] byte2;
+                logic [7:0] byte1;
+                logic [7:0] byte0;
+                logic [3:0] byte_mask;
+        } storbuf_entry_t;
+
 endpackage: rv32

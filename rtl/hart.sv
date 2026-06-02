@@ -290,6 +290,8 @@ begin
         end
 end
 
+
+
 // Memacc stage register forwarding
 always_ff @(posedge clk or posedge rst)
 begin
