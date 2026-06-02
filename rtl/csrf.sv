@@ -7,11 +7,10 @@ import rv32::*;
         input rst,
 
         // Read/write port
-        input csr_rd,
         input [11:0] csrs,
 
         input [11:0] csrd,
-        input [31:0] csr_wb,
+        input [31:0] csr_result,
 
         output logic [31:0] csrs_value,
 
@@ -51,25 +50,23 @@ always_comb
 begin
         csrs_value = 0;
 
-        if (csr_rd) begin
-                case (csrs)
-                12'hf11: csrs_value = mvendorid;
-                12'hf12: csrs_value = marchid;
-                12'hf13: csrs_value = mimpid;
-                12'hf14: csrs_value = mhartid;
-                12'h300: csrs_value = mstatus;
-                12'h310: csrs_value = mstatush;
-                12'h301: csrs_value = misa;
-                12'h304: csrs_value = mie;
-                12'h305: csrs_value = mtvec;
-                12'h340: csrs_value = mscratch;
-                12'h341: csrs_value = mepc;
-                12'h342: csrs_value = mcause;
-                12'h343: csrs_value = mtval;
-                12'h344: csrs_value = mip;
-                default:;
-                endcase
-        end
+        case (csrs)
+        12'hf11: csrs_value = mvendorid;
+        12'hf12: csrs_value = marchid;
+        12'hf13: csrs_value = mimpid;
+        12'hf14: csrs_value = mhartid;
+        12'h300: csrs_value = mstatus;
+        12'h310: csrs_value = mstatush;
+        12'h301: csrs_value = misa;
+        12'h304: csrs_value = mie;
+        12'h305: csrs_value = mtvec;
+        12'h340: csrs_value = mscratch;
+        12'h341: csrs_value = mepc;
+        12'h342: csrs_value = mcause;
+        12'h343: csrs_value = mtval;
+        12'h344: csrs_value = mip;
+        default:;
+        endcase
 end
 
 //==================================
@@ -90,16 +87,16 @@ begin
         mip_next = mip;
 
         case (csrd)
-        12'h300: mstatus_next = csr_wb;
-        12'h310: mstatush_next = csr_wb;
-        12'h301: misa_next = csr_wb;
-        12'h304: mie_next = csr_wb;
-        12'h305: mtvec_next = csr_wb;
-        12'h340: mscratch_next = csr_wb;
-        12'h341: mepc_next = csr_wb;
-        12'h342: mcause_next = csr_wb;
-        12'h343: mtval_next = csr_wb;
-        12'h344: mip_next = csr_wb;
+        12'h300: mstatus_next = csr_result;
+        12'h310: mstatush_next = csr_result;
+        12'h301: misa_next = csr_result;
+        12'h304: mie_next = csr_result;
+        12'h305: mtvec_next = csr_result;
+        12'h340: mscratch_next = csr_result;
+        12'h341: mepc_next = csr_result;
+        12'h342: mcause_next = csr_result;
+        12'h343: mtval_next = csr_result;
+        12'h344: mip_next = csr_result;
         default:;
         endcase
 

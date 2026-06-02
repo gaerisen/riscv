@@ -51,11 +51,10 @@ package rv32;
 
 
         typedef enum logic [1:0] {
-                NONE    = 2'b00,
                 CSRRW   = 2'b01,
                 CSRRS   = 2'b10,
                 CSRRC   = 2'b11
-        } csr_op_e;
+        } csr_funct2_e;
 
         typedef enum logic {
                 NRS1    = 0,
@@ -150,15 +149,16 @@ package rv32;
                 logic jump;
                 logic load;
                 logic store;
-                logic wb;
+                logic irf_wb;
+                logic csr_wb;
 
                 alu_src1_e alu_src1;
                 alu_src2_e alu_src2;
                 wb_src_e wb_src;
 
-                csr_op_e csr_op;
                 csr_src_e csr_src;
 
+                csr_funct2_e csr_op;
                 alu_funct3_e alu_op;
                 branch_funct3_e branch_op;
                 load_funct3_e load_op;

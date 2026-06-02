@@ -21,15 +21,16 @@ logic [31:0] mask;
 always_comb
 begin
         mask = rs1_value;
+        csr_new_next = csr_old;
 
         if (ctrl_i.csr_src == UIMM)
                 mask = imm;
 
-        unique case (ctrl_i.csr_op)
+        case (ctrl_i.csr_op)
         CSRRW: csr_new_next = mask;
         CSRRS: csr_new_next = csr_old | mask;
         CSRRC: csr_new_next = csr_old & ~mask;
-        NONE: csr_new_next = csr_old;
+        default :;
         endcase
 end
 

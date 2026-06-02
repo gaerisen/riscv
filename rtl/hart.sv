@@ -19,14 +19,25 @@ logic [31:0] pc_fet;
 logic valid;
 logic flush;
 
-// Decode pipeline regs
-logic [31:0] pc_dec;
-ctrl_t ctrl_dec;
-system_t system_dec;
+// Fetch->Decode wires
 logic [4:0] rs1;
 logic [4:0] rs2;
 logic [11:0] csrs;
 logic [31:0] csr_read;
+logic [31:0] rs1_val_dec_next;
+logic [31:0] rs2_val_dec_next;
+logic [31:0] csr_val_dec_next;
+
+// Decode pipeline regs
+logic [31:0] pc_dec;
+ctrl_t ctrl_dec;
+system_t system_dec;
+logic [31:0] rs1_val_dec;
+logic [31:0] rs2_val_dec;
+logic [31:0] csr_val_dec;
+logic [4:0] rs1_dec;
+logic [4:0] rs2_dec;
+logic [11:0] csrs_dec;
 logic [31:0] imm;
 logic [4:0] rd_dec;
 
@@ -70,11 +81,10 @@ logic [31:0] irf [32] /*verilator public*/;
 csrf csrf(
         .*,
 
-        .csr_rd(ctrl_dec.csr_op != NONE),
         .csrs_value(csr_read),
 
         .csrd(csrd_mem),
-        .csr_wb(csr_result_mem),
+        .csr_result(csr_result_mem),
 
         .sys_word(system_mem)
 );
@@ -99,9 +109,60 @@ fetch fetch (
         .flush_o(flush)
 );
 
+//======================================
+//      (2a) Reg read 
+//======================================
+
+assign rs1 = instr.r.rs1;
+assign rs2 = instr.r.rs2;
+assign csrs = instr.i.imm11_0;
+
+// Register read happens here, but we also need one pass of operand forwarding
+// from late in the pipeline to make sure we have an up-to-date fallback for the
+// second pass
+always_comb
+begin
+        rs1_val_dec_next = irf[rs1];
+        rs2_val_dec_next = irf[rs2];
+        csr_val_dec_next = csr_read;
+
+        if (rs1 == 0)
+                rs1_val_dec_next = 0;
+        else if (ctrl_mem.irf_wb & (rs1 == rd_mem))
+                rs1_val_dec_next = result_mem;
+
+        if (rs2 == 0)
+                rs2_val_dec_next = 0;
+        else if (ctrl_mem.irf_wb & (rs2 == rd_mem))
+                rs2_val_dec_next = result_mem;
+
+        if (ctrl_mem.csr_op & (csrs == csrd_mem))
+                csr_val_dec_next = csr_result_mem;
+end
+
+always_ff @(posedge clk or posedge rst)
+begin
+        if (rst | flush) begin
+                rs1_dec <= 0;
+                rs2_dec <= 0;
+                csrs_dec <= 0;
+                rs1_val_dec <= 0;
+                rs2_val_dec <= 0;
+                csr_val_dec <= 0;
+        end
+        else begin
+                rs1_dec <= rs1;
+                rs2_dec <= rs2;
+                csrs_dec <= csrs;
+                rs1_val_dec <= rs1_val_dec_next;
+                rs2_val_dec <= rs2_val_dec_next;
+                csr_val_dec <= csr_val_dec_next;
+        end
+end
+        
 
 //======================================
-//      (2) Decode
+//      (2b) Decode
 //======================================
 
 decoder decoder (
@@ -111,9 +172,6 @@ decoder decoder (
 
         .instr_i(instr),
 
-        .rs1_o(rs1),
-        .rs2_o(rs2),
-        .csrs_o(csrs),
         .imm_o(imm),
         .rd_o(rd_dec),
 
@@ -136,33 +194,31 @@ end
 //      (3) Execute        
 //======================================
 
-// Operand forwarding and register read
+// Operand forwarding second pass
 always_comb
 begin
-        if (rs1 == 0)
+        rs1_value = rs1_val_dec;
+        rs2_value = rs2_val_dec;
+        csr_value = csr_val_dec;
+
+        if (rs1_dec == 0)
                 rs1_value = 0;
-        else if (ctrl_exe.wb & (rs1 == rd_exe))
+        else if (ctrl_exe.irf_wb & (rs1_dec == rd_exe))
                 rs1_value = result_exe;
-        else if (ctrl_mem.wb & (rs1 == rd_mem))
+        else if (ctrl_mem.irf_wb & (rs1_dec == rd_mem))
                 rs1_value = result_mem;
-        else
-                rs1_value = irf[rs1];
 
-        if (rs2 == 0)
+        if (rs2_dec == 0)
                 rs2_value = 0;
-        else if (ctrl_exe.wb & (rs2 == rd_exe))
+        else if (ctrl_exe.irf_wb & (rs2_dec == rd_exe))
                 rs2_value = result_exe;
-        else if (ctrl_mem.wb & (rs2 == rd_mem))
+        else if (ctrl_mem.irf_wb & (rs2_dec == rd_mem))
                 rs2_value = result_mem;
-        else
-                rs2_value = irf[rs2];
 
-        if ((ctrl_exe.csr_op != NONE) & (csrs == csrd_exe))
+        if (ctrl_exe.csr_op & (csrs_dec == csrd_exe))
                 csr_value = csr_result_exe;
-        else if ((ctrl_mem.csr_op != NONE) & (csrs == csrd_mem))
+        else if (ctrl_mem.csr_op & (csrs_dec == csrd_mem))
                 csr_value = csr_result_mem;
-        else
-                csr_value = csr_read;
 end
 
 // Main ALU for single-cycle arithmetic and logic
@@ -203,7 +259,7 @@ begin
                 ctrl_exe <= ctrl_dec;
                 system_exe <= system_dec;
                 rd_exe <= rd_dec;
-                csrd_exe <= csrs; // Zicsr is atomic swap --> csrd = csrs
+                csrd_exe <= csrs_dec; // Zicsr is atomic swap --> csrd = csrs
                 csr_value_exe <= csr_value;
         end
 end
@@ -246,7 +302,7 @@ always_comb
 begin
         wb_next = 0;
         
-        if (ctrl_mem.wb & rd_mem != 0) begin
+        if (ctrl_mem.irf_wb & rd_mem != 0) begin
                 unique case (ctrl_mem.wb_src)
                 WB_ALU: begin
                         wb_next = result_mem;
@@ -270,7 +326,7 @@ begin
                 for (int i = 0; i < 32; i++)
                         irf[i] <= 0;
         end
-        else if (ctrl_mem.wb & !sys_redirect) begin // Traps must prevent next wb
+        else if (ctrl_mem.irf_wb & !sys_redirect) begin // Traps must prevent next wb
                 irf[rd_mem] <= wb_next;
         end
 end

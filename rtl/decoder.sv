@@ -11,9 +11,6 @@ import rv32::*;
 
         input logic [31:0] instr_i,
 
-        output logic [4:0] rs1_o,
-        output logic [4:0] rs2_o,
-        output logic [11:0] csrs_o,
         output logic [31:0] imm_o,
         output logic [4:0] rd_o,
 
@@ -24,10 +21,7 @@ import rv32::*;
 
 instr_t instr;
 logic [31:0] imm_next;
-logic [4:0] rs1_next;
-logic [4:0] rs2_next;
 logic [4:0] rd_next;
-logic [11:0] csrs_next;
 system_t system_next;
 ctrl_t ctrl_next;
 
@@ -35,10 +29,7 @@ ctrl_t ctrl_next;
 assign instr = instr_i;
 
 // Extract register identifiers (always same location)
-assign rs1_next = instr.r.rs1;
-assign rs2_next = instr.r.rs2;
 assign rd_next = instr.r.rd;
-assign csrs_next = instr.i.imm11_0;
 
 initial
 begin
@@ -58,12 +49,13 @@ begin
         ctrl_next.jump = 0;
         ctrl_next.load = 0;
         ctrl_next.store = 0;
-        ctrl_next.wb = 0;
+        ctrl_next.irf_wb = 0;
+        ctrl_next.csr_wb = 0;
         ctrl_next.wb_src = WB_ALU;
         ctrl_next.branch_op = BEQ;
         ctrl_next.load_op = LB;
         ctrl_next.store_op = SB;
-        ctrl_next.csr_op = NONE;
+        ctrl_next.csr_op = CSRRW;
         ctrl_next.csr_src = NRS1;
         ctrl_next.alu_alt = NORM;
         system_next.illegal = 0;
@@ -84,7 +76,7 @@ begin
                         ctrl_next.alu_src1 = ZERO;
                         ctrl_next.alu_src2 = IMM;
 
-                        ctrl_next.wb = 1;
+                        ctrl_next.irf_wb = 1;
                         ctrl_next.wb_src = WB_ALU;
                 end
 
@@ -95,7 +87,7 @@ begin
                         ctrl_next.alu_src1 = PC;
                         ctrl_next.alu_src2 = IMM;
 
-                        ctrl_next.wb = 1;
+                        ctrl_next.irf_wb = 1;
                         ctrl_next.wb_src = WB_ALU;
                 end
 
@@ -111,7 +103,7 @@ begin
 
                         ctrl_next.jump = 1;
 
-                        ctrl_next.wb = 1;
+                        ctrl_next.irf_wb = 1;
                         ctrl_next.wb_src = WB_PC4;
                 end
 
@@ -125,7 +117,7 @@ begin
 
                         ctrl_next.jump = 1;
 
-                        ctrl_next.wb = 1;
+                        ctrl_next.irf_wb = 1;
                         ctrl_next.wb_src = WB_PC4;
 
                         if (instr.i.funct3 != 3'b000)
@@ -160,7 +152,7 @@ begin
                         ctrl_next.load = 1;
                         ctrl_next.load_op = load_funct3_e'(instr.i.funct3);
 
-                        ctrl_next.wb = 1;
+                        ctrl_next.irf_wb = 1;
                         ctrl_next.wb_src = WB_MEM;
 
                         if (instr.i.funct3 == 3'b011 |
@@ -195,7 +187,7 @@ begin
                         if (alu_funct3_e'(instr.i.funct3) == SR)
                                 ctrl_next.alu_alt = alu_funct7_e'(instr.r.funct7);
 
-                        ctrl_next.wb = 1;
+                        ctrl_next.irf_wb = 1;
                         ctrl_next.wb_src = WB_ALU;
                 end
 
@@ -209,7 +201,7 @@ begin
                         ctrl_next.alu_src1 = RS1;
                         ctrl_next.alu_src2 = RS2;
 
-                        ctrl_next.wb = 1;
+                        ctrl_next.irf_wb = 1;
                         ctrl_next.wb_src = WB_ALU;
                 end
 
@@ -236,12 +228,13 @@ begin
                                         system_next.illegal = 1; 
                         end
                         else begin
-                                ctrl_next.csr_op = csr_op_e'(instr.i.funct3[1:0]);
+                                ctrl_next.csr_op = csr_funct2_e'(instr.i.funct3[1:0]);
                                 ctrl_next.csr_src = csr_src_e'(instr.i.funct3[2]);
 
                                 imm_next = {27'b0, instr.i.rs1};
 
-                                ctrl_next.wb = 1;
+                                ctrl_next.csr_wb = 1;
+                                ctrl_next.irf_wb = 1;
                                 ctrl_next.wb_src = WB_CSR;
                         end
                 end
@@ -259,18 +252,12 @@ begin
                 ctrl_o <= 0;
                 system_o <= 0;
                 imm_o <= 0;
-                rs1_o <= 0;
-                rs2_o <= 0;
                 rd_o <= 0;
-                csrs_o <= 0;
         end else begin
                 ctrl_o <= ctrl_next;
                 system_o <= system_next;
                 imm_o <= imm_next;
-                rs1_o <= rs1_next;
-                rs2_o <= rs2_next;
                 rd_o <= rd_next;
-                csrs_o <= csrs_next;
         end
 end
 

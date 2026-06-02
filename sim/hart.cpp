@@ -116,13 +116,11 @@ int hart::run_tests(int cycles)
                 pulse();
 
                 // Workaround for checking exit status without memory iface
-                if (dut->hart->ctrl_mem & (1 << 28)) {
+                if (dut->hart->ctrl_mem & (1 << 29)) {
                         status = !(dut->hart->irf[3] == 1);
                         break;
                 }
         }
-
-        std::cout << std::dec << std::endl;
 
         return status;
 }
