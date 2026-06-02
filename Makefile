@@ -51,6 +51,8 @@ main: obj_dir/Vtop__ALL.a $(TB_OBJ)
 	       -lpthread -o $@
 
 
-.PHONY: clean
+.PHONY: clean cleaner
 clean:
+	rm -rf sim/*.o
+cleaner:
 	rm -rf obj_dir sim/*.o main
