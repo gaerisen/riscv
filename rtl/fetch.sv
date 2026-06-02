@@ -31,11 +31,13 @@ import rv32::*;
         input sys_redirect,
         input [31:0] sys_vec,
 
+        // Asynchronous flush signal
+        output logic flush_o,
+
         // Output to decode stage
         output logic [31:0] pc_o,
         output instr_t instr_o,
-        output logic valid_o,
-        output logic flush_o
+        output logic valid_o
 );
 
 initial
@@ -56,7 +58,6 @@ logic [31:0] pc_next;
 
 logic [31:0] instr_next;
 logic valid_next;
-logic flush_next;
 
 logic imem_stalling;
 
@@ -215,8 +216,9 @@ always_comb
 begin
         // Stall-safe defaults
         pc_next = pc_o + 4;
-        flush_next = 0;
         state_next = state;
+
+        flush_o = 0;
 
         unique case (state)
         RESET: begin
@@ -236,11 +238,11 @@ begin
                 // If misprediction detected, redirect and flush pipeline
                 else if (j_mispredict | b_mispredict_nt) begin
                         pc_next = alu_result;
-                        flush_next = 1;
+                        flush_o = 1;
                 end
                 else if (b_mispredict_t) begin
                         pc_next = pc_exe + 4;
-                        flush_next = 1;
+                        flush_o = 1;
                 end
 
                 // Next cases should all be mutually exclusive; each relies on a
@@ -269,7 +271,7 @@ begin
         // If system-level redirect, clobber FSM results completely
         if (sys_redirect) begin
                 pc_next = sys_vec;
-                flush_next = 1;
+                flush_o = 1;
                 state_next = STREAMING;
         end
 
@@ -295,7 +297,6 @@ begin
                 pc_o <= 0;
                 instr_o <= 0;
                 valid_o <= 0;
-                flush_o <= 0;
 
                 state <= RESET;
         end
@@ -303,7 +304,6 @@ begin
                 pc_o <= pc_next;
                 instr_o <= instr_next;
                 valid_o <= valid_next;
-                flush_o <= flush_next;
 
                 state <= state_next;
         end

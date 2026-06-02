@@ -80,31 +80,51 @@ int hart::run_tests(int cycles)
         //                                             ^
         //                                         jalr imm[0]
 
-        std::cout << "=== Begin Hart Testing ===" << std::endl;
-
         // Hardware model execution
         reset(6);
-        dut->eval();
 
         set_i_ready(1);
 
         std::vector<unsigned char> prog;
 
-        read_program("program.bin", prog);
+        read_program("prog.bin", prog);
+        
+        // Pad end of memory with some NOPs
+        for (int i = 0; i < 32; i++) {
+                prog.push_back(0x13);
+                prog.push_back(0x00);
+                prog.push_back(0x00);
+                prog.push_back(0x00);
+        }
 
-        std::cout << std::hex;
 
-        for (auto v : prog) {
-                std::cout << v << " ";
+        unsigned int instr;
+        int status = 1;
+
+        for (int i = 0; i < cycles; i++) {
+                // Construct instruction from bytes
+                instr = prog.at(get_i_addr() + 3);
+                instr <<= 8;
+                instr |= prog.at(get_i_addr() + 2);
+                instr <<= 8;
+                instr |= prog.at(get_i_addr() + 1);
+                instr <<= 8;
+                instr |= prog.at(get_i_addr() + 0);
+
+                set_i_data(instr);
+
+                pulse();
+
+                // Workaround for checking exit status without memory iface
+                if (dut->hart->ctrl_mem & (1 << 28)) {
+                        status = !(dut->hart->irf[3] == 1);
+                        break;
+                }
         }
 
         std::cout << std::dec << std::endl;
 
-        print_regfile();
-
-        std::cout << "=== Testing Complete ===" << std::endl;
-
-        return 0;
+        return status;
 }
 
 } // namespace sim

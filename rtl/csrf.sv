@@ -23,7 +23,6 @@ import rv32::*;
         output logic [31:0] sys_vec
 );
 
-logic [31:0] csrs_value_next;
 logic sys_redirect_next;
 logic [31:0] sys_vec_next;
 
@@ -50,36 +49,26 @@ logic [31:0] mip, mip_next;
 
 always_comb
 begin
-        csrs_value_next = 0;
+        csrs_value = 0;
 
         if (csr_rd) begin
                 case (csrs)
-                12'hf11: csrs_value_next = mvendorid;
-                12'hf12: csrs_value_next = marchid;
-                12'hf13: csrs_value_next = mimpid;
-                12'hf14: csrs_value_next = mhartid;
-                12'h300: csrs_value_next = mstatus;
-                12'h310: csrs_value_next = mstatush;
-                12'h301: csrs_value_next = misa;
-                12'h304: csrs_value_next = mie;
-                12'h305: csrs_value_next = mtvec;
-                12'h340: csrs_value_next = mscratch;
-                12'h341: csrs_value_next = mepc;
-                12'h342: csrs_value_next = mcause;
-                12'h343: csrs_value_next = mtval;
-                12'h344: csrs_value_next = mip;
+                12'hf11: csrs_value = mvendorid;
+                12'hf12: csrs_value = marchid;
+                12'hf13: csrs_value = mimpid;
+                12'hf14: csrs_value = mhartid;
+                12'h300: csrs_value = mstatus;
+                12'h310: csrs_value = mstatush;
+                12'h301: csrs_value = misa;
+                12'h304: csrs_value = mie;
+                12'h305: csrs_value = mtvec;
+                12'h340: csrs_value = mscratch;
+                12'h341: csrs_value = mepc;
+                12'h342: csrs_value = mcause;
+                12'h343: csrs_value = mtval;
+                12'h344: csrs_value = mip;
                 default:;
                 endcase
-        end
-end
-
-always_ff @(posedge clk or posedge rst)
-begin
-        if (rst) begin
-                csrs_value <= 0;
-        end
-        else begin
-                csrs_value <= csrs_value_next;
         end
 end
 
@@ -113,6 +102,13 @@ begin
         12'h344: mip_next = csr_wb;
         default:;
         endcase
+
+        if (sys_word.ebreak)
+                mcause_next = 3;
+        else if (sys_word.illegal)
+                mcause_next = 2;
+        else if (sys_word.ecall)
+                mcause_next = 11;
 end
 
 always_ff @(posedge clk or posedge rst)

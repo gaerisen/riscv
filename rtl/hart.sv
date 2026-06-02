@@ -26,8 +26,6 @@ system_t system_dec;
 logic [4:0] rs1;
 logic [4:0] rs2;
 logic [11:0] csrs;
-logic [31:0] rs1_read;
-logic [31:0] rs2_read;
 logic [31:0] csr_read;
 logic [31:0] imm;
 logic [4:0] rd_dec;
@@ -55,7 +53,7 @@ logic [4:0] rd_mem;
 logic [31:0] csr_result_mem;
 logic [11:0] csrd_mem;
 logic [31:0] csr_value_mem;
-ctrl_t ctrl_mem;
+ctrl_t ctrl_mem /*verilator public*/;
 system_t system_mem;
 
 // Memacc->Writeback wires
@@ -103,20 +101,19 @@ fetch fetch (
 
 
 //======================================
-//      (2) Decode/IRF read
+//      (2) Decode
 //======================================
 
 decoder decoder (
         .*,
 
-        .flush(0),
         .stall(~valid),
 
         .instr_i(instr),
 
         .rs1_o(rs1),
         .rs2_o(rs2),
-        .csr_o(csrs),
+        .csrs_o(csrs),
         .imm_o(imm),
         .rd_o(rd_dec),
 
@@ -126,15 +123,11 @@ decoder decoder (
 
 always_ff @(posedge clk or posedge rst)
 begin
-        if (rst) begin
+        if (rst | flush) begin
                 pc_dec <= 0;
-                rs1_read <= 0;
-                rs2_read <= 0;
         end
         else begin
                 pc_dec <= pc_fet;
-                rs1_read <= irf[rs1];
-                rs2_read <= irf[rs2];
         end
 end
 
@@ -143,30 +136,30 @@ end
 //      (3) Execute        
 //======================================
 
-// Operand forwarding
+// Operand forwarding and register read
 always_comb
 begin
         if (rs1 == 0)
                 rs1_value = 0;
-        else if (rs1 == rd_exe)
+        else if (ctrl_exe.wb & (rs1 == rd_exe))
                 rs1_value = result_exe;
-        else if (rs1 == rd_mem)
+        else if (ctrl_mem.wb & (rs1 == rd_mem))
                 rs1_value = result_mem;
         else
-                rs1_value = rs1_read;
+                rs1_value = irf[rs1];
 
         if (rs2 == 0)
                 rs2_value = 0;
-        else if (rs2 == rd_exe)
+        else if (ctrl_exe.wb & (rs2 == rd_exe))
                 rs2_value = result_exe;
-        else if (rs2 == rd_mem)
+        else if (ctrl_mem.wb & (rs2 == rd_mem))
                 rs2_value = result_mem;
         else
-                rs2_value = rs2_read;
+                rs2_value = irf[rs2];
 
-        if (csrs == csrd_exe)
+        if ((ctrl_exe.csr_op != NONE) & (csrs == csrd_exe))
                 csr_value = csr_result_exe;
-        else if (csrs == csrd_mem)
+        else if ((ctrl_mem.csr_op != NONE) & (csrs == csrd_mem))
                 csr_value = csr_result_mem;
         else
                 csr_value = csr_read;
@@ -223,7 +216,7 @@ end
 // Memacc stage register forwarding
 always_ff @(posedge clk or posedge rst)
 begin
-        if (rst | flush) begin
+        if (rst | sys_redirect) begin
                 pc_mem <= 0;
                 ctrl_mem <= 0;
                 system_mem <= 0;
@@ -277,7 +270,7 @@ begin
                 for (int i = 0; i < 32; i++)
                         irf[i] <= 0;
         end
-        else if (ctrl_mem.wb) begin
+        else if (ctrl_mem.wb & !sys_redirect) begin // Traps must prevent next wb
                 irf[rd_mem] <= wb_next;
         end
 end

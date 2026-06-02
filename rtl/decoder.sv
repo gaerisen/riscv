@@ -13,7 +13,7 @@ import rv32::*;
 
         output logic [4:0] rs1_o,
         output logic [4:0] rs2_o,
-        output logic [11:0] csr_o,
+        output logic [11:0] csrs_o,
         output logic [31:0] imm_o,
         output logic [4:0] rd_o,
 
@@ -23,11 +23,11 @@ import rv32::*;
 );
 
 instr_t instr;
+logic [31:0] imm_next;
 logic [4:0] rs1_next;
 logic [4:0] rs2_next;
-logic [11:0] csr_next;
-logic [31:0] imm_next;
 logic [4:0] rd_next;
+logic [11:0] csrs_next;
 system_t system_next;
 ctrl_t ctrl_next;
 
@@ -38,7 +38,7 @@ assign instr = instr_i;
 assign rs1_next = instr.r.rs1;
 assign rs2_next = instr.r.rs2;
 assign rd_next = instr.r.rd;
-assign csr_next = instr.i.imm11_0;
+assign csrs_next = instr.i.imm11_0;
 
 initial
 begin
@@ -65,6 +65,7 @@ begin
         ctrl_next.store_op = SB;
         ctrl_next.csr_op = NONE;
         ctrl_next.csr_src = NRS1;
+        ctrl_next.alu_alt = NORM;
         system_next.illegal = 0;
         system_next.ecall = 0;
         system_next.ebreak = 0;
@@ -191,6 +192,9 @@ begin
                         ctrl_next.alu_src1 = RS1;
                         ctrl_next.alu_src2 = IMM;
 
+                        if (alu_funct3_e'(instr.i.funct3) == SR)
+                                ctrl_next.alu_alt = alu_funct7_e'(instr.r.funct7);
+
                         ctrl_next.wb = 1;
                         ctrl_next.wb_src = WB_ALU;
                 end
@@ -200,6 +204,7 @@ begin
                                 instr.r.funct7 != ALT)
                                 system_next.illegal = 1;
 
+                        ctrl_next.alu_alt = alu_funct7_e'(instr.r.funct7);
                         ctrl_next.alu_op = alu_funct3_e'(instr.i.funct3);
                         ctrl_next.alu_src1 = RS1;
                         ctrl_next.alu_src2 = RS2;
@@ -222,9 +227,9 @@ begin
                                 else if (instr.r.rs2 == 1 & instr.r.funct7 == 0)
                                         system_next.ebreak = 1;
                                 else if (instr.r.rs2 == 2 & instr.r.funct7 == 8)
-                                        system_next.mret = 1;
-                                else if (instr.r.rs2 == 2 & instr.r.funct7 == 24)
                                         system_next.sret = 1;
+                                else if (instr.r.rs2 == 2 & instr.r.funct7 == 24)
+                                        system_next.mret = 1;
                                 else if (instr.r.rs2 == 5 & instr.r.funct7 == 8)
                                         system_next.wfi = 1;
                                 else
@@ -251,21 +256,21 @@ end
 always_ff @(posedge clk or posedge rst)
 begin
         if (rst | flush | stall) begin
-                ctrl_o.alu_op <= ADDSUB;
+                ctrl_o <= 0;
                 system_o <= 0;
+                imm_o <= 0;
                 rs1_o <= 0;
                 rs2_o <= 0;
-                csr_o <= 0;
-                imm_o <= 0;
                 rd_o <= 0;
+                csrs_o <= 0;
         end else begin
                 ctrl_o <= ctrl_next;
                 system_o <= system_next;
+                imm_o <= imm_next;
                 rs1_o <= rs1_next;
                 rs2_o <= rs2_next;
-                csr_o <= csr_next;
-                imm_o <= imm_next;
                 rd_o <= rd_next;
+                csrs_o <= csrs_next;
         end
 end
 

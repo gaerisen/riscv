@@ -53,4 +53,4 @@ main: obj_dir/Vtop__ALL.a $(TB_OBJ)
 
 .PHONY: clean
 clean:
-	rm -rf obj_dir $(TB_OBJ) main
+	rm -rf obj_dir sim/*.o main
