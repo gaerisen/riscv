@@ -24,9 +24,7 @@ logic [4:0] rs1;
 logic [4:0] rs2;
 logic [11:0] csrs;
 logic [31:0] csr_read;
-logic [31:0] rs1_val_dec_next;
-logic [31:0] rs2_val_dec_next;
-logic [31:0] csr_val_dec_next;
+logic bubble_next;
 
 // Decode pipeline regs
 logic [31:0] pc_dec;
@@ -40,6 +38,7 @@ logic [4:0] rs2_dec;
 logic [11:0] csrs_dec;
 logic [31:0] imm;
 logic [4:0] rd_dec;
+logic stall;
 
 // Decode->Execute wires
 logic [31:0] rs1_value;
@@ -67,6 +66,11 @@ logic [31:0] wb_mem;
 
 // Memacc->Writeback wires
 logic [31:0] wb_next;
+
+// Writeback pipeline regs
+logic [4:0] rd_wb;
+logic [31:0] wb_wb;
+ctrl_t ctrl_wb;
 
 // Trap wires
 logic sys_redirect;
@@ -115,29 +119,6 @@ assign rs1 = instr.r.rs1;
 assign rs2 = instr.r.rs2;
 assign csrs = instr.i.imm11_0;
 
-// Register read happens here, but we also need one pass of operand forwarding
-// from late in the pipeline to make sure we have an up-to-date fallback for the
-// second pass
-always_comb
-begin
-        rs1_val_dec_next = irf[rs1];
-        rs2_val_dec_next = irf[rs2];
-        csr_val_dec_next = csr_read;
-
-        if (rs1 == 0)
-                rs1_val_dec_next = 0;
-        else if (ctrl_mem.irf_wb & (rs1 == rd_mem))
-                rs1_val_dec_next = wb_mem;
-
-        if (rs2 == 0)
-                rs2_val_dec_next = 0;
-        else if (ctrl_mem.irf_wb & (rs2 == rd_mem))
-                rs2_val_dec_next = wb_mem;
-
-        if (ctrl_mem.csr_wb & (csrs == csrd_mem))
-                csr_val_dec_next = csr_result_mem;
-end
-
 always_ff @(posedge clk or posedge rst)
 begin
         if (rst | flush) begin
@@ -152,9 +133,9 @@ begin
                 rs1_dec <= rs1;
                 rs2_dec <= rs2;
                 csrs_dec <= csrs;
-                rs1_val_dec <= rs1_val_dec_next;
-                rs2_val_dec <= rs2_val_dec_next;
-                csr_val_dec <= csr_val_dec_next;
+                rs1_val_dec <= irf[rs1];
+                rs2_val_dec <= irf[rs2];
+                csr_val_dec <= csr_read;
         end
 end
         
@@ -192,7 +173,7 @@ end
 //      (3) Execute        
 //======================================
 
-// Operand forwarding second pass
+// Operand forwarding
 always_comb
 begin
         rs1_value = rs1_val_dec;
@@ -205,6 +186,8 @@ begin
                 rs1_value = wb_next;
         else if (ctrl_mem.irf_wb & (rs1_dec == rd_mem))
                 rs1_value = wb_mem;
+        else if (ctrl_wb.irf_wb & (rs1_dec == rd_wb))
+                rs1_value = wb_wb;
 
         if (rs2_dec == 0)
                 rs2_value = 0;
@@ -212,6 +195,8 @@ begin
                 rs2_value = wb_next;
         else if (ctrl_mem.irf_wb & (rs2_dec == rd_mem))
                 rs2_value = wb_mem;
+        else if (ctrl_wb.irf_wb & (rs2_dec == rd_wb))
+                rs2_value = wb_wb;
 
         if (ctrl_exe.csr_wb & (csrs_dec == csrd_exe))
                 csr_value = csr_result_exe;
@@ -244,7 +229,7 @@ csru csru (
 
 always_ff @(posedge clk or posedge rst)
 begin
-        if (rst | flush) begin
+        if (rst | flush | stall) begin
                 pc_exe <= 0;
                 ctrl_exe <= 0;
                 system_exe <= 0;
@@ -290,8 +275,6 @@ begin
         end
 end
 
-
-
 // Memacc stage register forwarding
 always_ff @(posedge clk or posedge rst)
 begin
@@ -322,9 +305,15 @@ begin
         if (rst) begin
                 for (int i = 0; i < 32; i++)
                         irf[i] <= 0;
+                wb_wb <= 0;
+                rd_wb <= 0;
+                ctrl_wb <= 0;
         end
         else if (ctrl_mem.irf_wb & !sys_redirect) begin // Traps must prevent next wb
                 irf[rd_mem] <= wb_mem;
+                wb_wb <= wb_mem;
+                rd_wb <= rd_mem;
+                ctrl_wb <= ctrl_mem;
         end
 end
 
