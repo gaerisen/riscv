@@ -1,6 +1,6 @@
 TARGET ?= top
 
-RTL_SRC := pkg/rv32.sv rtl/$(TARGET).sv
+RTL_SRC := pkg/rv32.sv pkg/mem_ifc.sv rtl/$(TARGET).sv
 
 VERILATOR_ROOT ?= $(shell verilator --getenv VERILATOR_ROOT)
 VINC = $(VERILATOR_ROOT)/include
@@ -55,4 +55,4 @@ main: obj_dir/Vtop__ALL.a $(TB_OBJ)
 clean:
 	rm -rf sim/*.o
 cleaner:
-	rm -rf obj_dir sim/*.o main
+	rm -rf obj_dir sim/*.o main *.vcd

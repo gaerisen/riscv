@@ -1,6 +1,7 @@
 #include "fetch.hpp"
 #include "generator.hpp"
 #include <iostream>
+#include <vector>
 
 #define byte(x) (x & 0b11111111)
 #define fvlsb(x) (x & 0b11111)
@@ -67,13 +68,13 @@ bool fetch::get_valid() { return dut->valid_o; }
 bool fetch::get_flush() { return dut->flush_o; }
 
 void fetch::set_i_data_ready(int in) { dut->i_data_ready = in; }
-void fetch::set_i_data_i(int in) { dut->i_data_i = in; }
+void fetch::set_i_data_i(int in) { dut->i_data = in; }
 void fetch::set_jump(bool in) { dut->jump = in; }
 void fetch::set_branch(bool in) { dut->branch = in; }
 void fetch::set_branch_taken(bool in) { dut->branch_taken = in; }
 void fetch::set_alu_result(int in) { dut->alu_result = in; }
-void fetch::set_pc_dec(int in) { dut->pc_from_dec = in; }
-void fetch::set_pc_exe(int in) { dut->pc_from_exe = in; }
+void fetch::set_pc_dec(int in) { dut->pc_dec = in; }
+void fetch::set_pc_exe(int in) { dut->pc_exe = in; }
 
 int fetch::run_tests(int cycles)
 {

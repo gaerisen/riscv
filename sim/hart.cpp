@@ -1,6 +1,5 @@
 #include "hart.hpp"
 #include "Vtop_hart.h"
-#include "generator.hpp"
 #include <iomanip>
 #include <iostream>
 #include <fstream>
@@ -66,78 +65,73 @@ void hart::print_regfile() {
 
 int hart::run_tests(int cycles)
 {
-        struct sim::generator instr_gen;
-
-        instr_gen.add_field(1, 0, 3);
-        instr_gen.add_field(6, 2, opcodes, 11); 
-
-        // Masked random to make immediates word-aligned for jumps
-        int idx = instr_gen.add_field(31, 7, RAND_MASK);
-
-        //                                    jal(r) imm[1]    branch imm[1]
-        //                                            v            v
-        instr_gen.fields.at(idx).set_mask(0b1111111111001111111111101);
-        //                                             ^
-        //                                         jalr imm[0]
-
-        // Hardware model execution
-        reset(6);
-
-        set_i_ready(1);
-
+        std::ifstream progfs("progs.txt");
         std::vector<unsigned char> prog;
+        std::string filename;
 
-        read_program("prog.bin", prog);
-        
-        // Pad end of memory with some NOPs
-        for (int i = 0; i < 32; i++) {
-                prog.push_back(0x13);
-                prog.push_back(0x00);
-                prog.push_back(0x00);
-                prog.push_back(0x00);
-        }
+        while (true) {
+                prog.clear();
 
+                std::getline(progfs, filename);
+                if (!progfs) break;
 
-        unsigned int last_block;
-        unsigned int instr;
-        unsigned int addr = 0;
+                std::cout << std::setw(30) << std::left << filename;
 
-        int miss_done = 0;
-
-        int status = 1;
-
-        for (int i = 0; i < cycles; i++) {
-                last_block = addr >> 8;
-
-                addr = get_i_addr();
-
-                // Construct instruction from bytes
-                instr = prog.at(addr + 3);
-                instr <<= 8;
-                instr |= prog.at(addr + 2);
-                instr <<= 8;
-                instr |= prog.at(addr + 1);
-                instr <<= 8;
-                instr |= prog.at(addr + 0);
-
-                // Simulate cache misses
-                if (last_block != addr >> 8)
-                        miss_done = i + 10;
-
-                set_i_ready(i > miss_done);
-
-                set_i_data(instr);
-
-                pulse();
-
-                // Workaround for checking exit status without memory iface
-                if (dut->hart->ctrl_mem & (1 << 29)) {
-                        status = !(dut->hart->irf[3] == 1);
-                        break;
+                read_program(filename, prog);
+                
+                // Pad end of memory with some NOPs
+                for (int i = 0; i < 32; i++) {
+                        prog.push_back(0x13);
+                        prog.push_back(0x00);
+                        prog.push_back(0x00);
+                        prog.push_back(0x00);
                 }
-        }
 
-        return status;
+                unsigned int last_block;
+                unsigned int instr;
+                unsigned int addr = 0;
+
+                int miss_done = 0;
+                int status = 1;
+
+                reset(6);
+
+                for (int i = 0; true; i++) {
+                        last_block = addr >> 8;
+
+                        addr = get_i_addr();
+
+                        // Construct instruction from bytes
+                        instr = prog.at(addr + 3);
+                        instr <<= 8;
+                        instr |= prog.at(addr + 2);
+                        instr <<= 8;
+                        instr |= prog.at(addr + 1);
+                        instr <<= 8;
+                        instr |= prog.at(addr + 0);
+
+                        // Simulate cache misses
+                        if (last_block != addr >> 8)
+                                miss_done = i + 10;
+
+                        set_i_ready(i > miss_done);
+
+                        set_i_data(instr);
+
+                        pulse();
+
+                        // Workaround for checking exit status without memory iface
+                        if (dut->hart->ctrl_mem & (1 << 29)) {
+                                status = !(dut->hart->irf[3] == 1);
+                                break;
+                        }
+                }
+
+                if (status) std::cout << "Failed";
+                std::cout << std::endl;
+        }
+        
+        return 0;
 }
 
 } // namespace sim

@@ -10,17 +10,13 @@ int main(int argc, char *argv[])
         auto ctx = std::make_shared<VerilatedContext>();
         ctx->traceEverOn(true);
 
-        struct sim::hart dut(ctx);
+        sim::hart dut(ctx);
 
         srand(time(0));
 
         try {
 
-                if (dut.run_tests(1024)) {
-                        std::cout << "Tests failed" << std::endl;
-                } else {
-                        std::cout << "Tests passed" << std::endl;
-                }
+                dut.run_tests(0);
 
         } catch (const std::runtime_error& e) {
                 std::cerr << "RUNTIME: " << e.what();

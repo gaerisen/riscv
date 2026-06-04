@@ -6,6 +6,8 @@ obj_dir/
 *.bin
 *.hex
 *.vcd
+*.dat
+*.txt
 main
 compile_commands.json
 logs/

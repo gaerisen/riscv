@@ -236,7 +236,7 @@ begin
                 end
 
                 // If misprediction detected, redirect and flush pipeline
-                else if (j_mispredict | b_mispredict_nt) begin
+                if (j_mispredict | b_mispredict_nt) begin
                         pc_next = alu_result;
                         flush_o = 1;
                 end
