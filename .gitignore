@@ -8,7 +8,7 @@ obj_dir/
 *.vcd
 *.dat
 *.txt
+*.json
 main
-compile_commands.json
 logs/
 tests/

@@ -1,5 +1,4 @@
 `timescale 1ps / 1ps
-
 module hart
 import rv32::*;
 #()
@@ -7,10 +6,13 @@ import rv32::*;
         input clk,
         input rst,
 
+        output logic [31:0] i_addr,
+
         input i_data_ready,
         input [31:0] i_data,
-        
-        output logic [31:0] i_addr
+
+        output logic [31:0] d_addr,
+        output logic [31:0] d_data_o
 );
 
 // Fetch pipeline registers
@@ -65,7 +67,6 @@ logic [11:0] csrd_mem;
 ctrl_t ctrl_mem /*verilator public*/;
 system_t system_mem;
 logic [31:0] wb_mem;
-logic [31:0] rs2_val_mem /*verilator public*/;
 
 // Memacc->Writeback wires
 logic [31:0] wb_next;
@@ -263,6 +264,18 @@ end
 //      (4) Memory Access
 //======================================
 
+always_comb
+begin
+        d_addr = 0;
+        d_data_o = 0;
+
+        if (ctrl_exe.store | ctrl_exe.load)
+                d_addr = result_exe;
+
+        if (ctrl_exe.store)
+                d_data_o = rs2_val_exe;
+end
+
 // Construct writeback value now so it's available for forwarding
 always_comb
 begin
@@ -292,7 +305,6 @@ begin
         if (rst | sys_redirect) begin
                 ctrl_mem <= 0;
                 system_mem <= 0;
-                rs2_val_mem <= 0;
                 rd_mem <= 0;
                 csr_result_mem <= 0;
                 csrd_mem <= 0;
@@ -301,7 +313,6 @@ begin
         else begin
                 ctrl_mem <= ctrl_exe;
                 system_mem <= system_exe;
-                rs2_val_mem <= rs2_val_exe;
                 rd_mem <= rd_exe;
                 csr_result_mem <= csr_result_exe;
                 csrd_mem <= csrd_exe;
@@ -313,4 +324,4 @@ end
 //      (5) Writeback/Commit
 //======================================
 
-endmodule // core
+endmodule // hart
