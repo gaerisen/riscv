@@ -9,5 +9,6 @@ obj_dir/
 *.dat
 *.txt
 *.json
+*.f
 main
 logs/
