@@ -11,8 +11,8 @@ struct cache : public device {
         cache(std::shared_ptr<VerilatedContext> ctx);
         ~cache();
 
-        int req_read(int);
-        void req_write(int, int);
+        int req_read(int, int&);
+        int req_write(int, int, int);
 
         int run_tests(int);
 };
