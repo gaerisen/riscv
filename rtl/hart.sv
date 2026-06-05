@@ -185,7 +185,7 @@ end
 //      (3) Execute        
 //======================================
 
-// Operand forwarding second pass
+// Operand forwarding
 always_comb
 begin
         rs1_value = rs1_val_dec;
@@ -283,8 +283,6 @@ begin
         end
 end
 
-
-
 // Memacc stage register forwarding
 always_ff @(posedge clk or posedge rst)
 begin
@@ -309,6 +307,5 @@ end
 //======================================
 //      (5) Writeback/Commit
 //======================================
-
 
 endmodule // core
