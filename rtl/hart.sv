@@ -24,8 +24,6 @@ logic [4:0] rs1;
 logic [4:0] rs2;
 logic [11:0] csrs;
 logic [31:0] csr_read;
-logic [31:0] rs1_val_dec_next;
-logic [31:0] rs2_val_dec_next;
 logic [31:0] csr_val_dec_next;
 
 // Decode pipeline regs
@@ -73,7 +71,18 @@ logic sys_redirect;
 logic [31:0] sys_vec;
 
 // Integer register file
-logic [31:0] irf [32] /*verilator public*/;
+irf irf(
+        .clk(~clk),
+
+        .*,
+
+        .rs1_val(rs1_val_dec),
+        .rs2_val(rs2_val_dec),
+
+        .we(ctrl_mem.irf_wb),
+        .rd(rd_mem),
+        .rd_val(wb_mem)
+);
 
 // Control/status register file
 csrf csrf(
@@ -120,19 +129,7 @@ assign csrs = instr.i.imm11_0;
 // second pass
 always_comb
 begin
-        rs1_val_dec_next = irf[rs1];
-        rs2_val_dec_next = irf[rs2];
         csr_val_dec_next = csr_read;
-
-        if (rs1 == 0)
-                rs1_val_dec_next = 0;
-        else if (ctrl_mem.irf_wb & (rs1 == rd_mem))
-                rs1_val_dec_next = wb_mem;
-
-        if (rs2 == 0)
-                rs2_val_dec_next = 0;
-        else if (ctrl_mem.irf_wb & (rs2 == rd_mem))
-                rs2_val_dec_next = wb_mem;
 
         if (ctrl_mem.csr_wb & (csrs == csrd_mem))
                 csr_val_dec_next = csr_result_mem;
@@ -144,16 +141,12 @@ begin
                 rs1_dec <= 0;
                 rs2_dec <= 0;
                 csrs_dec <= 0;
-                rs1_val_dec <= 0;
-                rs2_val_dec <= 0;
                 csr_val_dec <= 0;
         end
         else begin
                 rs1_dec <= rs1;
                 rs2_dec <= rs2;
                 csrs_dec <= csrs;
-                rs1_val_dec <= rs1_val_dec_next;
-                rs2_val_dec <= rs2_val_dec_next;
                 csr_val_dec <= csr_val_dec_next;
         end
 end
@@ -316,17 +309,6 @@ end
 //======================================
 //      (5) Writeback/Commit
 //======================================
-
-always_ff @(posedge clk or posedge rst)
-begin
-        if (rst) begin
-                for (int i = 0; i < 32; i++)
-                        irf[i] <= 0;
-        end
-        else if (ctrl_mem.irf_wb & !sys_redirect) begin // Traps must prevent next wb
-                irf[rd_mem] <= wb_mem;
-        end
-end
 
 
 endmodule // core
