@@ -1,5 +1,4 @@
 #include "hart.hpp"
-#include "Vtop_hart.h"
 #include <iomanip>
 #include <iostream>
 #include <fstream>

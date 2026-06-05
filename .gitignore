@@ -11,4 +11,3 @@ obj_dir/
 *.json
 main
 logs/
-tests/
