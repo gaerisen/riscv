@@ -46,21 +46,7 @@ void hart::set_i_data(int in) { dut->i_data = in; }
 int hart::get_i_addr() { return dut->i_addr; }
 
 void hart::print_regfile() {
-        std::cout << "Register File" << std::endl;
-        int startln;
-
-        for (int i = 0; i < 8; i++) {
-                startln = i * 4;
-                for (int j = 0; j < 4; j++) {
-                        std::cout << "\tx" << std::dec <<  startln + j << " =\t"
-                                << std::hex << "0x" << std::setw(8)
-                                << std::setfill('0')
-                                << dut->hart->irf[startln + j];
-                }
-                std::cout << "\n";
-        }
-
-        std::cout << std::endl;
+        std::cout << "Register File" << std::endl; // lol
 }
 
 int hart::run_tests(int cycles)
@@ -122,7 +108,7 @@ int hart::run_tests(int cycles)
 
                         // Workaround for checking exit status without memory iface
                         if (dut->hart->ctrl_mem & (1 << 29)) {
-                                status = !(dut->hart->irf[3] == 1);
+                                status = !(dut->hart->rs2_val_mem == 1);
                                 break;
                         }
                 }

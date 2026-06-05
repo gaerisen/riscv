@@ -16,19 +16,30 @@ module irf
         input logic [31:0] rd_val
 );
 
-logic [31:0] irf [0:31];
+logic [31:0] x [0:31] /*verilator public_flat_rw*/;
 
-assign rs1_val = irf[rs1];
-assign rs2_val = irf[rs2];
+always_comb
+begin
+        rs1_val = x[rs1];
+        rs2_val = x[rs2];
+
+        if (rs1 == rd) begin
+                rs1_val = rd_val;
+        end
+
+        if (rs2 == rd) begin
+                rs2_val = rd_val;
+        end
+end
 
 always @(posedge clk or posedge rst)
 begin
         if (rst) begin
                 for (int i = 0; i < 32; i++) begin
-                        irf[i] <= 0;
+                        x[i] <= 0;
                 end
         end else if (we) begin
-                irf[rd] <= rd_val;
+                x[rd] <= rd_val;
         end
 end
 endmodule

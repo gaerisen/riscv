@@ -22,6 +22,8 @@ logic flush;
 // Fetch->Decode wires
 logic [4:0] rs1;
 logic [4:0] rs2;
+logic [31:0] rs1_val;
+logic [31:0] rs2_val;
 logic [11:0] csrs;
 logic [31:0] csr_read;
 logic [31:0] csr_val_dec_next;
@@ -52,6 +54,7 @@ logic [4:0] rd_exe;
 logic [31:0] csr_result_exe;
 logic [11:0] csrd_exe;
 logic [31:0] csr_value_exe;
+logic [31:0] rs2_val_exe;
 ctrl_t ctrl_exe;
 system_t system_exe;
 
@@ -62,6 +65,7 @@ logic [11:0] csrd_mem;
 ctrl_t ctrl_mem /*verilator public*/;
 system_t system_mem;
 logic [31:0] wb_mem;
+logic [31:0] rs2_val_mem /*verilator public*/;
 
 // Memacc->Writeback wires
 logic [31:0] wb_next;
@@ -72,12 +76,7 @@ logic [31:0] sys_vec;
 
 // Integer register file
 irf irf(
-        .clk(~clk),
-
         .*,
-
-        .rs1_val(rs1_val_dec),
-        .rs2_val(rs2_val_dec),
 
         .we(ctrl_mem.irf_wb),
         .rd(rd_mem),
@@ -146,6 +145,8 @@ begin
         else begin
                 rs1_dec <= rs1;
                 rs2_dec <= rs2;
+                rs1_val_dec <= rs1_val;
+                rs2_val_dec <= rs2_val;
                 csrs_dec <= csrs;
                 csr_val_dec <= csr_val_dec_next;
         end
@@ -240,6 +241,7 @@ begin
         if (rst | flush) begin
                 pc_exe <= 0;
                 ctrl_exe <= 0;
+                rs2_val_exe <= 0;
                 system_exe <= 0;
                 rd_exe <= 0;
                 csrd_exe <= 0;
@@ -248,6 +250,7 @@ begin
         else begin
                 pc_exe <= pc_dec;
                 ctrl_exe <= ctrl_dec;
+                rs2_val_exe <= rs2_value;
                 system_exe <= system_dec;
                 rd_exe <= rd_dec;
                 csrd_exe <= csrs_dec; // Zicsr is atomic swap --> csrd = csrs
@@ -289,6 +292,7 @@ begin
         if (rst | sys_redirect) begin
                 ctrl_mem <= 0;
                 system_mem <= 0;
+                rs2_val_mem <= 0;
                 rd_mem <= 0;
                 csr_result_mem <= 0;
                 csrd_mem <= 0;
@@ -297,6 +301,7 @@ begin
         else begin
                 ctrl_mem <= ctrl_exe;
                 system_mem <= system_exe;
+                rs2_val_mem <= rs2_val_exe;
                 rd_mem <= rd_exe;
                 csr_result_mem <= csr_result_exe;
                 csrd_mem <= csrd_exe;
