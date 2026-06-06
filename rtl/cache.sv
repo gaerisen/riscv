@@ -2,16 +2,19 @@
 module cache
 import rv32::*;
 #(
-        parameter int XLEN = 32,
+        parameter int ADDR_LEN = 32,
 
         parameter int LINE_WIDTH = 64,
         parameter int NUM_LINES = 16,
+        parameter int NUM_WAYS = 2,
+
+        localparam int NUM_SETS = NUM_LINES / NUM_WAYS,
 
         localparam int OFFSET_BITS = $clog2(LINE_WIDTH),
-        localparam int INDEX_BITS = $clog2(NUM_LINES),
-        localparam int TAG_BITS = XLEN - INDEX_BITS - OFFSET_BITS,
+        localparam int INDEX_BITS = $clog2(NUM_SETS),
+        localparam int TAG_BITS = ADDR_LEN - INDEX_BITS - OFFSET_BITS,
 
-        localparam int TAG_HI = XLEN - 1,
+        localparam int TAG_HI = ADDR_LEN - 1,
         localparam int TAG_LO = OFFSET_BITS + INDEX_BITS,
 
         localparam int INDEX_HI = OFFSET_BITS + INDEX_BITS - 1,
@@ -60,11 +63,11 @@ typedef enum logic [1:0] {
 state_e state;
 state_e state_next;
 
-cache_line_t mem [NUM_LINES-1:0];
+cache_line_t cache [NUM_SETS-1:0][NUM_WAYS-1:0];
 
 logic mem_valid_next;
 logic mem_we_next;
-logic [XLEN-1:0] mem_addr_next;
+logic [ADDR_LEN-1:0] mem_addr_next;
 logic [(8 * LINE_WIDTH)-1:0] mem_data_o_next;
 
 logic [TAG_BITS-1:0] tag;
@@ -80,15 +83,21 @@ initial begin
         $dumpvars(0, cache);
 end
 
-logic hit;
-logic miss;
-
-assign hit = cpu_valid & mem[index].valid & (mem[index].tag == tag);
-assign miss = cpu_valid & !(mem[index].valid & (mem[index].tag == tag));
+logic [NUM_WAYS-1:0] hit;
+logic [NUM_WAYS-1:0] miss;
 
 raw_line_t line_data_next;
 logic line_valid_next;
 logic [TAG_BITS-1:0] line_tag_next;
+
+// Hit/miss detection logic
+always_comb
+begin
+        for (int i = 0; i < NUM_WAYS-1; i++) begin
+                hit[i] = cpu_valid & cache[index][i].valid & (cache[index][i].tag == tag);
+                miss[i] = cpu_valid & !(cache[index][i].valid & (cache[index][i].tag == tag));
+        end
+end
 
 // FSM switching logic
 always_comb
@@ -101,10 +110,10 @@ begin
 
         case(state)
         IDLE: begin
-                if (miss) begin
-                        if (mem[index].dirty) begin
+                if (miss[0]) begin
+                        if (cache[index][0].dirty) begin
                                 mem_we_next = 1;
-                                mem_data_o_next = (8*LINE_WIDTH)'(mem[index].data);
+                                mem_data_o_next = (8*LINE_WIDTH)'(cache[index][0].data);
                                 state_next = BUSY_WR;
                         end
                         else begin
@@ -113,7 +122,7 @@ begin
 
                         // TODO: figure out how to parameterize the stupid
                         // 0 length at the tail
-                        mem_addr_next = {mem[index].tag, index, 6'b0};
+                        mem_addr_next = {cache[index][0].tag, index, 6'b0};
                         mem_valid_next = 1;
                 end
         end
@@ -163,11 +172,11 @@ end
 // Writeback construction
 always_comb
 begin
-        line_data_next = mem[index].data;
-        line_valid_next = mem[index].valid;
-        line_tag_next = mem[index].tag;
+        line_data_next = cache[index][0].data;
+        line_valid_next = cache[index][0].valid;
+        line_tag_next = cache[index][0].tag;
 
-        if (hit & cpu_we) begin
+        if (hit[0] & cpu_we) begin
                 case (st_op)
                 SB: begin
                         line_data_next[offset] = cpu_data_i[7:0];
@@ -200,21 +209,21 @@ end
 always_ff @(posedge clk or posedge rst)
 begin
         if (rst) begin
-                for (int i = 0; i < NUM_LINES; i++) begin
-                        for (int j = 0; j < LINE_WIDTH; j++) begin
-                                mem[i].data[j] <= 0;
+                for (int i = 0; i < NUM_SETS; i++) begin
+                        for (int j = 0; j < NUM_WAYS; j++) begin
+                                cache[i][j].data <= 0;
+                                cache[i][j].valid = 0;
+                                cache[i][j].dirty = 0;
+                                cache[i][j].tag = 0;
                         end
-                        mem[i].valid = 0;
-                        mem[i].dirty = 0;
-                        mem[i].tag = 0;
                 end
         end
         else begin
-                mem[index].data <= line_data_next;
-                mem[index].valid <= line_valid_next;
-                mem[index].tag <= line_tag_next;
-                if (hit & cpu_we) begin
-                        mem[index].dirty <= 1;
+                cache[index][0].data <= line_data_next;
+                cache[index][0].valid <= line_valid_next;
+                cache[index][0].tag <= line_tag_next;
+                if (hit[0] & cpu_we) begin
+                        cache[index][0].dirty <= 1;
                 end
         end
 end
@@ -230,13 +239,13 @@ begin
         // write miss details and handling those internally
         if (state == IDLE) begin
                 // Always fetch data to take advantage of parallelism
-                cpu_data_o = {  mem[index].data[offset+3],
-                                mem[index].data[offset+2],
-                                mem[index].data[offset+1],
-                                mem[index].data[offset+0] };
+                cpu_data_o = {  cache[index][0].data[offset+3],
+                                cache[index][0].data[offset+2],
+                                cache[index][0].data[offset+1],
+                                cache[index][0].data[offset+0] };
 
                 // Validate read if there's a hit.
-                cpu_ready = hit;
+                cpu_ready = hit[0];
         end
 
         if (rst) begin
