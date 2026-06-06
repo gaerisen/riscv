@@ -80,7 +80,7 @@ int cache::run_tests(int cycles) {
         dut->mem_data_i = mem_data;
 
         if (req_read(0x00000000, cpu_data)) {
-                std::cout << "Read failed" << std::endl;
+                std::cout << "1f Read failed" << std::endl;
                 status = 1;
         } else if (cpu_data != 0x1f) {
                 std::cout << "Got " << std::hex << cpu_data << std::endl;
@@ -89,7 +89,7 @@ int cache::run_tests(int cycles) {
 
         // Read hit test
         if (req_read(0x00000004, cpu_data)) {
-                std::cout << "Read failed" << std::endl;
+                std::cout << "1337 Read failed" << std::endl;
                 status = 1;
         } else if (cpu_data != 0x1337) { 
                 std::cout << "Got " << std::hex << cpu_data << std::endl;
@@ -122,7 +122,10 @@ int cache::run_tests(int cycles) {
 
         // Eviction test
         // tag 8, index 8
-        req_read(0x00001100, cpu_data);
+
+        // Now set associative; no eviction here
+       
+/*        req_read(0x00001100, cpu_data);
         req_read(0x00001100, cpu_data);
         req_read(0x00001100, cpu_data);
         req_read(0x00001100, cpu_data);
@@ -139,7 +142,7 @@ int cache::run_tests(int cycles) {
 
         req_read(0x00001100, cpu_data);
 
-        dut->mem_ready = 0;
+        dut->mem_ready = 0; */
 
         req_read(0x00001100, cpu_data);
         req_read(0x00001100, cpu_data);
@@ -152,9 +155,47 @@ int cache::run_tests(int cycles) {
         dut->mem_data_i = mem_data;
 
         if (req_read(0x00001100, cpu_data)) {
-                std::cout << "Read failed" << std::endl;
+                std::cout << "caac Read failed" << std::endl;
                 status = 1;
         } else if (cpu_data != 0xcaac) { 
+                std::cout << "Got " << std::hex << cpu_data << std::endl;
+                status = 1;
+        }
+
+        dut->mem_ready = 0;
+
+        req_read(0x00002100, cpu_data);
+        req_read(0x00002100, cpu_data);
+        req_read(0x00002100, cpu_data);
+        req_read(0x00002100, cpu_data);
+
+        dut->mem_ready = 1;
+        mem_data = dut->mem_data_o;
+
+        std::cout << "Evicted line: (should end in 0xfeed_00000000_deadbeef)"
+                << std::endl;
+        for (int i = 15; i >= 0; i--) {
+                std::cout << std::hex << "\t[" << i << "] " << mem_data.at(i)
+                        << std::endl;
+        }
+
+        req_read(0x00002100, cpu_data);
+
+        dut->mem_ready = 0;
+
+        req_read(0x00002100, cpu_data);
+        req_read(0x00002100, cpu_data);
+        req_read(0x00002100, cpu_data);
+        req_read(0x00002100, cpu_data);
+
+        dut->mem_ready = 1;
+        mem_data.at(0) = 0xfedd;
+        dut->mem_data_i = mem_data;
+
+        if (req_read(0x00002100, cpu_data)) {
+                std::cout << "fedd Read failed" << std::endl;
+                status = 1;
+        } else if (cpu_data != 0xfedd) { 
                 std::cout << "Got " << std::hex << cpu_data << std::endl;
                 status = 1;
         }

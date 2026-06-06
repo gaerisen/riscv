@@ -9,6 +9,7 @@ import rv32::*;
         parameter int NUM_WAYS = 2,
 
         localparam int NUM_SETS = NUM_LINES / NUM_WAYS,
+        localparam int WAY_IDX_BITS = $clog2(NUM_WAYS),
 
         localparam int OFFSET_BITS = $clog2(LINE_WIDTH),
         localparam int INDEX_BITS = $clog2(NUM_SETS),
@@ -74,6 +75,15 @@ logic [TAG_BITS-1:0] tag;
 logic [INDEX_BITS-1:0] index;
 logic [OFFSET_BITS-1:0] offset;
 
+logic [WAY_IDX_BITS-1:0] hit;
+logic miss;
+
+// FIFO replacement pointer. Always points to next way to be written to; if the
+// valid bit is set, we evict first.
+logic [WAY_IDX_BITS-1:0] fifo_head [0:NUM_SETS-1];
+logic [WAY_IDX_BITS-1:0] fifo_head_next [0:NUM_SETS-1];
+logic fifo_inc;
+
 assign tag = cpu_addr[TAG_HI:TAG_LO];
 assign index = cpu_addr[INDEX_HI:INDEX_LO];
 assign offset = cpu_addr[OFFSET_HI:0];
@@ -83,9 +93,6 @@ initial begin
         $dumpvars(0, cache);
 end
 
-logic [NUM_WAYS-1:0] hit;
-logic [NUM_WAYS-1:0] miss;
-
 raw_line_t line_data_next;
 logic line_valid_next;
 logic [TAG_BITS-1:0] line_tag_next;
@@ -93,9 +100,14 @@ logic [TAG_BITS-1:0] line_tag_next;
 // Hit/miss detection logic
 always_comb
 begin
-        for (int i = 0; i < NUM_WAYS-1; i++) begin
-                hit[i] = cpu_valid & cache[index][i].valid & (cache[index][i].tag == tag);
-                miss[i] = cpu_valid & !(cache[index][i].valid & (cache[index][i].tag == tag));
+        miss = cpu_valid;
+        hit = 0;
+
+        for (int i = 0; i < NUM_WAYS; i++) begin
+                miss = miss & !(cache[index][i].valid & (cache[index][i].tag == tag));
+
+                if (cpu_valid & cache[index][i].valid & (cache[index][i].tag == tag))
+                        hit = WAY_IDX_BITS'(unsigned'(i));
         end
 end
 
@@ -107,13 +119,15 @@ begin
         mem_we_next = mem_we;
         mem_addr_next = mem_addr;
         mem_data_o_next = mem_data_o;
+        fifo_head_next[index] = fifo_head[index] + 1;
+        fifo_inc = 0;
 
         case(state)
         IDLE: begin
-                if (miss[0]) begin
-                        if (cache[index][0].dirty) begin
+                if (miss) begin
+                        if (cache[index][fifo_head_next[index]].dirty) begin
                                 mem_we_next = 1;
-                                mem_data_o_next = (8*LINE_WIDTH)'(cache[index][0].data);
+                                mem_data_o_next = (8*LINE_WIDTH)'(cache[index][fifo_head_next[index]].data);
                                 state_next = BUSY_WR;
                         end
                         else begin
@@ -122,8 +136,9 @@ begin
 
                         // TODO: figure out how to parameterize the stupid
                         // 0 length at the tail
-                        mem_addr_next = {cache[index][0].tag, index, 6'b0};
+                        mem_addr_next = {cache[index][fifo_head_next[index]].tag, index, 6'b0};
                         mem_valid_next = 1;
+                        fifo_inc = 1;
                 end
         end
 
@@ -166,17 +181,20 @@ begin
                 mem_we <= mem_we_next;
                 mem_addr <= mem_addr_next;
                 mem_data_o <= mem_data_o_next;
+                if (fifo_inc)
+                        fifo_head[index] <= fifo_head_next[index];
         end
 end
+
 
 // Writeback construction
 always_comb
 begin
-        line_data_next = cache[index][0].data;
-        line_valid_next = cache[index][0].valid;
-        line_tag_next = cache[index][0].tag;
+        line_data_next = cache[index][fifo_head[index]].data;
+        line_valid_next = cache[index][fifo_head[index]].valid;
+        line_tag_next = cache[index][fifo_head[index]].tag;
 
-        if (hit[0] & cpu_we) begin
+        if (!miss & cpu_we) begin
                 case (st_op)
                 SB: begin
                         line_data_next[offset] = cpu_data_i[7:0];
@@ -212,18 +230,18 @@ begin
                 for (int i = 0; i < NUM_SETS; i++) begin
                         for (int j = 0; j < NUM_WAYS; j++) begin
                                 cache[i][j].data <= 0;
-                                cache[i][j].valid = 0;
-                                cache[i][j].dirty = 0;
-                                cache[i][j].tag = 0;
+                                cache[i][j].valid <= 0;
+                                cache[i][j].dirty <= 0;
+                                cache[i][j].tag <= 0;
                         end
                 end
         end
         else begin
-                cache[index][0].data <= line_data_next;
-                cache[index][0].valid <= line_valid_next;
-                cache[index][0].tag <= line_tag_next;
-                if (hit[0] & cpu_we) begin
-                        cache[index][0].dirty <= 1;
+                cache[index][fifo_head[index]].data <= line_data_next;
+                cache[index][fifo_head[index]].valid <= line_valid_next;
+                cache[index][fifo_head[index]].tag <= line_tag_next;
+                if (!miss & cpu_we) begin
+                        cache[index][fifo_head[index]].dirty <= 1;
                 end
         end
 end
@@ -239,13 +257,13 @@ begin
         // write miss details and handling those internally
         if (state == IDLE) begin
                 // Always fetch data to take advantage of parallelism
-                cpu_data_o = {  cache[index][0].data[offset+3],
-                                cache[index][0].data[offset+2],
-                                cache[index][0].data[offset+1],
-                                cache[index][0].data[offset+0] };
+                cpu_data_o = {  cache[index][hit].data[offset+3],
+                                cache[index][hit].data[offset+2],
+                                cache[index][hit].data[offset+1],
+                                cache[index][hit].data[offset+0] };
 
                 // Validate read if there's a hit.
-                cpu_ready = hit[0];
+                cpu_ready = !miss;
         end
 
         if (rst) begin
