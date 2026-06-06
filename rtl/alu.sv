@@ -6,40 +6,25 @@ import rv32::*;
 )(
         input clk,
         input rst,
-        input stall,
-        input flush,
 
-        input ctrl_t ctrl_i,
+        input sel,
+        input alu_funct3_e op,
+        input alu_funct7_e alt,
 
-        input [31:0] rs1_value,
-        input [31:0] rs2_value,
-        input [31:0] imm,
-        input [31:0] pc_dec,
+        input [31:0] in1,
+        input [31:0] in2,
 
-        output logic [31:0] result_o,
-        output logic branch_o
+        output logic ready,
+        output logic [31:0] result
 );
 
-logic [31:0] in1;
-logic [31:0] in2;
-
 logic [31:0] result_next;
-logic branch_next;
-
-initial
-begin
-        $dumpfile("alu.vcd");
-        $dumpvars(1, alu);
-end
 
 always_comb
 begin
-        in1 = rs1_value;
-        in2 = rs2_value;
         result_next = 0;
-        branch_next = 0;
 
-        unique case(ctrl_i.alu_src1)
+/*        unique case(ctrl_i.alu_src1)
         ZERO: in1 = 0;
         RS1: in1 = rs1_value;
         PC: in1 = pc_dec;
@@ -48,11 +33,11 @@ begin
         unique case(ctrl_i.alu_src2)
         RS2: in2 = rs2_value;
         IMM: in2 = imm;
-        endcase
+        endcase */
 
-        unique case(ctrl_i.alu_op)
+        unique case(op)
         ADDSUB: begin
-                unique case(ctrl_i.alu_alt)
+                unique case(alt)
                         ALT: result_next = in1 - in2;
                         NORM: result_next = in1 + in2;
                 endcase
@@ -62,7 +47,7 @@ begin
         SLTU: result_next = {31'b0, in1 < in2};
         XOR: result_next = in1 ^ in2;
         SR: begin
-                unique case(ctrl_i.alu_alt)
+                unique case(alt)
                         ALT: result_next = $unsigned($signed(in1) >>> in2[4:0]);
                         NORM: result_next = in1 >> in2[4:0];
                 endcase
@@ -71,24 +56,16 @@ begin
         AND: result_next = in1 & in2;
         endcase
 
-        unique case(ctrl_i.branch_op)
-        BEQ: branch_next = rs1_value == rs2_value;
-        BNE: branch_next = rs1_value != rs2_value;
-        BLT: branch_next = $signed(rs1_value) < $signed(rs2_value);
-        BGE: branch_next = $signed(rs1_value) >= $signed(rs2_value);
-        BLTU: branch_next = rs1_value < rs2_value;
-        BGEU: branch_next = rs1_value >= rs2_value;
-        endcase
 end
 
 always_ff @(posedge clk or posedge rst)
 begin
-        if (flush | rst) begin
-                result_o <= 0;
-                branch_o <= 0;
-        end else if (!stall) begin
-                result_o <= result_next;
-                branch_o <= branch_next;
+        if (rst) begin
+                result <= 0;
+                ready <= 0;
+        end else begin
+                result <= result_next;
+                ready <= sel;
         end
 end
 
