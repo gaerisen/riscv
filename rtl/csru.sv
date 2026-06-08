@@ -6,12 +6,15 @@ import rv32::*;
         input clk,
         input rst,
 
+        input sel,
         input [31:0] csr_old,
         input [31:0] rs1_value,
         input [31:0] imm,
 
-        input ctrl_t ctrl_i,
+        input csr_funct2_e op,
+        input csr_src_e src,
 
+        output logic ready,
         output logic [31:0] csr_new
 );
 
@@ -23,10 +26,10 @@ begin
         mask = rs1_value;
         csr_new_next = csr_old;
 
-        if (ctrl_i.csr_src == UIMM)
+        if (src == UIMM)
                 mask = imm;
 
-        case (ctrl_i.csr_op)
+        case (op)
         CSRRW: csr_new_next = mask;
         CSRRS: csr_new_next = csr_old | mask;
         CSRRC: csr_new_next = csr_old & ~mask;
@@ -38,9 +41,11 @@ always_ff @(posedge clk or posedge rst)
 begin
         if (rst) begin
                 csr_new <= 0;
+                ready <= 0;
         end
         else begin
                 csr_new <= csr_new_next;
+                ready <= sel;
         end
 end
 

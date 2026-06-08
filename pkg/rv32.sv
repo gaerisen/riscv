@@ -177,15 +177,22 @@ package rv32;
         } system_t;
 
         /*====================================================================*/
-        /*              STORE BUFFER TYPES                                    */
+        /*              TOMASULO BUFFER ENTRY TYPES                           */
         /*====================================================================*/
         typedef struct packed {
-                logic [31:0] addr;
-                logic [7:0] byte3;
-                logic [7:0] byte2;
-                logic [7:0] byte1;
-                logic [7:0] byte0;
-                logic [3:0] byte_mask;
-        } storbuf_entry_t;
+                logic [31:0] pc;
+                ctrl_t ctrl_word;
+                logic [31:0] in1;
+                logic [31:0] in2;
+
+        } rs_entry_t;
+
+        typedef struct packed {
+                ctrl_t ctrl_word;
+                logic [31:0] dest;
+                logic [31:0] value;
+                logic ready;
+        } rob_entry_t;
+
 
 endpackage: rv32

@@ -9,11 +9,11 @@ import rv32::*;
         input sel,
         input branch_funct3_e op,
 
-        input [31:0] in1,
-        input [31:0] in2,
+        input [31:0] rs1_value,
+        input [31:0] rs2_value,
 
         output logic ready,
-        output logic branch_result
+        output logic result
 );
 
 logic branch_next;
@@ -23,12 +23,12 @@ begin
         branch_next = 0;
 
         unique case(op)
-        BEQ: branch_next = in1 == in2;
-        BNE: branch_next = in1 != in2;
-        BLT: branch_next = $signed(in1) < $signed(in2);
-        BGE: branch_next = $signed(in1) >= $signed(in2);
-        BLTU: branch_next = in1 < in2;
-        BGEU: branch_next = in1 >= in2;
+        BEQ: branch_next = rs1_value == rs2_value;
+        BNE: branch_next = rs1_value != rs2_value;
+        BLT: branch_next = $signed(rs1_value) < $signed(rs2_value);
+        BGE: branch_next = $signed(rs1_value) >= $signed(rs2_value);
+        BLTU: branch_next = rs1_value < rs2_value;
+        BGEU: branch_next = rs1_value >= rs2_value;
         endcase
 end
 
@@ -36,11 +36,11 @@ always_ff @(posedge clk or posedge rst)
 begin
         if (rst) begin
                 ready <= 0;
-                branch_result <= 0;
+                result <= 0;
         end
         else begin
                 ready <= sel;
-                branch_result <= branch_next;
+                result <= branch_next;
         end
 end
 

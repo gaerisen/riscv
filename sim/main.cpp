@@ -3,22 +3,21 @@
 #include <cstdlib>
 #include <ctime>
 
-#include "cache.hpp"
+#include "hart.hpp"
 
 int main(int argc, char *argv[])
 {
         auto ctx = std::make_shared<VerilatedContext>();
         ctx->traceEverOn(true);
 
-        sim::cache dut(ctx);
+        sim::hart dut(ctx);
 
         srand(time(0));
 
         try {
 
-                if (dut.run_tests(1024) == 0) {
-                        std::cout << "Success" << std::endl;
-                }
+                if (dut.run_tests(1024) == 0)
+                        return 1;
 
         } catch (const std::runtime_error& e) {
                 std::cerr << "RUNTIME: " << e.what();

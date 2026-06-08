@@ -12,7 +12,13 @@ import rv32::*;
         input [31:0] i_data,
 
         output logic [31:0] d_addr,
-        output logic [31:0] d_data_o
+        output logic d_valid,
+        output logic d_we,
+        output store_funct3_e d_st_op,
+        output logic [31:0] d_data_o,
+
+        input logic d_ready,
+        input logic [31:0] d_data_i
 );
 
 // Fetch pipeline registers
@@ -47,6 +53,9 @@ logic [4:0] rd_dec;
 logic [31:0] rs1_value;
 logic [31:0] rs2_value;
 logic [31:0] csr_value;
+logic alu_sel;
+logic bu_sel;
+logic csru_sel;
 
 // Execute pipeline regs
 logic [31:0] pc_exe;
@@ -59,6 +68,9 @@ logic [31:0] csr_value_exe;
 logic [31:0] rs2_val_exe;
 ctrl_t ctrl_exe;
 system_t system_exe;
+logic alu_ready;
+logic bu_ready;
+logic csru_ready;
 
 // Memacc pipeline regs
 logic [4:0] rd_mem;
@@ -214,26 +226,50 @@ begin
                 csr_value = csr_result_mem;
 end
 
-// Main ALU for single-cycle arithmetic and logic
+// Execution unit selection
+
+assign bu_sel = ctrl_dec.branch;
+assign csru_sel = ctrl_dec.csr_wb;
+assign alu_sel = !(bu_sel | csru_sel);
+
+// Ex unit for integral arithmetic and logic instructions
 alu alu (
         .*,
 
-        .stall(0),
+        .sel(alu_sel),
 
-        .ctrl_i(ctrl_dec),
+        .op(ctrl_dec.alu_op),
+        .alt(ctrl_dec.alu_alt),
+        .src1(ctrl_dec.alu_src1),
+        .src2(ctrl_dec.alu_src2),
         
-        .result_o(result_exe),
-        .branch_o(branch_taken)
+        .ready(alu_ready),
+        .result(result_exe)
 );
 
-// Execution unit for Zicsr instructions
+// Ex unit for branch resolution
+bu bu (
+        .*,
+
+        .sel(bu_sel),
+        .op(ctrl_dec.branch_op),
+
+        .ready(bu_ready),
+        .result(branch_taken)
+);
+
+// Ex unit for Zicsr instructions
 csru csru (
         .*,
 
-        .ctrl_i(ctrl_dec),
+        .sel(csru_sel),
+
+        .op(ctrl_dec.csr_op),
+        .src(ctrl_dec.csr_src),
 
         .csr_old(csr_value),
 
+        .ready(csru_ready),
         .csr_new(csr_result_exe)
 );
 
