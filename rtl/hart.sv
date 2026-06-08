@@ -26,6 +26,7 @@ instr_t instr;
 logic [31:0] pc_fet;
 logic valid;
 logic flush;
+logic rob_full;
 
 // Fetch->Decode wires
 logic [4:0] rs1;
@@ -60,7 +61,7 @@ logic csru_sel;
 // Execute pipeline regs
 logic [31:0] pc_exe;
 logic branch_taken;
-logic [31:0] result_exe;
+logic [31:0] alu_result_exe;
 logic [4:0] rd_exe;
 logic [31:0] csr_result_exe;
 logic [11:0] csrd_exe;
@@ -72,6 +73,10 @@ logic alu_ready;
 logic bu_ready;
 logic csru_ready;
 
+
+logic ready_exe;
+logic [31:0] result_exe;
+
 // Memacc pipeline regs
 logic [4:0] rd_mem;
 logic [31:0] csr_result_mem;
@@ -82,6 +87,15 @@ logic [31:0] wb_mem;
 
 // Memacc->Writeback wires
 logic [31:0] wb_next;
+
+// Commit wires
+logic commit;
+logic store_commit;
+logic branch_commit;
+logic [31:0] rd_commit;
+logic [31:0] wb_commit;
+
+wire [5:0] rob_ptr_exe;
 
 // Trap wires
 logic sys_redirect;
@@ -120,7 +134,7 @@ fetch fetch (
 
         .jump(ctrl_exe.jump),
         .branch(ctrl_exe.branch),
-        .alu_result(result_exe),
+        .alu_result(alu_result_exe),
 
         .pc_o(pc_fet),
         .instr_o(instr),
@@ -244,7 +258,7 @@ alu alu (
         .src2(ctrl_dec.alu_src2),
         
         .ready(alu_ready),
-        .result(result_exe)
+        .result(alu_result_exe)
 );
 
 // Ex unit for branch resolution
@@ -273,6 +287,22 @@ csru csru (
         .csr_new(csr_result_exe)
 );
 
+assign ready_exe = alu_ready | bu_ready | csru_ready;
+
+always_comb
+begin
+        result_exe = 0;
+
+        if (alu_ready && ctrl_exe.store)
+                result_exe = rs2_val_exe;
+        else if (alu_ready)
+                result_exe = alu_result_exe;
+        else if (csru_ready)
+                result_exe = csr_result_exe;
+        else if (bu_ready)
+                result_exe = {31'b0, branch_taken};
+end
+
 always_ff @(posedge clk or posedge rst)
 begin
         if (rst | flush) begin
@@ -299,18 +329,6 @@ end
 //======================================
 //      (4) Memory Access
 //======================================
-
-always_comb
-begin
-        d_addr = 0;
-        d_data_o = 0;
-
-        if (ctrl_exe.store | ctrl_exe.load)
-                d_addr = result_exe;
-
-        if (ctrl_exe.store)
-                d_data_o = rs2_val_exe;
-end
 
 // Construct writeback value now so it's available for forwarding
 always_comb
@@ -360,4 +378,41 @@ end
 //      (5) Writeback/Commit
 //======================================
 
+rob rob (
+        .*,
+
+        .full(rob_full),
+
+        .issue(1),
+        .issued_dest({27'b0, rd_dec}),
+        .issued_ctrl(ctrl_dec),
+
+        .issued_ptr(rob_ptr_exe),
+        
+        .update_entry(ready_exe),
+        .result(result_exe),
+        .updated_dest(alu_result_exe),
+        .entry_idx(rob_ptr_exe),
+
+        .store(store_commit),
+        .branch(branch_commit),
+        .rd(rd_commit),
+        .wb(wb_commit)
+);
+
+always_comb
+begin
+        d_addr = 0;
+        d_valid = 0;
+        d_data_o = 0;
+        d_we = 0;
+        d_st_op = SB;
+
+        if (store_commit) begin
+                d_valid = 1;
+                d_we = 1;
+                d_addr = rd_commit;
+                d_data_o = wb_commit;
+        end
+end
 endmodule // hart

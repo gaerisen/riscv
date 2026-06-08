@@ -3,14 +3,14 @@
 #include <cstdlib>
 #include <ctime>
 
-#include "rob.hpp"
+#include "hart.hpp"
 
 int main(int argc, char *argv[])
 {
         auto ctx = std::make_shared<VerilatedContext>();
         ctx->traceEverOn(true);
 
-        sim::rob dut(ctx);
+        sim::hart dut(ctx);
 
         srand(time(0));
 

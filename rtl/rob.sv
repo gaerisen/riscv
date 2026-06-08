@@ -34,6 +34,7 @@ import rv32::*;
         // From exe
         input update_entry,
         input [31:0] result,
+        input [31:0] updated_dest,
         input [ROB_BITS-1:0] entry_idx,
 
         output logic commit,
@@ -80,6 +81,10 @@ begin
         if (issue) begin
                 rob_tail_next = rob_tail + 1;
         end
+
+        if (flush) begin
+                rob_head_next = entry_idx;
+        end
 end
 
 always_ff @(posedge clk or posedge rst)
@@ -111,6 +116,8 @@ begin
         rob_update_next = rob[entry_idx];
 
         rob_update_next.value = result;
+        if (rob_update_next.ctrl_word.store)
+                rob_update_next.dest = updated_dest;
         rob_update_next.ready = 1;
 end
 

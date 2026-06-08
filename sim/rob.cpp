@@ -76,6 +76,9 @@ int rob::run_tests(int cycles)
                         }
                 }
 
+                if (i == 32) dut->flush = 1;
+                else dut->flush = 0;
+
                 pulse();
 
                 if (commit()) {
