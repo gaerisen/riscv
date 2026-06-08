@@ -11,6 +11,7 @@ struct rob : public device {
         rob(std::shared_ptr<VerilatedContext> ctx);
         ~rob();
 
+        bool full() { return dut->full; };
         uint32_t ptr() { return dut->issued_ptr; };
         bool commit() { return dut->commit; };
         bool branch() { return dut->branch; };

@@ -16,14 +16,12 @@ int main(int argc, char *argv[])
 
         try {
 
-                for (int i = 0; i < 1024; i++) {
-                        if (dut.run_tests(128)) {
-                                std::cout << "Failed" << std::endl;
-                                return 1;
-                        }
+                if (dut.run_tests(1024)) {
+                        std::cout << "Failed" << std::endl;
+                        return 1;
+                } else {
+                        std::cout << "Success" << std::endl;
                 }
-
-                std::cout << "Success" << std::endl;
 
         } catch (const std::runtime_error& e) {
                 std::cerr << "RUNTIME: " << e.what();

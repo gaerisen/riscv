@@ -11,10 +11,16 @@
 module rob
 import rv32::*;
 #(
-        parameter int ROB_LEN = 32
+        parameter int ROB_LEN = 64,
+        localparam int ROB_BITS = $clog2(ROB_LEN)
 )(
         input clk,
         input rst,
+
+        // From fetch
+        input flush,
+
+        output full,
 
         // From issue/ex regs
         input issue,
@@ -23,12 +29,12 @@ import rv32::*;
 
         // Broadcast ROB entry ptr for the instruction just issued so the
         // pipeline can update the right entry later
-        output logic [$clog2(ROB_LEN)-1:0] issued_ptr,
+        output logic [ROB_BITS-1:0] issued_ptr,
         
         // From exe
         input update_entry,
         input [31:0] result,
-        input [$clog2(ROB_LEN)-1:0] entry_idx,
+        input [ROB_BITS-1:0] entry_idx,
 
         output logic commit,
         output logic store,
@@ -42,17 +48,19 @@ rob_entry_t rob [ROB_LEN-1:0];
 rob_entry_t rob_issue_next;
 rob_entry_t rob_update_next;
 
-logic [$clog2(ROB_LEN)-1:0] rob_head;
-logic [$clog2(ROB_LEN)-1:0] rob_head_next;
+logic [ROB_BITS-1:0] rob_head;
+logic [ROB_BITS-1:0] rob_head_next;
 
-logic [$clog2(ROB_LEN)-1:0] rob_tail;
-logic [$clog2(ROB_LEN)-1:0] rob_tail_next;
+logic [ROB_BITS-1:0] rob_tail;
+logic [ROB_BITS-1:0] rob_tail_next;
 
 assign commit = rob[rob_head].ready;
 assign store = rob[rob_head].ctrl_word.store;
 assign branch = rob[rob_head].ctrl_word.branch;
 assign rd = rob[rob_head].dest;
 assign wb = rob[rob_head].value;
+
+assign full = rob_tail == (rob_head + {ROB_BITS{1'b1}});
 
 initial begin
         $dumpfile("rob.vcd");
@@ -91,29 +99,19 @@ begin
         end
 end
 
-// ROB issue write logic
+// ROB write logic
 always_comb
 begin
-        rob_issue_next.ctrl_word = 0;
-        rob_issue_next.dest = 0;
-        rob_issue_next.value = 0;
-        rob_issue_next.ready = 0;
+        rob_issue_next = 0;
 
-        if (issue) begin
-                rob_issue_next.ctrl_word = issued_ctrl;
-                rob_issue_next.dest = issued_dest;
-        end
-end
+        rob_issue_next.ctrl_word = issued_ctrl;
+        rob_issue_next.dest = issued_dest;
 
-// ROB update logic
-always_comb
-begin
+
         rob_update_next = rob[entry_idx];
 
-        if (update_entry) begin
-                rob_update_next.value = result;
-                rob_update_next.ready = 1;
-        end
+        rob_update_next.value = result;
+        rob_update_next.ready = 1;
 end
 
 always_ff @(posedge clk or posedge rst)
@@ -124,8 +122,15 @@ begin
                 end
         end
         else begin
-                rob[rob_tail] <= rob_issue_next;
-                rob[entry_idx] <= rob_update_next;
+                if (update_entry) begin
+                        rob[entry_idx] <= rob_update_next;
+                end
+                if (issue) begin
+                        rob[rob_tail] <= rob_issue_next;
+                end
+                if (commit) begin
+                        rob[rob_head] <= 0;
+                end
         end
 end
 

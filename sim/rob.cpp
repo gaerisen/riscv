@@ -3,8 +3,10 @@
 
 void shuffle(int[], int[], size_t);
 
-int rds[32];
-int rds_shuf[32];
+#define ENTRIES 256
+
+int rds[ENTRIES];
+int rds_shuf[ENTRIES];
 
 namespace sim
 {
@@ -42,32 +44,34 @@ int rob::run_tests(int cycles)
 
         issue = true;
 
-        for (int i = 0; i < 32; i++)
+        for (int i = 0; i < ENTRIES; i++)
                 rds[i] = i;
 
-        shuffle(rds, rds_shuf, 32);
+        shuffle(rds, rds_shuf, ENTRIES);
 
+        int issue_idx = 0;
         int result_idx = 0;
         int commit_rd = 0;
 
         int status = 0;
         
         for (int i = 0; i < cycles; i++) {
-                if (i < 32) {
-                        dut->issued_dest = rds[i];
+                if ((issue_idx < ENTRIES) && !full()) {
+                        dut->issued_dest = rds[issue_idx];
                         dut->issue = true;
+                        issue_idx++;
                 } else {
                         dut->issued_dest = 0;
                         dut->issue = false;
                 }
 
-                if ((i < 5) || (result_idx > 31)) {
+                if ((i < 5) || (result_idx > ENTRIES - 1)) {
                         dut->update_entry = false;
                         dut->entry_idx = 0;
                 } else {
                         dut->update_entry = (rand() % 4) != 0;
                         if (dut->update_entry) {
-                                dut->entry_idx = rds_shuf[result_idx];
+                                dut->entry_idx = rds_shuf[result_idx] % 64;
                                 result_idx++;
                         }
                 }
@@ -85,7 +89,7 @@ int rob::run_tests(int cycles)
                 }
         }
         
-        if (result_idx < 31) status = 1;
+        if (result_idx < ENTRIES - 1) status = 1;
 
         return status;
 }
