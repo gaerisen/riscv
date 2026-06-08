@@ -3,21 +3,27 @@
 #include <cstdlib>
 #include <ctime>
 
-#include "hart.hpp"
+#include "rob.hpp"
 
 int main(int argc, char *argv[])
 {
         auto ctx = std::make_shared<VerilatedContext>();
         ctx->traceEverOn(true);
 
-        sim::hart dut(ctx);
+        sim::rob dut(ctx);
 
         srand(time(0));
 
         try {
 
-                if (dut.run_tests(1024) == 0)
-                        return 1;
+                for (int i = 0; i < 1024; i++) {
+                        if (dut.run_tests(128)) {
+                                std::cout << "Failed" << std::endl;
+                                return 1;
+                        }
+                }
+
+                std::cout << "Success" << std::endl;
 
         } catch (const std::runtime_error& e) {
                 std::cerr << "RUNTIME: " << e.what();
