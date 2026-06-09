@@ -14,16 +14,15 @@ import rv32::*;
 
         output logic [31:0] csrs_value,
 
-        // System word from decoder
-        input system_t sys_word,
+        // System redirect request from ROB commit
+        input exception,
+        input trapret,
+        input trap_cause_e trap_cause,
 
-        // System redirect port
+        // System redirect signalling for fetch
         output logic sys_redirect,
         output logic [31:0] sys_vec
 );
-
-logic sys_redirect_next;
-logic [31:0] sys_vec_next;
 
 logic [31:0] mvendorid;
 logic [31:0] marchid;
@@ -100,12 +99,9 @@ begin
         default:;
         endcase
 
-        if (sys_word.ebreak)
-                mcause_next = 3;
-        else if (sys_word.illegal)
-                mcause_next = 2;
-        else if (sys_word.ecall)
-                mcause_next = 11;
+        if (exception) begin
+                mcause_next = {28'b0, trap_cause};
+        end
 end
 
 always_ff @(posedge clk or posedge rst)
@@ -146,28 +142,21 @@ end
 
 always_comb
 begin
-        sys_redirect_next = 0;
-        sys_vec_next = 0;
+        sys_redirect = 0;
+        sys_vec = 0;
 
-        if (sys_word.illegal | sys_word.ecall | sys_word.ebreak) begin
-                sys_redirect_next = 1;
-                sys_vec_next = mtvec;
+        if (exception) begin
+                sys_redirect = 1;
+                sys_vec = mtvec;
         end
-        if (sys_word.mret) begin
-                sys_redirect_next = 1;
-                sys_vec_next = mepc;
+        if (trapret) begin
+                sys_redirect = 1;
+                sys_vec = mepc;
         end
-end
 
-always_ff @(posedge clk or posedge rst)
-begin
         if (rst) begin
-                sys_redirect <= 0;
-                sys_vec <= 0;
-        end
-        else begin
-                sys_redirect <= sys_redirect_next;
-                sys_vec <= sys_vec_next;
+                sys_redirect = 0;
+                sys_vec = 0;
         end
 end
 

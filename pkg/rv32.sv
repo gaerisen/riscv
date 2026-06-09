@@ -61,6 +61,22 @@ package rv32;
                 UIMM    = 1
         } csr_src_e;
 
+        typedef enum logic [3:0] {
+                INST_ADDR_MISAL = 0,
+                INST_ACC_FAULT = 1,
+                ILLEGAL = 2,
+                EBREAK = 3,
+                LOAD_ADDR_MISAL = 4,
+                LOAD_ACC_FAULT = 5,
+                STORE_ADDR_MISAL = 6,
+                STORE_ACC_FAULT = 7,
+                // ECALLs have different cause codes for M-S-U modes, but the
+                // decoder doesn't know current priv, so I'm collapsing them
+                // into one. Whether this changes in the future depends on how
+                // messy handling it in the CSRF gets
+                ECALL = 11
+        } trap_cause_e;
+
         /*====================================================================*/
         /*          ALU SOURCE ENUMS                                          */
         /*====================================================================*/
@@ -145,36 +161,36 @@ package rv32;
         /*              DECODED INSTRUCTION TYPEDEF                           */
         /*====================================================================*/
         typedef struct packed {
+                // Instruction type signals
                 logic branch;
                 logic jump;
                 logic load;
                 logic store;
-                logic irf_wb;
-                logic csr_wb;
+                logic exception;
+                logic trapret;
+                logic wfi;
 
+                // RF write enables
+                logic irf_we;
+                logic csr_we;
+
+                // Source enums
                 alu_src1_e alu_src1;
                 alu_src2_e alu_src2;
                 wb_src_e wb_src;
-
                 csr_src_e csr_src;
 
-                csr_funct2_e csr_op;
+                // Operation enums
                 alu_funct3_e alu_op;
+                alu_funct7_e alu_alt;
                 branch_funct3_e branch_op;
                 load_funct3_e load_op;
                 store_funct3_e store_op;
+                csr_funct2_e csr_op;
 
-                alu_funct7_e alu_alt;
+                trap_cause_e trap_cause;
         } ctrl_t;
 
-        typedef struct packed {
-                logic illegal;
-                logic ecall;
-                logic ebreak;
-                logic mret;
-                logic sret;
-                logic wfi;
-        } system_t;
 
         /*====================================================================*/
         /*              TOMASULO BUFFER ENTRY TYPES                           */
@@ -192,6 +208,7 @@ package rv32;
                 logic [31:0] dest;
                 logic [31:0] value;
                 logic ready;
+                logic [31:0] pc;
         } rob_entry_t;
 
 

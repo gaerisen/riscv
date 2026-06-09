@@ -5,6 +5,7 @@ import rv32::*;
 )(
         input clk,
         input rst,
+        input flush,
 
         input sel,
         input [31:0] csr_old,
@@ -39,7 +40,7 @@ end
 
 always_ff @(posedge clk or posedge rst)
 begin
-        if (rst) begin
+        if (rst | flush) begin
                 csr_new <= 0;
                 ready <= 0;
         end

@@ -12,6 +12,7 @@ import rv32::*;
 )(
         input clk,
         input rst,
+        input stall,
 
         // I-mem interface signals
         input i_data_ready,
@@ -231,7 +232,7 @@ begin
         STREAMING: begin
                 // Entry point for all redirects; if imem isn't ready, hold
                 // i_addr at the redirect vector
-                if (imem_stalling | rst) begin
+                if (stall | imem_stalling | rst) begin
                         pc_next = pc_o;
                 end
 

@@ -6,6 +6,7 @@ import rv32::*;
 )(
         input clk,
         input rst,
+        input flush,
 
         input sel,
         input alu_funct3_e op,
@@ -68,7 +69,7 @@ end
 
 always_ff @(posedge clk or posedge rst)
 begin
-        if (rst) begin
+        if (rst | flush) begin
                 result <= 0;
                 ready <= 0;
         end else begin

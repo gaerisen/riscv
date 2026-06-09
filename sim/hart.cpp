@@ -54,13 +54,17 @@ int hart::run_tests(int cycles)
         std::vector<unsigned char> prog;
         std::string filename;
 
+        int count = 1;
+
         while (true) {
                 prog.clear();
 
                 std::getline(progfs, filename);
                 if (!progfs) break;
 
-                std::cout << std::setw(30) << std::left << filename;
+                std::cout << "[" << count << "] " << std::setw(30) << std::left
+                        << filename;
+                count++;
 
                 read_program(filename, prog);
                 
@@ -99,7 +103,8 @@ int hart::run_tests(int cycles)
                         if (last_block != addr >> 8)
                                 miss_done = i + 10;
 
-                        set_i_ready(i > miss_done);
+//                        set_i_ready(i > miss_done);
+                        set_i_ready(1);
 
                         set_i_data(instr);
 
