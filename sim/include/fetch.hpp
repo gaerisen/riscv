@@ -17,7 +17,7 @@ struct fetch : public device {
         bool get_valid();
         bool get_flush();
 
-        void set_i_data_ready(int);
+        void set_stall(int);
         void set_i_data_i(int);
 
         void set_branch(bool);

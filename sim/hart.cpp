@@ -76,7 +76,7 @@ int hart::run_tests(int cycles)
                         prog.push_back(0x00);
                 }
 
-                unsigned int last_block;
+                unsigned int last_block = 0;
                 unsigned int instr;
                 unsigned int addr = 0;
 
@@ -101,10 +101,10 @@ int hart::run_tests(int cycles)
 
                         // Simulate cache misses
                         if (last_block != addr >> 8)
-                                miss_done = i + 10;
+                                miss_done = i + 16;
 
-//                        set_i_ready(i > miss_done);
-                        set_i_ready(1);
+                        set_i_ready(i >= miss_done);
+//                        set_i_ready(1);
 
                         set_i_data(instr);
 

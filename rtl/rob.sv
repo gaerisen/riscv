@@ -18,7 +18,7 @@ import rv32::*;
         input rst,
 
         // From fetch
-        input flush_fet,
+        input spec_flush_fet,
 
         output stall,
 
@@ -59,20 +59,35 @@ logic [ROB_BITS-1:0] rob_head_next;
 logic [ROB_BITS-1:0] rob_tail;
 logic [ROB_BITS-1:0] rob_tail_next;
 
-logic flush;
+logic flush_internal;
 
 logic [31:0] pc; // For debugging
 assign pc = rob[rob_head].pc;
 
 
 assign commit = rob[rob_head].ready;
-assign store = rob[rob_head].ctrl_word.store;
-assign branch = rob[rob_head].ctrl_word.branch;
-assign exception = rob[rob_head].ctrl_word.exception;
-assign trap_cause = rob[rob_head].ctrl_word.trap_cause;
-assign trapret = rob[rob_head].ctrl_word.trapret;
-assign rd = rob[rob_head].dest;
-assign wb = rob[rob_head].value;
+
+always_comb
+begin
+        if (commit) begin
+                store = rob[rob_head].ctrl_word.store;
+                branch = rob[rob_head].ctrl_word.branch;
+                exception = rob[rob_head].ctrl_word.exception;
+                trap_cause = rob[rob_head].ctrl_word.trap_cause;
+                trapret = rob[rob_head].ctrl_word.trapret;
+                rd = rob[rob_head].dest;
+                wb = rob[rob_head].value;
+        end
+        else begin
+                store = 0;
+                branch = 0;
+                exception = 0;
+                trap_cause = ILLEGAL;
+                trapret = 0;
+                rd = 0;
+                wb = 0;
+        end
+end
 
 
 // Stall logic
@@ -101,7 +116,7 @@ assign full = rob_tail == (rob_head + {ROB_BITS{1'b1}});
 
 assign stall = full;
 
-assign flush = flush_fet | (trapret | exception);
+assign flush_internal = spec_flush_fet | (commit & (trapret | exception));
 
 initial begin
         $dumpfile("rob.vcd");
@@ -125,7 +140,7 @@ end
 
 always_ff @(posedge clk or posedge rst)
 begin
-        if (rst | flush) begin
+        if (rst | flush_internal) begin
                 rob_tail <= 0;
                 rob_head <= 0;
         end
@@ -159,7 +174,7 @@ end
 
 always_ff @(posedge clk or posedge rst)
 begin
-        if (rst | flush) begin
+        if (rst | flush_internal) begin
                 for (int i = 0; i < ROB_LEN; i++) begin
                         rob[i] <= 0;
                 end

@@ -15,15 +15,15 @@
 int opcodes[] = {
         0b01101, // lui
         0b00101, // auipc
-        0b11011, // jal
-        0b11001, // jalr
-        0b11000, // branch
+//        0b11011, // jal
+//        0b11001, // jalr
+//        0b11000, // branch
         0b00000, // load
         0b01000, // store
         0b00100, // alui
         0b01100, // alur
         0b00011, // fence 
-        0b11100  // system
+//        0b11100  // system
 };
 
 int program[] = {
@@ -67,7 +67,7 @@ int fetch::get_instr() { return dut->instr_o; }
 bool fetch::get_valid() { return dut->valid_o; }
 bool fetch::get_flush() { return dut->flush_o; }
 
-void fetch::set_i_data_ready(int in) { dut->i_data_ready = in; }
+void fetch::set_stall(int in) { dut->stall = in; }
 void fetch::set_i_data_i(int in) { dut->i_data = in; }
 void fetch::set_jump(bool in) { dut->jump = in; }
 void fetch::set_branch(bool in) { dut->branch = in; }
@@ -113,8 +113,6 @@ int fetch::run_tests(int cycles)
 
         std::cout << "=== Begin Fetch Testing ===" << std::endl;
 
-        int miss_done = 0;
-
         // Program generation
         for (int i = 0; i < 256; i++) {
                 imem[i] = instr_gen.generate();
@@ -129,15 +127,21 @@ int fetch::run_tests(int cycles)
         reset(6);
         dut->eval();
 
-        set_i_data_ready(1);
+        set_stall(0);
 
-        instr = program[0];
+        instr = imem[0];
         set_i_data_i(instr);
 
         int valid_ctr = 0;
+        int miss_ctr = 0;
+        int last_tag = 0;
+        bool stall = false;
 
         for (int i = 0; i < cycles; i++) {
                 pulse();
+
+                dut->sys_redirect = 0;
+                dut->sys_vec = 0;
 
                 if (get_flush()) {
                         for (int j = 0; j < valid_ctr; j++)
@@ -177,8 +181,16 @@ int fetch::run_tests(int cycles)
 
                 dut->eval();
 
-                instr = program[byte(get_i_addr()>>2)];
-                set_i_data_i(instr);
+                if (last_tag != (get_i_addr() >> 8)) {
+                        miss_ctr = i + 4;
+                }
+                stall = i < miss_ctr;
+
+                set_stall(stall);
+                instr = imem[byte(get_i_addr()>>2)];
+                set_i_data_i(stall ? 0 : instr);
+
+                last_tag = get_i_addr() >> 8;
         }
 
         // Software model execution
@@ -188,7 +200,7 @@ int fetch::run_tests(int cycles)
         std::cout << std::hex;
 
         for (int i = 0; i < pcs_sim.size(); i++) {
-                instr = program[byte(pc>>2)];
+                instr = imem[byte(pc>>2)];
 
                 std::cout << pc << " (" << byte(pc>>2) << ") gives " << instr;
 

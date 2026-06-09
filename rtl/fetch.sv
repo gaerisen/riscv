@@ -13,9 +13,9 @@ import rv32::*;
         input clk,
         input rst,
         input stall,
+        input flush,
 
         // I-mem interface signals
-        input i_data_ready,
         input [31:0] i_data,
 
         output logic [31:0] i_addr,
@@ -56,11 +56,10 @@ state_e state;
 state_e state_next;
 
 logic [31:0] pc_next;
+logic [31:0] pc_stalled;
 
 logic [31:0] instr_next;
 logic valid_next;
-
-logic imem_stalling;
 
 // Prediction signals
 logic inst_is_jump;
@@ -230,12 +229,9 @@ begin
         end
 
         STREAMING: begin
-                // Entry point for all redirects; if imem isn't ready, hold
-                // i_addr at the redirect vector
-                if (stall | imem_stalling | rst) begin
-                        pc_next = pc_o;
+                if (!valid_o) begin
+                        pc_next = pc_stalled;
                 end
-
                 // If misprediction detected, redirect and flush pipeline
                 if (j_mispredict | b_mispredict_nt) begin
                         pc_next = alu_result;
@@ -280,15 +276,10 @@ begin
         valid_next = 1;
         instr_next = i_data;
 
-        if (~i_data_ready) begin
+        if (stall | flush) begin
                 valid_next = 0;
-                instr_next = 0;
+                instr_next = instr_o;
         end
-end
-
-// Instruction validity detection
-always_comb
-begin
 end
 
 // Output flip-flops
@@ -296,10 +287,16 @@ always_ff @(posedge clk or posedge rst)
 begin
         if (rst) begin
                 pc_o <= 0;
-                instr_o <= 0;
+                instr_o <= 32'h13;
                 valid_o <= 0;
 
                 state <= RESET;
+        end
+        else if (stall) begin
+                pc_o <= pc_next;
+                instr_o <= instr_next;
+                valid_o <= valid_next;
+                pc_stalled <= pc_next;
         end
         else begin
                 pc_o <= pc_next;
@@ -309,7 +306,6 @@ begin
                 state <= state_next;
         end
 
-        imem_stalling <= ~i_data_ready;
 end
 
 endmodule // fetch

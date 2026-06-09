@@ -24,14 +24,15 @@ import rv32::*;
         input logic [31:0] d_data_i
 );
 
-logic flush;
-
 // Fetch pipeline registers
 instr_t instr;
 logic [31:0] pc_fet;
 logic valid;
-logic flush_fet;
+logic spec_flush;
+logic spec_flush_fet;
 logic rob_full;
+
+logic system_flush;
 
 // Fetch->Decode wires
 logic [4:0] rs1;
@@ -130,6 +131,10 @@ csrf csrf(
         .csr_result(csr_result_mem)
 );
 
+logic stall;
+
+assign stall = rob_full | !i_data_ready;
+
 //==============================================================================
 //                              PIPELINE
 //==============================================================================
@@ -140,7 +145,7 @@ csrf csrf(
 fetch fetch (
         .*,
 
-        .stall(rob_full),
+        .flush(system_flush),
 
         .jump(ctrl_exe.jump),
         .branch(ctrl_exe.branch),
@@ -149,16 +154,16 @@ fetch fetch (
         .pc_o(pc_fet),
         .instr_o(instr),
         .valid_o(valid),
-        .flush_o(flush)
+        .flush_o(spec_flush)
 );
 
 always_ff @(posedge clk or posedge rst)
 begin
         if (rst) begin
-                flush_fet <= 0;
+                spec_flush_fet <= 0;
         end
         else begin
-                flush_fet <= flush;
+                spec_flush_fet <= spec_flush;
         end
 end
 
@@ -183,7 +188,7 @@ end
 
 always_ff @(posedge clk or posedge rst)
 begin
-        if (rst | flush) begin
+        if (rst | system_flush | spec_flush) begin
                 rs1_dec <= 0;
                 rs2_dec <= 0;
                 csrs_dec <= 0;
@@ -207,7 +212,9 @@ end
 decoder decoder (
         .*,
 
-        .stall(~valid),
+        .flush(system_flush),
+
+        .stall(~valid | stall),
 
         .instr_i(instr),
 
@@ -217,15 +224,15 @@ decoder decoder (
         .ctrl_o(ctrl_dec)
 );
 
+assign issue = rst ? 0 : valid;
+
 always_ff @(posedge clk or posedge rst)
 begin
-        if (rst | flush) begin
+        if (rst | system_flush | spec_flush) begin
                 pc_dec <= 0;
-                issue <= 0;
         end
-        else begin
+        else if (issue) begin
                 pc_dec <= pc_fet;
-                issue <= valid;
         end
 end
 
@@ -263,13 +270,15 @@ end
 
 // Execution unit selection
 
-assign bu_sel = ctrl_dec.branch;
-assign csru_sel = ctrl_dec.csr_we;
-assign alu_sel = !(bu_sel | csru_sel);
+assign bu_sel = issue & ctrl_dec.branch;
+assign csru_sel = issue & ctrl_dec.csr_we;
+assign alu_sel = issue & (ctrl_dec.irf_we | ctrl_dec.store);
 
 // Ex unit for integral arithmetic and logic instructions
 alu alu (
         .*,
+
+        .flush(spec_flush),
 
         .sel(alu_sel),
 
@@ -286,6 +295,8 @@ alu alu (
 bu bu (
         .*,
 
+        .flush(spec_flush),
+
         .sel(bu_sel),
         .op(ctrl_dec.branch_op),
 
@@ -296,6 +307,8 @@ bu bu (
 // Ex unit for Zicsr instructions
 csru csru (
         .*,
+
+        .flush(spec_flush),
 
         .sel(csru_sel),
 
@@ -308,7 +321,8 @@ csru csru (
         .csr_new(csr_result_exe)
 );
 
-assign ready_exe = alu_ready | bu_ready | csru_ready;
+assign ready_exe = alu_ready | bu_ready | csru_ready |
+                ctrl_exe.exception | ctrl_exe.wfi | ctrl_exe.trapret;
 
 always_comb
 begin
@@ -323,14 +337,14 @@ begin
                         result_exe = alu_result_exe;
         end
         else if (csru_ready)
-                result_exe = csr_result_exe;
+                result_exe = csr_value_exe;
         else if (bu_ready)
                 result_exe = {31'b0, branch_taken};
 end
 
 always_ff @(posedge clk or posedge rst)
 begin
-        if (rst | flush) begin
+        if (rst | spec_flush | system_flush) begin
                 pc_exe <= 0;
                 ctrl_exe <= 0;
                 rs2_val_exe <= 0;
@@ -401,7 +415,7 @@ end
 rob rob (
         .*,
 
-        .flush_fet(flush_fet),
+        .spec_flush_fet(spec_flush_fet),
 
         .stall(rob_full),
 
@@ -421,6 +435,8 @@ rob rob (
         .rd(rd_commit),
         .wb(wb_commit)
 );
+
+assign system_flush = commit & (exception | trapret);
 
 defparam rob.ROB_LEN = ROB_LEN;
 

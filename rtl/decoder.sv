@@ -6,8 +6,8 @@ import rv32::*;
 )(
         input clk,
         input rst,
-        input stall,
         input flush,
+        input stall,
 
         input logic [31:0] instr_i,
 
@@ -260,11 +260,12 @@ end
 // Save outputs to pipeline registers
 always_ff @(posedge clk or posedge rst)
 begin
-        if (rst | flush | stall) begin
+        if (rst | flush) begin
                 ctrl_o <= 0;
+                ctrl_o.irf_we <= 1;
                 imm_o <= 0;
                 rd_o <= 0;
-        end else begin
+        end else if (!stall) begin
                 ctrl_o <= ctrl_next;
                 imm_o <= imm_next;
                 rd_o <= rd_next;
