@@ -12,10 +12,11 @@ import rv32::*;
 )(
         input clk,
         input rst,
-        input stall,
-        input flush,
+
+        input rob_stall,
 
         // I-mem interface signals
+        input i_data_ready,
         input [31:0] i_data,
 
         output logic [31:0] i_addr,
@@ -41,22 +42,15 @@ import rv32::*;
         output logic valid_o
 );
 
-initial
-begin
-        $dumpfile("fetch.vcd");
-        $dumpvars(0, fetch);
-end
-
 typedef enum logic {
-        RESET,
-        STREAMING
+        STREAMING,
+        STALLED
 } state_e;
 
 state_e state;
 state_e state_next;
 
 logic [31:0] pc_next;
-logic [31:0] pc_stalled;
 
 logic [31:0] instr_next;
 logic valid_next;
@@ -211,27 +205,45 @@ end
 //      MAIN FETCH FSM
 //=================================
 
+logic stall;
+assign stall = !i_data_ready | rob_stall;
+
 // State switch logic
 always_comb
 begin
         // Stall-safe defaults
         pc_next = pc_o + 4;
         state_next = state;
+        valid_next = valid_o;
+        instr_next = i_data;
 
         flush_o = 0;
 
         unique case (state)
-        RESET: begin
-                pc_next = 0;
+        STALLED: begin
+                pc_next = pc_o;
 
-                if (~rst)
+                if (sys_redirect) begin
+                        pc_next = sys_vec;
+                end
+
+                if (!stall) begin
+                        valid_next = 1;
                         state_next = STREAMING;
+                end
         end
 
         STREAMING: begin
-                if (!valid_o) begin
-                        pc_next = pc_stalled;
+                if (!i_data_ready) begin
+                        valid_next = 0;
+                        state_next = STALLED;
                 end
+                else if (rob_stall) begin
+                        valid_next = 0;
+                        pc_next = pc_o;
+                        state_next = STALLED;
+                end
+
                 // If misprediction detected, redirect and flush pipeline
                 if (j_mispredict | b_mispredict_nt) begin
                         pc_next = alu_result;
@@ -262,24 +274,14 @@ begin
                         pc_next = btb[pc_o[BTB_PTR_SIZE+1:2]];
                 end
 
+                // Sys redirects clobber normal control flow
+                if (sys_redirect) begin
+                        pc_next = sys_vec;
+                        flush_o = 1;
+                end
+
         end
         endcase
-
-        // If system-level redirect, clobber FSM results completely
-        if (sys_redirect) begin
-                pc_next = sys_vec;
-                flush_o = 1;
-                state_next = STREAMING;
-        end
-
-        // Instruction validity detection
-        valid_next = 1;
-        instr_next = i_data;
-
-        if (stall | flush) begin
-                valid_next = 0;
-                instr_next = instr_o;
-        end
 end
 
 // Output flip-flops
@@ -289,20 +291,12 @@ begin
                 pc_o <= 0;
                 instr_o <= 32'h13;
                 valid_o <= 0;
-
-                state <= RESET;
-        end
-        else if (stall) begin
-                pc_o <= pc_next;
-                instr_o <= instr_next;
-                valid_o <= valid_next;
-                pc_stalled <= pc_next;
+                state <= STALLED;
         end
         else begin
                 pc_o <= pc_next;
                 instr_o <= instr_next;
                 valid_o <= valid_next;
-
                 state <= state_next;
         end
 

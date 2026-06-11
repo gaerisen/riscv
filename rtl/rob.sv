@@ -20,7 +20,7 @@ import rv32::*;
         // From fetch
         input spec_flush_fet,
 
-        output stall,
+        output rob_stall,
 
         // From issue/ex regs
         input issue,
@@ -114,7 +114,7 @@ end
 
 assign full = rob_tail == (rob_head + {ROB_BITS{1'b1}});
 
-assign stall = full;
+assign rob_stall = full | (commit & (trapret | exception));
 
 assign flush_internal = spec_flush_fet | (commit & (trapret | exception));
 

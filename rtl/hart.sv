@@ -28,11 +28,7 @@ import rv32::*;
 instr_t instr;
 logic [31:0] pc_fet;
 logic valid;
-logic spec_flush;
 logic spec_flush_fet;
-logic rob_full;
-
-logic system_flush;
 
 // Fetch->Decode wires
 logic [4:0] rs1;
@@ -101,6 +97,8 @@ logic [31:0] wb_commit;
 logic exception;
 logic trapret;
 trap_cause_e trap_cause;
+logic rob_stall;
+logic flush;
 
 wire [ROB_BITS-1:0] rob_ptr_exe;
 
@@ -131,10 +129,6 @@ csrf csrf(
         .csr_result(csr_result_mem)
 );
 
-logic stall;
-
-assign stall = rob_full | !i_data_ready;
-
 //==============================================================================
 //                              PIPELINE
 //==============================================================================
@@ -145,16 +139,15 @@ assign stall = rob_full | !i_data_ready;
 fetch fetch (
         .*,
 
-        .flush(system_flush),
 
         .jump(ctrl_exe.jump),
-        .branch(ctrl_exe.branch),
+        .branch(bu_ready),
         .alu_result(alu_result_exe),
 
         .pc_o(pc_fet),
         .instr_o(instr),
         .valid_o(valid),
-        .flush_o(spec_flush)
+        .flush_o(flush)
 );
 
 always_ff @(posedge clk or posedge rst)
@@ -163,7 +156,7 @@ begin
                 spec_flush_fet <= 0;
         end
         else begin
-                spec_flush_fet <= spec_flush;
+                spec_flush_fet <= flush;
         end
 end
 
@@ -188,7 +181,7 @@ end
 
 always_ff @(posedge clk or posedge rst)
 begin
-        if (rst | system_flush | spec_flush) begin
+        if (rst | flush) begin
                 rs1_dec <= 0;
                 rs2_dec <= 0;
                 csrs_dec <= 0;
@@ -212,9 +205,7 @@ end
 decoder decoder (
         .*,
 
-        .flush(system_flush),
-
-        .stall(~valid | stall),
+        .stall(rob_stall),
 
         .instr_i(instr),
 
@@ -224,15 +215,19 @@ decoder decoder (
         .ctrl_o(ctrl_dec)
 );
 
-assign issue = rst ? 0 : valid;
 
 always_ff @(posedge clk or posedge rst)
 begin
-        if (rst | system_flush | spec_flush) begin
+        if (rst | flush) begin
                 pc_dec <= 0;
+                issue <= 0;
+        end
+        else if (rob_stall) begin
+                issue <= 0;
         end
         else if (issue) begin
                 pc_dec <= pc_fet;
+                issue <= valid;
         end
 end
 
@@ -278,7 +273,7 @@ assign alu_sel = issue & (ctrl_dec.irf_we | ctrl_dec.store);
 alu alu (
         .*,
 
-        .flush(spec_flush),
+        .flush(flush),
 
         .sel(alu_sel),
 
@@ -295,7 +290,7 @@ alu alu (
 bu bu (
         .*,
 
-        .flush(spec_flush),
+        .flush(flush),
 
         .sel(bu_sel),
         .op(ctrl_dec.branch_op),
@@ -308,7 +303,7 @@ bu bu (
 csru csru (
         .*,
 
-        .flush(spec_flush),
+        .flush(flush),
 
         .sel(csru_sel),
 
@@ -344,7 +339,7 @@ end
 
 always_ff @(posedge clk or posedge rst)
 begin
-        if (rst | spec_flush | system_flush) begin
+        if (rst | flush) begin
                 pc_exe <= 0;
                 ctrl_exe <= 0;
                 rs2_val_exe <= 0;
@@ -415,10 +410,6 @@ end
 rob rob (
         .*,
 
-        .spec_flush_fet(spec_flush_fet),
-
-        .stall(rob_full),
-
         .issued_dest({27'b0, rd_dec}),
         .issued_ctrl(ctrl_dec),
         .issued_pc(pc_dec),
@@ -435,8 +426,6 @@ rob rob (
         .rd(rd_commit),
         .wb(wb_commit)
 );
-
-assign system_flush = commit & (exception | trapret);
 
 defparam rob.ROB_LEN = ROB_LEN;
 
