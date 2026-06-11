@@ -6,8 +6,6 @@ import rv32::*;
 )(
         input clk,
         input rst,
-        input flush,
-        input stall,
 
         input logic [31:0] instr_i,
 
@@ -27,12 +25,6 @@ assign instr = instr_i;
 
 // Extract register identifiers (always same location)
 assign rd_next = instr.r.rd;
-
-initial
-begin
-        $dumpfile("decoder.vcd");
-        $dumpvars(0, decoder);
-end
 
 // Combinational decode step
 always_comb
@@ -260,12 +252,12 @@ end
 // Save outputs to pipeline registers
 always_ff @(posedge clk or posedge rst)
 begin
-        if (rst | flush) begin
+        if (rst) begin
                 ctrl_o <= 0;
                 ctrl_o.irf_we <= 1;
                 imm_o <= 0;
                 rd_o <= 0;
-        end else if (!stall) begin
+        end else begin
                 ctrl_o <= ctrl_next;
                 imm_o <= imm_next;
                 rd_o <= rd_next;

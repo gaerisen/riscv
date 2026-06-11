@@ -24,13 +24,10 @@ import rv32::*;
         input logic [31:0] d_data_i
 );
 
-// Fetch pipeline registers
 instr_t instr;
+logic issue_next;
 logic [31:0] pc_fet;
 logic valid;
-logic spec_flush_fet;
-
-// Fetch->Decode wires
 logic [4:0] rs1;
 logic [4:0] rs2;
 logic [31:0] rs1_val;
@@ -38,8 +35,6 @@ logic [31:0] rs2_val;
 logic [11:0] csrs;
 logic [31:0] csr_read;
 logic [31:0] csr_val_dec_next;
-
-// Decode pipeline regs
 logic [31:0] pc_dec;
 ctrl_t ctrl_dec;
 logic [31:0] rs1_val_dec;
@@ -51,16 +46,12 @@ logic [11:0] csrs_dec;
 logic [31:0] imm;
 logic [4:0] rd_dec;
 logic issue;
-
-// Decode->Execute wires
 logic [31:0] rs1_value;
 logic [31:0] rs2_value;
 logic [31:0] csr_value;
 logic alu_sel;
 logic bu_sel;
 logic csru_sel;
-
-// Execute pipeline regs
 logic [31:0] pc_exe;
 logic branch_taken;
 logic [31:0] alu_result_exe;
@@ -70,42 +61,28 @@ logic [11:0] csrd_exe;
 logic [31:0] csr_value_exe;
 logic [31:0] rs2_val_exe;
 ctrl_t ctrl_exe;
-logic alu_ready;
-logic bu_ready;
-logic csru_ready;
-
-
 logic ready_exe;
 logic [31:0] result_exe;
-
-// Memacc pipeline regs
 logic [4:0] rd_mem;
 logic [31:0] csr_result_mem;
 logic [11:0] csrd_mem;
 ctrl_t ctrl_mem /*verilator public*/;
 logic [31:0] wb_mem;
-
-// Memacc->Writeback wires
 logic [31:0] wb_next;
-
-// Commit wires
 logic commit;
 logic store_commit;
 logic branch_commit;
 logic [31:0] rd_commit;
 logic [31:0] wb_commit;
+logic branch_taken_exe;
 logic exception;
 logic trapret;
 trap_cause_e trap_cause;
 logic rob_stall;
 logic flush;
-
 wire [ROB_BITS-1:0] rob_ptr_exe;
-
-// Trap wires
 logic sys_redirect;
 logic [31:0] sys_vec;
-
 logic irf_we;
 
 assign irf_we = commit & !(branch_commit | store_commit);
@@ -140,25 +117,16 @@ fetch fetch (
         .*,
 
 
-        .jump(ctrl_exe.jump),
-        .branch(bu_ready),
-        .alu_result(alu_result_exe),
+        .jump(ready_exe & ctrl_exe.jump),
+        .branch(ready_exe & ctrl_exe.branch),
+        .branch_taken(branch_taken_exe),
+        .alu_result(result_exe),
 
         .pc_o(pc_fet),
         .instr_o(instr),
         .valid_o(valid),
         .flush_o(flush)
 );
-
-always_ff @(posedge clk or posedge rst)
-begin
-        if (rst) begin
-                spec_flush_fet <= 0;
-        end
-        else begin
-                spec_flush_fet <= flush;
-        end
-end
 
 //======================================
 //      (2a) Reg read 
@@ -181,7 +149,7 @@ end
 
 always_ff @(posedge clk or posedge rst)
 begin
-        if (rst | flush) begin
+        if (rst) begin
                 rs1_dec <= 0;
                 rs2_dec <= 0;
                 csrs_dec <= 0;
@@ -190,8 +158,8 @@ begin
         else begin
                 rs1_dec <= rs1;
                 rs2_dec <= rs2;
-                rs1_val_dec <= rs1_val;
-                rs2_val_dec <= rs2_val;
+                rs1_val_dec <= rs1_val; // direct from irf module
+                rs2_val_dec <= rs2_val; // direct from irf module
                 csrs_dec <= csrs;
                 csr_val_dec <= csr_val_dec_next;
         end
@@ -205,8 +173,6 @@ end
 decoder decoder (
         .*,
 
-        .stall(rob_stall),
-
         .instr_i(instr),
 
         .imm_o(imm),
@@ -215,19 +181,24 @@ decoder decoder (
         .ctrl_o(ctrl_dec)
 );
 
+always_comb
+begin
+        issue_next = valid;
+
+        if (flush | rob_stall) begin
+                issue_next = 0;
+        end
+end
 
 always_ff @(posedge clk or posedge rst)
 begin
-        if (rst | flush) begin
+        if (rst) begin
                 pc_dec <= 0;
                 issue <= 0;
         end
-        else if (rob_stall) begin
-                issue <= 0;
-        end
-        else if (issue) begin
+        else begin
                 pc_dec <= pc_fet;
-                issue <= valid;
+                issue <= issue_next;
         end
 end
 
@@ -256,33 +227,18 @@ begin
                 rs2_value = wb_next;
         else if (ctrl_mem.irf_we & (rs2_dec == rd_mem))
                 rs2_value = wb_mem;
-
-        if (ctrl_exe.csr_we & (csrs_dec == csrd_exe))
-                csr_value = csr_result_exe;
-        else if (ctrl_mem.csr_we & (csrs_dec == csrd_mem))
-                csr_value = csr_result_mem;
 end
 
-// Execution unit selection
-
-assign bu_sel = issue & ctrl_dec.branch;
-assign csru_sel = issue & ctrl_dec.csr_we;
-assign alu_sel = issue & (ctrl_dec.irf_we | ctrl_dec.store);
 
 // Ex unit for integral arithmetic and logic instructions
 alu alu (
         .*,
 
-        .flush(flush),
-
-        .sel(alu_sel),
-
         .op(ctrl_dec.alu_op),
         .alt(ctrl_dec.alu_alt),
         .src1(ctrl_dec.alu_src1),
         .src2(ctrl_dec.alu_src2),
-        
-        .ready(alu_ready),
+
         .result(alu_result_exe)
 );
 
@@ -290,12 +246,8 @@ alu alu (
 bu bu (
         .*,
 
-        .flush(flush),
-
-        .sel(bu_sel),
         .op(ctrl_dec.branch_op),
 
-        .ready(bu_ready),
         .result(branch_taken)
 );
 
@@ -303,57 +255,80 @@ bu bu (
 csru csru (
         .*,
 
-        .flush(flush),
-
-        .sel(csru_sel),
-
         .op(ctrl_dec.csr_op),
         .src(ctrl_dec.csr_src),
 
         .csr_old(csr_value),
 
-        .ready(csru_ready),
         .csr_new(csr_result_exe)
 );
 
-assign ready_exe = alu_ready | bu_ready | csru_ready |
-                ctrl_exe.exception | ctrl_exe.wfi | ctrl_exe.trapret;
+logic [4:0] rd_exe_next;
 
 always_comb
 begin
-        result_exe = 0;
+        rd_exe_next = rd_dec;
+        if (!issue)
+                rd_exe_next = 0;
+end
 
-        if (alu_ready) begin
-                if (ctrl_exe.store)
-                        result_exe = rs2_val_exe;
-                else if (ctrl_exe.jump)
-                        result_exe = pc_exe + 4;
-                else
-                        result_exe = alu_result_exe;
+// Execution unit selection
+
+assign bu_sel = ctrl_dec.branch;
+assign csru_sel = ctrl_dec.csr_we;
+assign alu_sel = (ctrl_dec.irf_we | ctrl_dec.store);
+
+logic ready_exe_next;
+logic [31:0] result_exe_next;
+
+always_comb
+begin
+        ready_exe_next = 0;
+
+        if (issue & !flush) begin
+                ready_exe_next = alu_sel | csru_sel | bu_sel |
+                        ctrl_dec.exception | ctrl_dec.wfi | ctrl_dec.trapret;
+        end else begin
+                ready_exe_next = 0;
         end
-        else if (csru_ready)
-                result_exe = csr_value_exe;
-        else if (bu_ready)
-                result_exe = {31'b0, branch_taken};
+
+        if (alu_sel | bu_sel) begin
+                if (ctrl_dec.store)
+                        result_exe_next = rs2_val_exe;
+                else if (ctrl_exe.jump)
+                        result_exe_next = pc_exe + 4;
+                else
+                        result_exe_next = alu_result_exe;
+        end
+        else if (csru_sel)
+                result_exe_next = csr_value_exe;
+        else
+                result_exe_next = 0;
 end
 
 always_ff @(posedge clk or posedge rst)
 begin
-        if (rst | flush) begin
+        if (rst) begin
                 pc_exe <= 0;
                 ctrl_exe <= 0;
                 rs2_val_exe <= 0;
                 rd_exe <= 0;
                 csrd_exe <= 0;
                 csr_value_exe <= 0;
+                ready_exe <= 0;
+                result_exe <= 0;
+                branch_taken_exe <= 0;
         end
         else begin
                 pc_exe <= pc_dec;
                 ctrl_exe <= ctrl_dec;
                 rs2_val_exe <= rs2_value;
-                rd_exe <= rd_dec;
+                rd_exe <= rd_exe_next;
                 csrd_exe <= csrs_dec; // Zicsr is atomic swap --> csrd = csrs
                 csr_value_exe <= csr_value;
+                ready_exe <= ready_exe_next;
+                result_exe <= result_exe_next;
+                branch_taken_exe <= branch_taken;
         end
 end
 
@@ -361,6 +336,7 @@ end
 //======================================
 //      (4) Memory Access
 //======================================
+
 
 // Construct writeback value now so it's available for forwarding
 always_comb

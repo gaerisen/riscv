@@ -33,10 +33,8 @@ import rv32::*;
         input sys_redirect,
         input [31:0] sys_vec,
 
-        // Asynchronous flush signal
-        output logic flush_o,
-
         // Output to decode stage
+        output logic flush_o,
         output logic [31:0] pc_o,
         output instr_t instr_o,
         output logic valid_o
@@ -51,8 +49,8 @@ state_e state;
 state_e state_next;
 
 logic [31:0] pc_next;
-
 logic [31:0] instr_next;
+logic flush_next;
 logic valid_next;
 
 // Prediction signals
@@ -217,7 +215,7 @@ begin
         valid_next = valid_o;
         instr_next = i_data;
 
-        flush_o = 0;
+        flush_next = 0;
 
         unique case (state)
         STALLED: begin
@@ -247,11 +245,11 @@ begin
                 // If misprediction detected, redirect and flush pipeline
                 if (j_mispredict | b_mispredict_nt) begin
                         pc_next = alu_result;
-                        flush_o = 1;
+                        flush_next = 1;
                 end
                 else if (b_mispredict_t) begin
                         pc_next = pc_exe + 4;
-                        flush_o = 1;
+                        flush_next = 1;
                 end
 
                 // Next cases should all be mutually exclusive; each relies on a
@@ -277,7 +275,7 @@ begin
                 // Sys redirects clobber normal control flow
                 if (sys_redirect) begin
                         pc_next = sys_vec;
-                        flush_o = 1;
+                        flush_next = 1;
                 end
 
         end
@@ -291,12 +289,14 @@ begin
                 pc_o <= 0;
                 instr_o <= 32'h13;
                 valid_o <= 0;
+                flush_o <= 0;
                 state <= STALLED;
         end
         else begin
                 pc_o <= pc_next;
                 instr_o <= instr_next;
                 valid_o <= valid_next;
+                flush_o <= flush_next;
                 state <= state_next;
         end
 

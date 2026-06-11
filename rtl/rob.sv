@@ -17,8 +17,7 @@ import rv32::*;
         input clk,
         input rst,
 
-        // From fetch
-        input spec_flush_fet,
+        input flush,
 
         output rob_stall,
 
@@ -116,7 +115,7 @@ assign full = rob_tail == (rob_head + {ROB_BITS{1'b1}});
 
 assign rob_stall = full | (commit & (trapret | exception));
 
-assign flush_internal = spec_flush_fet | (commit & (trapret | exception));
+assign flush_internal = flush | (commit & (trapret | exception));
 
 initial begin
         $dumpfile("rob.vcd");
