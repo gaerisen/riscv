@@ -24,61 +24,7 @@ import rv32::*;
         input logic [31:0] d_data_i
 );
 
-logic [31:0] target_addr_exe;
-logic [31:0] target_addr_exe_next;
-logic [31:0] csr_result_exe;
-instr_t instr;
-logic issue_next;
-logic [31:0] pc_fet;
-logic valid;
-logic [4:0] rs1;
-logic [4:0] rs2;
-logic [31:0] rs1_val;
-logic [31:0] rs2_val;
-logic [11:0] csrs;
-logic [31:0] pc_dec;
-ctrl_t ctrl_dec;
-logic [31:0] rs1_val_dec;
-logic [31:0] rs2_val_dec;
-logic [31:0] csr_val_dec;
-logic [4:0] rs1_dec;
-logic [4:0] rs2_dec;
-logic [11:0] csrs_dec;
-logic [31:0] csr_read;
-logic [31:0] imm;
-logic [4:0] rd_dec;
-logic issue;
-logic [31:0] rs1_value;
-logic [31:0] rs2_value;
-logic [31:0] csr_value;
-logic alu_sel;
-logic bu_sel;
-logic csru_sel;
-logic [31:0] pc_exe;
-logic branch_taken;
-logic [31:0] alu_result;
-logic [4:0] rd_exe;
-logic [31:0] csr_result;
-ctrl_t ctrl_exe;
-logic ready_exe;
-logic [31:0] result_exe;
-logic commit;
-logic store_commit;
-logic branch_commit;
-logic [31:0] rd_commit;
-logic [31:0] wb_commit;
-logic branch_taken_exe;
-logic exception;
-logic trapret;
-trap_cause_e trap_cause;
-logic rob_stall;
-logic flush;
-wire [ROB_BITS-1:0] rob_ptr_exe;
-logic sys_redirect;
-logic [31:0] sys_vec;
-logic irf_we;
-logic [11:0] csrd_commit;
-logic [31:0] csrwb_commit;
+`include "hart-sigs.svh"
 
 assign irf_we = commit & !(branch_commit | store_commit);
 
@@ -108,12 +54,12 @@ csrf csrf(
 //      (1) Fetch
 //======================================
 
+assign jump = !flush & ready_exe & ctrl_exe.jump;
+assign branch = !flush & ready_exe & ctrl_exe.branch;
+
 fetch fetch (
         .*,
 
-
-        .jump(!flush & ready_exe & ctrl_exe.jump),
-        .branch(!flush & ready_exe & ctrl_exe.branch),
         .branch_taken(branch_taken_exe),
         .alu_result(target_addr_exe),
 
@@ -247,47 +193,29 @@ csru csru (
         .csr_new(csr_result)
 );
 
-logic [4:0] rd_exe_next;
+// Result selection
 
-always_comb
-begin
-        rd_exe_next = rd_dec;
-        if (!issue)
-                rd_exe_next = 0;
-end
-
-// Execution unit selection
-
-assign bu_sel = ctrl_dec.branch;
-assign csru_sel = ctrl_dec.csr_we;
-assign alu_sel = (ctrl_dec.irf_we | ctrl_dec.store);
-
-logic ready_exe_next;
-logic [31:0] result_exe_next;
 
 always_comb
 begin
         ready_exe_next = 0;
+        result_exe_next = 0;
 
-        if (issue & !flush) begin
-                ready_exe_next = alu_sel | csru_sel | bu_sel |
-                        ctrl_dec.exception | ctrl_dec.wfi | ctrl_dec.trapret;
-        end else begin
-                ready_exe_next = 0;
+        if (!flush) begin
+                ready_exe_next = issue;
         end
 
-        if (csru_sel)
-                result_exe_next = csr_value;
-        else if (alu_sel | bu_sel) begin
+        unique case (ctrl_dec.wb_src)
+        WB_ALU: begin // Decoder lets default value thru for stores
                 if (ctrl_dec.store)
                         result_exe_next = rs2_value;
-                else if (ctrl_dec.jump)
-                        result_exe_next = pc_dec + 4;
                 else
                         result_exe_next = alu_result;
         end
-        else
-                result_exe_next = 0;
+        WB_MEM: result_exe_next = 0; // TODO: Come on, bro
+        WB_PC4: result_exe_next = pc_dec + 4;
+        WB_CSR: result_exe_next = csr_value;
+        endcase
 
         if (ctrl_dec.jump | ctrl_dec.branch | ctrl_dec.store) begin
                 target_addr_exe_next = alu_result;
@@ -312,7 +240,7 @@ begin
         else begin
                 pc_exe <= pc_dec;
                 ctrl_exe <= ctrl_dec;
-                rd_exe <= rd_exe_next;
+                rd_exe <= rd_dec;
                 ready_exe <= ready_exe_next;
                 result_exe <= result_exe_next;
                 branch_taken_exe <= branch_taken;
