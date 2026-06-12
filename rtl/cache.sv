@@ -134,9 +134,8 @@ begin
                                 state_next = BUSY_RD;
                         end
 
-                        // TODO: figure out how to parameterize the stupid
-                        // 0 length at the tail
-                        mem_addr_next = {cache[index][fifo_head_next[index]].tag, index, 6'b0};
+                        mem_addr_next = {cache[index][fifo_head_next[index]].tag,
+                                index, {OFFSET_BITS{1'b0}}};
                         mem_valid_next = 1;
                         fifo_inc = 1;
                 end
