@@ -207,6 +207,8 @@ package rv32;
                 ctrl_t ctrl_word;
                 logic [31:0] dest;
                 logic [31:0] value;
+                logic [11:0] csr_dest;
+                logic [31:0] csr_value;
                 logic [31:0] pc;
                 logic ready;
         } rob_entry_t;

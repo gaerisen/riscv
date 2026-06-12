@@ -24,6 +24,9 @@ import rv32::*;
         input logic [31:0] d_data_i
 );
 
+logic [31:0] target_addr_exe;
+logic [31:0] target_addr_exe_next;
+logic [31:0] csr_result_exe;
 instr_t instr;
 logic issue_next;
 logic [31:0] pc_fet;
@@ -54,11 +57,10 @@ logic bu_sel;
 logic csru_sel;
 logic [31:0] pc_exe;
 logic branch_taken;
-logic [31:0] alu_result_exe;
+logic [31:0] alu_result;
 logic [4:0] rd_exe;
-logic [31:0] csr_result_exe;
+logic [31:0] csr_result;
 logic [11:0] csrd_exe;
-logic [31:0] csr_value_exe;
 logic [31:0] rs2_val_exe;
 ctrl_t ctrl_exe;
 logic ready_exe;
@@ -84,6 +86,8 @@ wire [ROB_BITS-1:0] rob_ptr_exe;
 logic sys_redirect;
 logic [31:0] sys_vec;
 logic irf_we;
+logic [11:0] csrd_commit;
+logic [31:0] csrwb_commit;
 
 assign irf_we = commit & !(branch_commit | store_commit);
 
@@ -102,8 +106,8 @@ csrf csrf(
 
         .csrs_value(csr_read),
 
-        .csrd(csrd_mem),
-        .csr_result(csr_result_mem)
+        .csrd(csrd_commit),
+        .csr_result(csrwb_commit)
 );
 
 //==============================================================================
@@ -120,7 +124,7 @@ fetch fetch (
         .jump(ready_exe & ctrl_exe.jump),
         .branch(ready_exe & ctrl_exe.branch),
         .branch_taken(branch_taken_exe),
-        .alu_result(result_exe),
+        .alu_result(target_addr_exe),
 
         .pc_o(pc_fet),
         .instr_o(instr),
@@ -185,7 +189,7 @@ always_comb
 begin
         issue_next = valid;
 
-        if (flush | rob_stall) begin
+        if (rob_stall) begin
                 issue_next = 0;
         end
 end
@@ -239,7 +243,7 @@ alu alu (
         .src1(ctrl_dec.alu_src1),
         .src2(ctrl_dec.alu_src2),
 
-        .result(alu_result_exe)
+        .result(alu_result)
 );
 
 // Ex unit for branch resolution
@@ -260,7 +264,7 @@ csru csru (
 
         .csr_old(csr_value),
 
-        .csr_new(csr_result_exe)
+        .csr_new(csr_result)
 );
 
 logic [4:0] rd_exe_next;
@@ -294,16 +298,23 @@ begin
 
         if (alu_sel | bu_sel) begin
                 if (ctrl_dec.store)
-                        result_exe_next = rs2_val_exe;
-                else if (ctrl_exe.jump)
-                        result_exe_next = pc_exe + 4;
+                        result_exe_next = rs2_value;
+                else if (ctrl_dec.jump)
+                        result_exe_next = pc_dec + 4;
                 else
-                        result_exe_next = alu_result_exe;
+                        result_exe_next = alu_result;
         end
         else if (csru_sel)
-                result_exe_next = csr_value_exe;
+                result_exe_next = csr_value;
         else
                 result_exe_next = 0;
+
+        if (ctrl_dec.jump | ctrl_dec.branch | ctrl_dec.store) begin
+                target_addr_exe_next = alu_result;
+        end
+        else begin
+                target_addr_exe_next = 0;
+        end
 end
 
 always_ff @(posedge clk or posedge rst)
@@ -314,10 +325,11 @@ begin
                 rs2_val_exe <= 0;
                 rd_exe <= 0;
                 csrd_exe <= 0;
-                csr_value_exe <= 0;
                 ready_exe <= 0;
                 result_exe <= 0;
                 branch_taken_exe <= 0;
+                target_addr_exe <= 0;
+                csr_result_exe <= 0;
         end
         else begin
                 pc_exe <= pc_dec;
@@ -325,10 +337,11 @@ begin
                 rs2_val_exe <= rs2_value;
                 rd_exe <= rd_exe_next;
                 csrd_exe <= csrs_dec; // Zicsr is atomic swap --> csrd = csrs
-                csr_value_exe <= csr_value;
                 ready_exe <= ready_exe_next;
                 result_exe <= result_exe_next;
                 branch_taken_exe <= branch_taken;
+                target_addr_exe <= target_addr_exe_next;
+                csr_result_exe <= csr_result;
         end
 end
 
@@ -355,7 +368,7 @@ begin
                         wb_next = pc_exe + 4;
                 end
                 WB_CSR: begin
-                        wb_next = csr_value_exe;
+                        wb_next = 0;
                 end
                 endcase
         end
@@ -374,7 +387,7 @@ begin
         else begin
                 ctrl_mem <= ctrl_exe;
                 rd_mem <= rd_exe;
-                csr_result_mem <= csr_result_exe;
+                csr_result_mem <= csr_result;
                 csrd_mem <= csrd_exe;
                 wb_mem <= wb_next;
         end
@@ -387,6 +400,7 @@ rob rob (
         .*,
 
         .issued_dest({27'b0, rd_dec}),
+        .issued_csr_dest(csrs_dec),
         .issued_ctrl(ctrl_dec),
         .issued_pc(pc_dec),
 
@@ -394,13 +408,16 @@ rob rob (
         
         .update_entry(ready_exe),
         .result(result_exe),
-        .updated_dest(alu_result_exe),
+        .csr_result(csr_result_exe),
+        .updated_dest(target_addr_exe),
         .entry_idx(rob_ptr_exe),
 
         .store(store_commit),
         .branch(branch_commit),
         .rd(rd_commit),
-        .wb(wb_commit)
+        .wb(wb_commit),
+        .csrd(csrd_commit),
+        .csrwb(csrwb_commit)
 );
 
 defparam rob.ROB_LEN = ROB_LEN;

@@ -24,6 +24,7 @@ import rv32::*;
         // From issue/ex regs
         input issue,
         input [31:0] issued_dest,
+        input [11:0] issued_csr_dest,
         input ctrl_t issued_ctrl,
         input [31:0] issued_pc,
 
@@ -34,6 +35,7 @@ import rv32::*;
         // From exe
         input update_entry,
         input [31:0] result,
+        input [31:0] csr_result,
         input [31:0] updated_dest,
         input [ROB_BITS-1:0] entry_idx,
 
@@ -44,7 +46,9 @@ import rv32::*;
         output logic trapret,
         output trap_cause_e trap_cause,
         output logic [31:0] rd,
-        output logic [31:0] wb
+        output logic [31:0] wb,
+        output logic [11:0] csrd,
+        output logic [31:0] csrwb
 );
 
 rob_entry_t rob [ROB_LEN-1:0];
@@ -76,6 +80,8 @@ begin
                 trapret = rob[rob_head].ctrl_word.trapret;
                 rd = rob[rob_head].dest;
                 wb = rob[rob_head].value;
+                csrd = rob[rob_head].csr_dest;
+                csrwb = rob[rob_head].csr_value;
         end
         else begin
                 store = 0;
@@ -85,6 +91,8 @@ begin
                 trapret = 0;
                 rd = 0;
                 wb = 0;
+                csrd = 0;
+                csrwb = 0;
         end
 end
 
@@ -92,28 +100,44 @@ end
 // Stall logic
 logic full;
 
-/*
+
+logic issued_is_system;
+assign issued_is_system = issued_ctrl.exception | issued_ctrl.trapret |
+                issued_ctrl.wfi | issued_ctrl.csr_we;
+
+logic committed_is_system;
+assign committed_is_system = rob[rob_head].ctrl_word.exception |
+                                rob[rob_head].ctrl_word.trapret |
+                                rob[rob_head].ctrl_word.wfi |
+                                rob[rob_head].ctrl_word.csr_we;
+
 logic sys_in_flight;
+logic sys_in_flight_next;
+
+always_comb
+begin
+        if (sys_in_flight) begin
+                sys_in_flight_next = !(commit & committed_is_system);
+        end
+        else begin
+                sys_in_flight_next = issued_is_system;
+        end
+end
 
 always_ff @(posedge clk or posedge rst)
 begin
         if (rst) begin
-                sys_in_flight <= 0; 
+                sys_in_flight <= 0;
         end
         else begin
-                if (issued_system != 0) begin
-                        sys_in_flight <= 1;
-                end
-                else if (commit & system != 0) begin
-                        sys_in_flight <= 0;
-                end
+                sys_in_flight <= sys_in_flight_next;
         end
 end
-*/
+
 
 assign full = rob_tail == (rob_head + {ROB_BITS{1'b1}});
 
-assign rob_stall = full | (commit & (trapret | exception));
+assign rob_stall = full | sys_in_flight_next;
 
 assign flush_internal = flush | (commit & (trapret | exception));
 
@@ -161,11 +185,13 @@ begin
 
         rob_issue_next.ctrl_word = issued_ctrl;
         rob_issue_next.dest = issued_dest;
+        rob_issue_next.csr_dest = issued_csr_dest;
         rob_issue_next.pc = issued_pc;
 
         rob_update_next = rob[entry_idx];
 
         rob_update_next.value = result;
+        rob_update_next.csr_value = csr_result;
         if (rob_update_next.ctrl_word.store)
                 rob_update_next.dest = updated_dest;
         rob_update_next.ready = 1;
