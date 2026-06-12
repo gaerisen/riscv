@@ -221,20 +221,26 @@ begin
         STALLED: begin
                 pc_next = pc_o;
 
+                // Following three cases are delayed from issue by a few cycles;
+                // -> redirects come from exception commits
+                // -> mispredictions come from the execute stage
+                // Therefore these should be serviced before we resolve whatever
+                // we're waiting on here.
                 if (sys_redirect) begin
                         pc_next = sys_vec;
                 end
 
-                // If misprediction detected, redirect and flush pipeline
                 if (j_mispredict | b_mispredict_nt) begin
                         pc_next = alu_result;
                         flush_next = 1;
                 end
-                else if (b_mispredict_t) begin
+
+                if (b_mispredict_t) begin
                         pc_next = pc_exe + 4;
                         flush_next = 1;
                 end
 
+                // Doesn't matter how stall goes low; if it does, we're good
                 if (!stall) begin
                         valid_next = 1;
                         state_next = STREAMING;

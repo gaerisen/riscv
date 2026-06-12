@@ -36,8 +36,6 @@ logic [4:0] rs2;
 logic [31:0] rs1_val;
 logic [31:0] rs2_val;
 logic [11:0] csrs;
-logic [31:0] csr_read;
-logic [31:0] csr_val_dec_next;
 logic [31:0] pc_dec;
 ctrl_t ctrl_dec;
 logic [31:0] rs1_val_dec;
@@ -46,6 +44,7 @@ logic [31:0] csr_val_dec;
 logic [4:0] rs1_dec;
 logic [4:0] rs2_dec;
 logic [11:0] csrs_dec;
+logic [31:0] csr_read;
 logic [31:0] imm;
 logic [4:0] rd_dec;
 logic issue;
@@ -60,17 +59,9 @@ logic branch_taken;
 logic [31:0] alu_result;
 logic [4:0] rd_exe;
 logic [31:0] csr_result;
-logic [11:0] csrd_exe;
-logic [31:0] rs2_val_exe;
 ctrl_t ctrl_exe;
 logic ready_exe;
 logic [31:0] result_exe;
-logic [4:0] rd_mem;
-logic [31:0] csr_result_mem;
-logic [11:0] csrd_mem;
-ctrl_t ctrl_mem /*verilator public*/;
-logic [31:0] wb_mem;
-logic [31:0] wb_next;
 logic commit;
 logic store_commit;
 logic branch_commit;
@@ -140,17 +131,6 @@ assign rs1 = instr.r.rs1;
 assign rs2 = instr.r.rs2;
 assign csrs = instr.i.imm11_0;
 
-// Register read happens here, but we also need one pass of operand forwarding
-// from late in the pipeline to make sure we have an up-to-date fallback for the
-// second pass
-always_comb
-begin
-        csr_val_dec_next = csr_read;
-
-        if (ctrl_mem.csr_we & (csrs == csrd_mem))
-                csr_val_dec_next = csr_result_mem;
-end
-
 always_ff @(posedge clk or posedge rst)
 begin
         if (rst) begin
@@ -165,7 +145,7 @@ begin
                 rs1_val_dec <= rs1_val; // direct from irf module
                 rs2_val_dec <= rs2_val; // direct from irf module
                 csrs_dec <= csrs;
-                csr_val_dec <= csr_val_dec_next;
+                csr_val_dec <= csr_read;
         end
 end
         
@@ -221,16 +201,16 @@ begin
         if (rs1_dec == 0)
                 rs1_value = 0;
         else if (!flush & ready_exe & ctrl_exe.irf_we & (rs1_dec == rd_exe))
-                rs1_value = wb_next;
-        else if (commit & ctrl_mem.irf_we & (rs1_dec == rd_commit[4:0]))
-                rs1_value = wb_mem;
+                rs1_value = result_exe;
+        else if (commit & !(branch_commit | store_commit) & (rs1_dec == rd_commit[4:0]))
+                rs1_value = wb_commit;
 
         if (rs2_dec == 0)
                 rs2_value = 0;
         else if (!flush & ready_exe & ctrl_exe.irf_we & (rs2_dec == rd_exe))
-                rs2_value = wb_next;
-        else if (commit & ctrl_mem.irf_we & (rs2_dec == rd_commit[4:0]))
-                rs2_value = wb_mem;
+                rs2_value = result_exe;
+        else if (commit & !(branch_commit | store_commit) & (rs2_dec == rd_commit[4:0]))
+                rs2_value = wb_commit;
 end
 
 
@@ -322,9 +302,7 @@ begin
         if (rst) begin
                 pc_exe <= 0;
                 ctrl_exe <= 0;
-                rs2_val_exe <= 0;
                 rd_exe <= 0;
-                csrd_exe <= 0;
                 ready_exe <= 0;
                 result_exe <= 0;
                 branch_taken_exe <= 0;
@@ -334,9 +312,7 @@ begin
         else begin
                 pc_exe <= pc_dec;
                 ctrl_exe <= ctrl_dec;
-                rs2_val_exe <= rs2_value;
                 rd_exe <= rd_exe_next;
-                csrd_exe <= csrs_dec; // Zicsr is atomic swap --> csrd = csrs
                 ready_exe <= ready_exe_next;
                 result_exe <= result_exe_next;
                 branch_taken_exe <= branch_taken;
@@ -351,47 +327,6 @@ end
 //======================================
 
 
-// Construct writeback value now so it's available for forwarding
-always_comb
-begin
-        wb_next = 0;
-        
-        if (ctrl_exe.irf_we & rd_exe != 0) begin
-                unique case (ctrl_exe.wb_src)
-                WB_ALU: begin
-                        wb_next = result_exe;
-                end
-                WB_MEM: begin
-                        wb_next = 0; // TODO: Override this after memacc resolves
-                end
-                WB_PC4: begin
-                        wb_next = pc_exe + 4;
-                end
-                WB_CSR: begin
-                        wb_next = 0;
-                end
-                endcase
-        end
-end
-
-// Memacc stage register forwarding
-always_ff @(posedge clk or posedge rst)
-begin
-        if (rst | sys_redirect) begin
-                ctrl_mem <= 0;
-                rd_mem <= 0;
-                csr_result_mem <= 0;
-                csrd_mem <= 0;
-                wb_mem <= wb_next;
-        end
-        else begin
-                ctrl_mem <= ctrl_exe;
-                rd_mem <= rd_exe;
-                csr_result_mem <= csr_result;
-                csrd_mem <= csrd_exe;
-                wb_mem <= wb_next;
-        end
-end
 
 //======================================
 //      (5) Writeback/Commit
