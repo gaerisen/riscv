@@ -197,9 +197,11 @@ begin
                         ctrl_next.wb_src = WB_ALU;
                 end
 
-                FENCE: begin    // TODO: Make this not NOP
+                FENCE: begin
                         if (instr.i.funct3 != 0)
                                 ctrl_next.exception = 1;
+
+                        ctrl_next.irf_we = 1; // Makes this a valid NOP
                 end
 
                 SYSTEM: begin 

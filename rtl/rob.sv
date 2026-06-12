@@ -117,10 +117,10 @@ logic sys_in_flight_next;
 always_comb
 begin
         if (sys_in_flight) begin
-                sys_in_flight_next = !(commit & committed_is_system);
+                sys_in_flight_next = !(flush | (commit & committed_is_system));
         end
         else begin
-                sys_in_flight_next = issued_is_system;
+                sys_in_flight_next = issue & issued_is_system;
         end
 end
 

@@ -121,8 +121,8 @@ fetch fetch (
         .*,
 
 
-        .jump(ready_exe & ctrl_exe.jump),
-        .branch(ready_exe & ctrl_exe.branch),
+        .jump(!flush & ready_exe & ctrl_exe.jump),
+        .branch(!flush & ready_exe & ctrl_exe.branch),
         .branch_taken(branch_taken_exe),
         .alu_result(target_addr_exe),
 
@@ -220,16 +220,16 @@ begin
 
         if (rs1_dec == 0)
                 rs1_value = 0;
-        else if (ctrl_exe.irf_we & (rs1_dec == rd_exe))
+        else if (!flush & ready_exe & ctrl_exe.irf_we & (rs1_dec == rd_exe))
                 rs1_value = wb_next;
-        else if (ctrl_mem.irf_we & (rs1_dec == rd_mem))
+        else if (commit & ctrl_mem.irf_we & (rs1_dec == rd_commit[4:0]))
                 rs1_value = wb_mem;
 
         if (rs2_dec == 0)
                 rs2_value = 0;
-        else if (ctrl_exe.irf_we & (rs2_dec == rd_exe))
+        else if (!flush & ready_exe & ctrl_exe.irf_we & (rs2_dec == rd_exe))
                 rs2_value = wb_next;
-        else if (ctrl_mem.irf_we & (rs2_dec == rd_mem))
+        else if (commit & ctrl_mem.irf_we & (rs2_dec == rd_commit[4:0]))
                 rs2_value = wb_mem;
 end
 
@@ -296,7 +296,9 @@ begin
                 ready_exe_next = 0;
         end
 
-        if (alu_sel | bu_sel) begin
+        if (csru_sel)
+                result_exe_next = csr_value;
+        else if (alu_sel | bu_sel) begin
                 if (ctrl_dec.store)
                         result_exe_next = rs2_value;
                 else if (ctrl_dec.jump)
@@ -304,8 +306,6 @@ begin
                 else
                         result_exe_next = alu_result;
         end
-        else if (csru_sel)
-                result_exe_next = csr_value;
         else
                 result_exe_next = 0;
 

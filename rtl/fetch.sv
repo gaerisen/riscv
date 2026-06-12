@@ -225,6 +225,16 @@ begin
                         pc_next = sys_vec;
                 end
 
+                // If misprediction detected, redirect and flush pipeline
+                if (j_mispredict | b_mispredict_nt) begin
+                        pc_next = alu_result;
+                        flush_next = 1;
+                end
+                else if (b_mispredict_t) begin
+                        pc_next = pc_exe + 4;
+                        flush_next = 1;
+                end
+
                 if (!stall) begin
                         valid_next = 1;
                         state_next = STREAMING;
