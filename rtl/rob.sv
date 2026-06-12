@@ -63,10 +63,17 @@ logic [ROB_BITS-1:0] rob_tail;
 logic [ROB_BITS-1:0] rob_tail_next;
 
 logic flush_internal;
+logic full;
+
+logic issued_is_system;
+logic committed_is_system;
+logic sys_in_flight;
+logic sys_in_flight_state;
 
 logic [31:0] pc; // For debugging
-assign pc = rob[rob_head].pc;
 
+
+// Commit logic
 
 assign commit = rob[rob_head].ready;
 
@@ -82,6 +89,7 @@ begin
                 wb = rob[rob_head].value;
                 csrd = rob[rob_head].csr_dest;
                 csrwb = rob[rob_head].csr_value;
+                pc = rob[rob_head].pc;
         end
         else begin
                 store = 0;
@@ -93,51 +101,44 @@ begin
                 wb = 0;
                 csrd = 0;
                 csrwb = 0;
+                pc = 0;
         end
 end
 
 
 // Stall logic
-logic full;
-
-
-logic issued_is_system;
 assign issued_is_system = issued_ctrl.exception | issued_ctrl.trapret |
                 issued_ctrl.wfi | issued_ctrl.csr_we;
 
-logic committed_is_system;
 assign committed_is_system = rob[rob_head].ctrl_word.exception |
                                 rob[rob_head].ctrl_word.trapret |
                                 rob[rob_head].ctrl_word.wfi |
                                 rob[rob_head].ctrl_word.csr_we;
 
-logic sys_in_flight;
-logic sys_in_flight_next;
-
 always_comb
 begin
-        if (sys_in_flight) begin
-                sys_in_flight_next = !(flush | (commit & committed_is_system));
+        if (sys_in_flight_state) begin
+                sys_in_flight = !(flush | (commit & committed_is_system));
         end
         else begin
-                sys_in_flight_next = issue & issued_is_system;
+                sys_in_flight = issue & issued_is_system;
         end
 end
 
 always_ff @(posedge clk or posedge rst)
 begin
         if (rst) begin
-                sys_in_flight <= 0;
+                sys_in_flight_state <= 0;
         end
         else begin
-                sys_in_flight <= sys_in_flight_next;
+                sys_in_flight_state <= sys_in_flight;
         end
 end
 
 
 assign full = rob_tail == (rob_head + {ROB_BITS{1'b1}});
 
-assign rob_stall = full | sys_in_flight_next;
+assign rob_stall = full | sys_in_flight;
 
 assign flush_internal = flush | (commit & (trapret | exception));
 
