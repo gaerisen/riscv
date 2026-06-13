@@ -7,12 +7,11 @@ import rv32::*;
         input rst,
 
         // Read/write port
-        input [11:0] csrs,
+        fet_to_dec_ifc.csrf_read fet_dec_ifc,
 
         input [11:0] csrd,
         input [31:0] csr_result,
 
-        output logic [31:0] csrs_value,
 
         // System redirect request from ROB commit
         input exception,
@@ -46,23 +45,23 @@ logic [31:0] mip, mip_next;
 
 always_comb
 begin
-        csrs_value = 0;
+        fet_dec_ifc.csr_val = 0;
 
-        case (csrs)
-        12'hf11: csrs_value = mvendorid;
-        12'hf12: csrs_value = marchid;
-        12'hf13: csrs_value = mimpid;
-        12'hf14: csrs_value = mhartid;
-        12'h300: csrs_value = mstatus;
-        12'h310: csrs_value = mstatush;
-        12'h301: csrs_value = misa;
-        12'h304: csrs_value = mie;
-        12'h305: csrs_value = mtvec;
-        12'h340: csrs_value = mscratch;
-        12'h341: csrs_value = mepc;
-        12'h342: csrs_value = mcause;
-        12'h343: csrs_value = mtval;
-        12'h344: csrs_value = mip;
+        case (fet_dec_ifc.csrs)
+        12'hf11: fet_dec_ifc.csr_val = mvendorid;
+        12'hf12: fet_dec_ifc.csr_val = marchid;
+        12'hf13: fet_dec_ifc.csr_val = mimpid;
+        12'hf14: fet_dec_ifc.csr_val = mhartid;
+        12'h300: fet_dec_ifc.csr_val = mstatus;
+        12'h310: fet_dec_ifc.csr_val = mstatush;
+        12'h301: fet_dec_ifc.csr_val = misa;
+        12'h304: fet_dec_ifc.csr_val = mie;
+        12'h305: fet_dec_ifc.csr_val = mtvec;
+        12'h340: fet_dec_ifc.csr_val = mscratch;
+        12'h341: fet_dec_ifc.csr_val = mepc;
+        12'h342: fet_dec_ifc.csr_val = mcause;
+        12'h343: fet_dec_ifc.csr_val = mtval;
+        12'h344: fet_dec_ifc.csr_val = mip;
         default:;
         endcase
 end

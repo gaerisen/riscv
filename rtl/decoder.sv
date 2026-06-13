@@ -7,7 +7,7 @@ import rv32::*;
         input clk,
         input rst,
 
-        input logic [31:0] instr_i,
+        input fet_to_dec_ifc.decode fet_dec_ifc,
 
         output logic [31:0] imm_o,
         output logic [4:0] rd_o,
@@ -21,7 +21,7 @@ logic [4:0] rd_next;
 ctrl_t ctrl_next;
 
 // Pack raw instruction into union struct
-assign instr = instr_i;
+assign instr = fet_dec_ifc.instr;
 
 // Extract register identifiers (always same location)
 assign rd_next = instr.r.rd;

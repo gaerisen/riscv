@@ -22,10 +22,7 @@ import rv32::*;
         global_ctrl_ifc.fetch ctrl_ifc,
 
         // Output to decode stage
-        output logic [31:0] pc_o,
-        output instr_t instr_o,
-        output logic valid_o,
-        output speculation_meta_t speculation_meta
+        fet_to_dec_ifc.fetch fet_dec_ifc
 );
 
 typedef enum logic {
@@ -71,19 +68,19 @@ assign i_addr = pc_next;
 //=================================
 
 // Flag any issued JAL(R)s
-assign inst_is_jump = (instr_o.j.opcode == JAL);
-assign inst_is_jalr = (instr_o.i.opcode == JALR);
+assign inst_is_jump = (fet_dec_ifc.instr.j.opcode == JAL);
+assign inst_is_jalr = (fet_dec_ifc.instr.i.opcode == JALR);
 
 // Flag JAL(R)s with rd==ra/x1 (calls)
-assign inst_is_call = (inst_is_jump | inst_is_jalr) & (instr_o.j.rd == 1);
+assign inst_is_call = (inst_is_jump | inst_is_jalr) & (fet_dec_ifc.instr.j.rd == 1);
 
 // Flag JALRs with rs1==ra/x1 (rets)
-assign inst_is_ret = inst_is_jalr & (instr_o.i.rs1 == 1) &
-                        (instr_o.i.imm11_0 == 0);
+assign inst_is_ret = inst_is_jalr & (fet_dec_ifc.instr.i.rs1 == 1) &
+                        (fet_dec_ifc.instr.i.imm11_0 == 0);
 
 // Calculate jump targets
-assign jump_target = pc_o + {{12{instr_o.j.imm20}}, instr_o.j.imm19_12,
-                                instr_o.j.imm11, instr_o.j.imm10_1, 1'b0};
+assign jump_target = fet_dec_ifc.pc + {{12{fet_dec_ifc.instr.j.imm20}}, fet_dec_ifc.instr.j.imm19_12,
+                                fet_dec_ifc.instr.j.imm11, fet_dec_ifc.instr.j.imm10_1, 1'b0};
 
 
 // Push/pop on call/ret
@@ -109,7 +106,7 @@ begin
         else begin
                 ras_ptr <= ras_ptr_next;
                 if (inst_is_call) begin
-                        ras[ras_ptr_next] = pc_o + 4;
+                        ras[ras_ptr_next] = fet_dec_ifc.pc + 4;
                 end
         end
 
@@ -120,14 +117,14 @@ end
 //================================
 
 // Flag any issued branches
-assign inst_is_b = (instr_o.b.opcode == BRANCH);
+assign inst_is_b = (fet_dec_ifc.instr.b.opcode == BRANCH);
 
 // Calculate branch targets
-assign branch_target = pc_o + {{20{instr_o.b.imm12}}, instr_o.b.imm11,
-        instr_o.b.imm10_5, instr_o.b.imm4_1, 1'b0};
+assign branch_target = fet_dec_ifc.pc + {{20{fet_dec_ifc.instr.b.imm12}}, fet_dec_ifc.instr.b.imm11,
+        fet_dec_ifc.instr.b.imm10_5, fet_dec_ifc.instr.b.imm4_1, 1'b0};
 
 // Read branch predictor high bit for current PC
-assign b_predict_taken = inst_is_b & b_pred[pc_o[B_PRED_PTR_SIZE+1:2]][1];
+assign b_predict_taken = inst_is_b & b_pred[fet_dec_ifc.pc[B_PRED_PTR_SIZE+1:2]][1];
 
 logic inc_predictor;
 logic dec_predictor;
@@ -223,17 +220,17 @@ assign b_mispredict_nt =        ctrl_ifc.branch_result_ready & !ctrl_ifc.flush &
 always_comb
 begin
         // Stall-safe defaults
-        pc_next = pc_o + 4;
+        pc_next = fet_dec_ifc.pc + 4;
         state_next = state;
-        valid_next = valid_o;
+        valid_next = fet_dec_ifc.valid;
         instr_next = i_data;
-        speculation_meta = 0;
+        fet_dec_ifc.speculation_meta = 0;
 
         flush_next = 0;
 
         unique case (state)
         STALLED: begin
-                pc_next = pc_o;
+                pc_next = fet_dec_ifc.pc;
 
                 // Following three cases are delayed from issue by a few cycles;
                 // -> redirects come from exception commits
@@ -268,7 +265,7 @@ begin
                 end
                 else if (ctrl_ifc.stall) begin
                         valid_next = 0;
-                        pc_next = pc_o;
+                        pc_next = fet_dec_ifc.pc;
                         state_next = STALLED;
                 end
 
@@ -290,29 +287,29 @@ begin
 
                 // All following are speculative
                 else if (inst_is_b) begin
-                        speculation_meta.branch = 1;
-                        speculation_meta.branch_taken = b_predict_taken;
+                        fet_dec_ifc.speculation_meta.branch = 1;
+                        fet_dec_ifc.speculation_meta.branch_taken = b_predict_taken;
 
                         if (b_predict_taken) begin
-                                speculation_meta.target = branch_target;
-                                pc_next = speculation_meta.target;
+                                fet_dec_ifc.speculation_meta.target = branch_target;
+                                pc_next = fet_dec_ifc.speculation_meta.target;
                         end
                         else begin
-                                speculation_meta.target = pc_o + 4;
-                                pc_next = pc_o + 4;
+                                fet_dec_ifc.speculation_meta.target = fet_dec_ifc.pc + 4;
+                                pc_next = fet_dec_ifc.pc + 4;
                         end
 
                 end
                 else if (inst_is_ret) begin
-                        speculation_meta.jump = 1;
-                        speculation_meta.target = ras[ras_ptr];
+                        fet_dec_ifc.speculation_meta.jump = 1;
+                        fet_dec_ifc.speculation_meta.target = ras[ras_ptr];
                         pc_next = ras[ras_ptr];
                 end
                 // jalr-not-ret must come after jalr-is-ret
                 else if (inst_is_jalr) begin
-                        speculation_meta.jump = 1;
-                        speculation_meta.target = btb[pc_o[BTB_PTR_SIZE+1:2]];
-                        pc_next = btb[pc_o[BTB_PTR_SIZE+1:2]];
+                        fet_dec_ifc.speculation_meta.jump = 1;
+                        fet_dec_ifc.speculation_meta.target = btb[fet_dec_ifc.pc[BTB_PTR_SIZE+1:2]];
+                        pc_next = btb[fet_dec_ifc.pc[BTB_PTR_SIZE+1:2]];
                 end
 
                 // Sys redirects clobber normal control flow
@@ -329,16 +326,16 @@ end
 always_ff @(posedge clk or posedge rst)
 begin
         if (rst) begin
-                pc_o <= 0;
-                instr_o <= 32'h13;
-                valid_o <= 0;
+                fet_dec_ifc.pc <= 0;
+                fet_dec_ifc.instr <= 32'h13;
+                fet_dec_ifc.valid <= 0;
                 ctrl_ifc.flush <= 0;
                 state <= STALLED;
         end
         else begin
-                pc_o <= pc_next;
-                instr_o <= instr_next;
-                valid_o <= valid_next;
+                fet_dec_ifc.pc <= pc_next;
+                fet_dec_ifc.instr <= instr_next;
+                fet_dec_ifc.valid <= valid_next;
                 ctrl_ifc.flush <= flush_next;
                 state <= state_next;
         end

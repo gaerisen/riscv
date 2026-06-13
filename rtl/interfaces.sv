@@ -62,7 +62,8 @@ import rv32::*;
 
 logic [31:0] pc;
 instr_t instr;
-logic [31:0] valid;
+logic valid;
+speculation_meta_t speculation_meta;
 
 logic [4:0] rs1;
 logic [4:0] rs2;
@@ -77,7 +78,7 @@ assign rs2 = instr.r.rs2;
 assign csrs = instr.i.imm11_0;
 
 modport fetch (
-        output pc, instr, valid
+        output pc, instr, valid, speculation_meta
 );
 
 // Need registerfile modports for inline RF read

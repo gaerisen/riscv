@@ -26,12 +26,12 @@ import rv32::*;
 
 `include "hart-sigs.svh"
 
-speculation_meta_t speculation_meta_fet;
 speculation_meta_t speculation_meta_dec;
 
 assign irf_we = commit & !(branch_commit | store_commit);
 
 global_ctrl_ifc ctrl_ifc();
+fet_to_dec_ifc fet_dec_ifc();
 
 // Integer register file
 irf irf(
@@ -46,8 +46,6 @@ irf irf(
 csrf csrf(
         .*,
 
-        .csrs_value(csr_read),
-
         .csrd(csrd_commit),
         .csr_result(csrwb_commit)
 );
@@ -61,12 +59,7 @@ csrf csrf(
 
 
 fetch fetch (
-        .*,
-
-        .pc_o(pc_fet),
-        .instr_o(instr),
-        .valid_o(valid),
-        .speculation_meta(speculation_meta_fet)
+        .*
 );
 
 //======================================
@@ -86,12 +79,12 @@ begin
                 csr_val_dec <= 0;
         end
         else begin
-                rs1_dec <= rs1;
-                rs2_dec <= rs2;
-                rs1_val_dec <= rs1_val; // direct from irf module
-                rs2_val_dec <= rs2_val; // direct from irf module
-                csrs_dec <= csrs;
-                csr_val_dec <= csr_read;
+                rs1_dec <= fet_dec_ifc.rs1;
+                rs2_dec <= fet_dec_ifc.rs2;
+                rs1_val_dec <= fet_dec_ifc.rs1_val; // direct from irf module
+                rs2_val_dec <= fet_dec_ifc.rs2_val; // direct from irf module
+                csrs_dec <= fet_dec_ifc.csrs;
+                csr_val_dec <= fet_dec_ifc.csr_val;
         end
 end
         
@@ -103,8 +96,6 @@ end
 decoder decoder (
         .*,
 
-        .instr_i(instr),
-
         .imm_o(imm),
         .rd_o(rd_dec),
 
@@ -113,7 +104,7 @@ decoder decoder (
 
 always_comb
 begin
-        issue_next = valid;
+        issue_next = fet_dec_ifc.valid;
 
         if (ctrl_ifc.stall) begin
                 issue_next = 0;
@@ -128,8 +119,8 @@ begin
                 issue <= 0;
         end
         else begin
-                pc_dec <= pc_fet;
-                speculation_meta_dec <= speculation_meta_fet;
+                pc_dec <= fet_dec_ifc.pc;
+                speculation_meta_dec <= fet_dec_ifc.speculation_meta;
                 issue <= issue_next;
         end
 end
