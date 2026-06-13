@@ -1,6 +1,6 @@
 TARGET ?= top
 
-RTL_SRC := pkg/rv32.sv pkg/mem_ifc.sv rtl/$(TARGET).sv
+RTL_SRC := pkg/rv32.sv pkg/mem_ifc.sv rtl/interfaces.sv rtl/$(TARGET).sv
 
 VERILATOR_ROOT ?= $(shell verilator --getenv VERILATOR_ROOT)
 VINC = $(VERILATOR_ROOT)/include

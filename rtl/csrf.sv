@@ -20,8 +20,7 @@ import rv32::*;
         input trap_cause_e trap_cause,
 
         // System redirect signalling for fetch
-        output logic sys_redirect,
-        output logic [31:0] sys_vec
+        global_ctrl_ifc.csrf ctrl_ifc
 );
 
 logic [31:0] mvendorid;
@@ -142,21 +141,21 @@ end
 
 always_comb
 begin
-        sys_redirect = 0;
-        sys_vec = 0;
+        ctrl_ifc.sys_redirect = 0;
+        ctrl_ifc.sys_vec = 0;
 
         if (exception) begin
-                sys_redirect = 1;
-                sys_vec = mtvec;
+                ctrl_ifc.sys_redirect = 1;
+                ctrl_ifc.sys_vec = mtvec;
         end
         if (trapret) begin
-                sys_redirect = 1;
-                sys_vec = mepc;
+                ctrl_ifc.sys_redirect = 1;
+                ctrl_ifc.sys_vec = mepc;
         end
 
         if (rst) begin
-                sys_redirect = 0;
-                sys_vec = 0;
+                ctrl_ifc.sys_redirect = 0;
+                ctrl_ifc.sys_vec = 0;
         end
 end
 

@@ -43,7 +43,7 @@ logic [31:0] target_addr_exe_next;
 logic [31:0] pc_exe;
 logic [31:0] target_addr_exe;
 logic [31:0] csr_result_exe;
-logic [4:0] rd_exe;
+logic [31:0] rd_exe;
 ctrl_t ctrl_exe;
 logic ready_exe;
 logic [31:0] result_exe;

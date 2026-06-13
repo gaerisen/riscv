@@ -17,9 +17,7 @@ import rv32::*;
         input clk,
         input rst,
 
-        input flush,
-
-        output rob_stall,
+        global_ctrl_ifc.rob ctrl_ifc,
 
         // From issue/ex regs
         input issue,
@@ -118,7 +116,7 @@ assign committed_is_system = rob[rob_head].ctrl_word.exception |
 always_comb
 begin
         if (sys_in_flight_state) begin
-                sys_in_flight = !(flush | (commit & committed_is_system));
+                sys_in_flight = !(ctrl_ifc.flush | (commit & committed_is_system));
         end
         else begin
                 sys_in_flight = issue & issued_is_system;
@@ -138,9 +136,9 @@ end
 
 assign full = rob_tail == (rob_head + {ROB_BITS{1'b1}});
 
-assign rob_stall = full | sys_in_flight;
+assign ctrl_ifc.stall = full | sys_in_flight;
 
-assign flush_internal = flush | (commit & (trapret | exception));
+assign flush_internal = ctrl_ifc.flush | (commit & (trapret | exception));
 
 initial begin
         $dumpfile("rob.vcd");
@@ -193,8 +191,7 @@ begin
 
         rob_update_next.value = result;
         rob_update_next.csr_value = csr_result;
-        if (rob_update_next.ctrl_word.store)
-                rob_update_next.dest = updated_dest;
+        rob_update_next.dest = updated_dest;
         rob_update_next.ready = 1;
 end
 

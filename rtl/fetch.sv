@@ -13,26 +13,15 @@ import rv32::*;
         input clk,
         input rst,
 
-        input rob_stall,
-
         // I-mem interface signals
         input i_data_ready,
         input [31:0] i_data,
-
         output logic [31:0] i_addr,
 
-        // Speculation resolution signals from execute
-        input [31:0] pc_exe,
-        input ready_exe,
-        input speculation_meta_t speculation_meta_exe,
-        input branch_taken_exe,
-        input [31:0] target_addr_exe,
-
-        input sys_redirect,
-        input [31:0] sys_vec,
+        // Control flow change signals
+        global_ctrl_ifc.fetch ctrl_ifc,
 
         // Output to decode stage
-        output logic flush_o,
         output logic [31:0] pc_o,
         output instr_t instr_o,
         output logic valid_o,
@@ -138,7 +127,18 @@ assign branch_target = pc_o + {{20{instr_o.b.imm12}}, instr_o.b.imm11,
         instr_o.b.imm10_5, instr_o.b.imm4_1, 1'b0};
 
 // Read branch predictor high bit for current PC
-assign b_predict_taken = inst_is_b & b_pred[pc_o[9:2]][1];
+assign b_predict_taken = inst_is_b & b_pred[pc_o[B_PRED_PTR_SIZE+1:2]][1];
+
+logic inc_predictor;
+logic dec_predictor;
+
+assign inc_predictor =  ctrl_ifc.branch_result_ready &
+                        ctrl_ifc.speculation_meta.branch &
+                        ctrl_ifc.branch_taken;
+
+assign dec_predictor =  ctrl_ifc.branch_result_ready &
+                        ctrl_ifc.speculation_meta.branch &
+                        !ctrl_ifc.branch_taken;
 
 // Update predictor whenever a branch is resolved
 always_ff @(posedge clk or posedge rst)
@@ -149,20 +149,20 @@ begin
                 end
         end
         else begin
-                if (speculation_meta_exe.branch & branch_taken_exe) begin
-                        unique case (b_pred[pc_exe[B_PRED_PTR_SIZE+1:2]])
-                        2'b00: b_pred[pc_exe[B_PRED_PTR_SIZE+1:2]] = 2'b01;
-                        2'b01: b_pred[pc_exe[B_PRED_PTR_SIZE+1:2]] = 2'b10;
-                        2'b10: b_pred[pc_exe[B_PRED_PTR_SIZE+1:2]] = 2'b11;
-                        2'b11: b_pred[pc_exe[B_PRED_PTR_SIZE+1:2]] = 2'b11;
+                if (inc_predictor) begin
+                        unique case (b_pred[ctrl_ifc.branch_pc[B_PRED_PTR_SIZE+1:2]])
+                        2'b00: b_pred[ctrl_ifc.branch_pc[B_PRED_PTR_SIZE+1:2]] = 2'b01;
+                        2'b01: b_pred[ctrl_ifc.branch_pc[B_PRED_PTR_SIZE+1:2]] = 2'b10;
+                        2'b10: b_pred[ctrl_ifc.branch_pc[B_PRED_PTR_SIZE+1:2]] = 2'b11;
+                        2'b11: b_pred[ctrl_ifc.branch_pc[B_PRED_PTR_SIZE+1:2]] = 2'b11;
                         endcase
                 end
-                else if (speculation_meta_exe.branch & ~branch_taken_exe) begin
-                        unique case (b_pred[pc_exe[B_PRED_PTR_SIZE+1:2]])
-                        2'b00: b_pred[pc_exe[B_PRED_PTR_SIZE+1:2]] = 2'b00;
-                        2'b01: b_pred[pc_exe[B_PRED_PTR_SIZE+1:2]] = 2'b00;
-                        2'b10: b_pred[pc_exe[B_PRED_PTR_SIZE+1:2]] = 2'b01;
-                        2'b11: b_pred[pc_exe[B_PRED_PTR_SIZE+1:2]] = 2'b10;
+                else if (dec_predictor) begin
+                        unique case (b_pred[ctrl_ifc.branch_pc[B_PRED_PTR_SIZE+1:2]])
+                        2'b00: b_pred[ctrl_ifc.branch_pc[B_PRED_PTR_SIZE+1:2]] = 2'b00;
+                        2'b01: b_pred[ctrl_ifc.branch_pc[B_PRED_PTR_SIZE+1:2]] = 2'b00;
+                        2'b10: b_pred[ctrl_ifc.branch_pc[B_PRED_PTR_SIZE+1:2]] = 2'b01;
+                        2'b11: b_pred[ctrl_ifc.branch_pc[B_PRED_PTR_SIZE+1:2]] = 2'b10;
                         endcase
                 end
         end
@@ -171,6 +171,11 @@ end
 //=================================
 //      BRANCH TARGET BUFFER
 //=================================
+
+logic update_btb;
+
+assign update_btb =     ctrl_ifc.branch_result_ready & !ctrl_ifc.flush &
+                        ctrl_ifc.speculation_meta.jump;
 
 always @(posedge clk or posedge rst)
 begin
@@ -183,8 +188,8 @@ begin
                 // For now, we'll update for every successful jump. If this
                 // proves to be a problem, add signalling to only update with
                 // targets from jalr-not-rets
-                if (speculation_meta_exe.jump) begin
-                        btb[pc_exe[BTB_PTR_SIZE+1:2]] = target_addr_exe;
+                if (update_btb) begin
+                        btb[ctrl_ifc.branch_pc[BTB_PTR_SIZE+1:2]] = ctrl_ifc.branch_target;
                 end
         end
 end
@@ -194,25 +199,25 @@ end
 //=================================
 
 logic stall;
-assign stall = !i_data_ready | rob_stall;
+assign stall = !i_data_ready | ctrl_ifc.stall;
 
 logic j_mispredict;
 logic b_mispredict_t;
 logic b_mispredict_nt;
 
-assign j_mispredict =   ready_exe & !flush_o &
-                        speculation_meta_exe.jump &
-                        (speculation_meta_exe.target != target_addr_exe);
+assign j_mispredict =   ctrl_ifc.branch_result_ready &
+                        ctrl_ifc.speculation_meta.jump &
+                        (ctrl_ifc.speculation_meta.target != ctrl_ifc.branch_target);
 
-assign b_mispredict_t =         ready_exe & !flush_o &
-                                speculation_meta_exe.branch &
-                                speculation_meta_exe.branch_taken &
-                                !branch_taken_exe;
+assign b_mispredict_t =         ctrl_ifc.branch_result_ready & !ctrl_ifc.flush &
+                                ctrl_ifc.speculation_meta.branch &
+                                ctrl_ifc.speculation_meta.branch_taken &
+                                !ctrl_ifc.branch_taken;
 
-assign b_mispredict_nt =        ready_exe & !flush_o &
-                                speculation_meta_exe.branch &
-                                !speculation_meta_exe.branch_taken &
-                                branch_taken_exe;
+assign b_mispredict_nt =        ctrl_ifc.branch_result_ready & !ctrl_ifc.flush &
+                                ctrl_ifc.speculation_meta.branch &
+                                !ctrl_ifc.speculation_meta.branch_taken &
+                                ctrl_ifc.branch_taken;
 
 // State switch logic
 always_comb
@@ -235,17 +240,17 @@ begin
                 // -> mispredictions come from the execute stage
                 // Therefore these should be serviced before we resolve whatever
                 // we're waiting on here.
-                if (sys_redirect) begin
-                        pc_next = sys_vec;
+                if (ctrl_ifc.sys_redirect) begin
+                        pc_next = ctrl_ifc.sys_vec;
                 end
 
                 if (j_mispredict | b_mispredict_nt) begin
-                        pc_next = target_addr_exe;
+                        pc_next = ctrl_ifc.branch_target;
                         flush_next = 1;
                 end
 
                 if (b_mispredict_t) begin
-                        pc_next = pc_exe + 4;
+                        pc_next = ctrl_ifc.branch_pc + 4;
                         flush_next = 1;
                 end
 
@@ -261,7 +266,7 @@ begin
                         valid_next = 0;
                         state_next = STALLED;
                 end
-                else if (rob_stall) begin
+                else if (ctrl_ifc.stall) begin
                         valid_next = 0;
                         pc_next = pc_o;
                         state_next = STALLED;
@@ -269,11 +274,11 @@ begin
 
                 // If misprediction detected, redirect and flush pipeline
                 if (j_mispredict | b_mispredict_nt) begin
-                        pc_next = target_addr_exe;
+                        pc_next = ctrl_ifc.branch_target;
                         flush_next = 1;
                 end
                 else if (b_mispredict_t) begin
-                        pc_next = pc_exe + 4;
+                        pc_next = ctrl_ifc.branch_pc + 4;
                         flush_next = 1;
                 end
 
@@ -311,8 +316,8 @@ begin
                 end
 
                 // Sys redirects clobber normal control flow
-                if (sys_redirect) begin
-                        pc_next = sys_vec;
+                if (ctrl_ifc.sys_redirect) begin
+                        pc_next = ctrl_ifc.sys_vec;
                         flush_next = 1;
                 end
 
@@ -327,14 +332,14 @@ begin
                 pc_o <= 0;
                 instr_o <= 32'h13;
                 valid_o <= 0;
-                flush_o <= 0;
+                ctrl_ifc.flush <= 0;
                 state <= STALLED;
         end
         else begin
                 pc_o <= pc_next;
                 instr_o <= instr_next;
                 valid_o <= valid_next;
-                flush_o <= flush_next;
+                ctrl_ifc.flush <= flush_next;
                 state <= state_next;
         end
 

@@ -5,6 +5,7 @@
 /*    Global Control Ifc    */
 /*==========================*/
 interface global_ctrl_ifc
+import rv32::*;
 #(
 )(
 );
@@ -12,18 +13,24 @@ interface global_ctrl_ifc
 logic sys_redirect;
 logic [31:0] sys_vec;
 
-logic jump;
-logic branch;
+logic [31:0] branch_pc;
+logic branch_result_ready;
+speculation_meta_t speculation_meta;
 logic branch_taken;
-logic [31:0] jump_target;
+logic [31:0] branch_target;
 
 logic stall;
 logic flush;
 
 modport fetch (
-        input sys_redirect, sys_vec,
-        input jump, branch, branch_taken, jump_target,
+        input stall, sys_redirect, sys_vec,
+        input branch_pc, speculation_meta,
+        input branch_result_ready, branch_taken, branch_target,
         output flush
+);
+
+modport csrf (
+        output sys_redirect, sys_vec
 );
 
 modport rob (
@@ -37,7 +44,8 @@ modport decode (
 
 modport execute (
         input flush,
-        output jump, branch, branch_taken, jump_target
+        output branch_pc, speculation_meta,
+        output branch_result_ready, branch_taken, branch_target
 );
 
 endinterface
