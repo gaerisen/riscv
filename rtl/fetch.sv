@@ -21,15 +21,13 @@ import rv32::*;
 
         output logic [31:0] i_addr,
 
-        // Jump/branch signals (From EXE; pc_o - 2)
+        // Speculation resolution signals from execute
         input [31:0] pc_exe,
-        input jump,
-        input branch,
-        input branch_taken,
-        input [31:0] alu_result,
+        input ready_exe,
+        input speculation_meta_t speculation_meta_exe,
+        input branch_taken_exe,
+        input [31:0] target_addr_exe,
 
-        // System control signals (From DEC; pc_o - 1)
-        input [31:0] pc_dec,
         input sys_redirect,
         input [31:0] sys_vec,
 
@@ -37,7 +35,8 @@ import rv32::*;
         output logic flush_o,
         output logic [31:0] pc_o,
         output instr_t instr_o,
-        output logic valid_o
+        output logic valid_o,
+        output speculation_meta_t speculation_meta
 );
 
 typedef enum logic {
@@ -65,10 +64,6 @@ logic [31:0] branch_target;
 
 logic b_predict_taken;
 
-logic j_mispredict;
-logic b_mispredict_nt;
-logic b_mispredict_t;
-
 // Prediction registers
 logic [1:0] b_pred [0:B_PRED_SIZE-1];
 
@@ -80,11 +75,6 @@ logic [RAS_PTR_SIZE-1:0] ras_ptr_next;
 
 // Slam IMEM with whatever's next
 assign i_addr = pc_next;
-
-// Detect mispredictions
-assign j_mispredict = (jump & (pc_dec != alu_result));
-assign b_mispredict_nt = (branch & branch_taken & (pc_dec != alu_result));
-assign b_mispredict_t = (branch & ~branch_taken & (pc_dec != (pc_exe + 4)));
 
 
 //=================================
@@ -159,7 +149,7 @@ begin
                 end
         end
         else begin
-                if (branch & branch_taken) begin
+                if (speculation_meta_exe.branch & branch_taken_exe) begin
                         unique case (b_pred[pc_exe[B_PRED_PTR_SIZE+1:2]])
                         2'b00: b_pred[pc_exe[B_PRED_PTR_SIZE+1:2]] = 2'b01;
                         2'b01: b_pred[pc_exe[B_PRED_PTR_SIZE+1:2]] = 2'b10;
@@ -167,7 +157,7 @@ begin
                         2'b11: b_pred[pc_exe[B_PRED_PTR_SIZE+1:2]] = 2'b11;
                         endcase
                 end
-                else if (branch & ~branch_taken) begin
+                else if (speculation_meta_exe.branch & ~branch_taken_exe) begin
                         unique case (b_pred[pc_exe[B_PRED_PTR_SIZE+1:2]])
                         2'b00: b_pred[pc_exe[B_PRED_PTR_SIZE+1:2]] = 2'b00;
                         2'b01: b_pred[pc_exe[B_PRED_PTR_SIZE+1:2]] = 2'b00;
@@ -193,8 +183,8 @@ begin
                 // For now, we'll update for every successful jump. If this
                 // proves to be a problem, add signalling to only update with
                 // targets from jalr-not-rets
-                if (jump) begin
-                        btb[pc_exe[BTB_PTR_SIZE+1:2]] = alu_result;
+                if (speculation_meta_exe.jump) begin
+                        btb[pc_exe[BTB_PTR_SIZE+1:2]] = target_addr_exe;
                 end
         end
 end
@@ -206,6 +196,24 @@ end
 logic stall;
 assign stall = !i_data_ready | rob_stall;
 
+logic j_mispredict;
+logic b_mispredict_t;
+logic b_mispredict_nt;
+
+assign j_mispredict =   ready_exe & !flush_o &
+                        speculation_meta_exe.jump &
+                        (speculation_meta_exe.target != target_addr_exe);
+
+assign b_mispredict_t =         ready_exe & !flush_o &
+                                speculation_meta_exe.branch &
+                                speculation_meta_exe.branch_taken &
+                                !branch_taken_exe;
+
+assign b_mispredict_nt =        ready_exe & !flush_o &
+                                speculation_meta_exe.branch &
+                                !speculation_meta_exe.branch_taken &
+                                branch_taken_exe;
+
 // State switch logic
 always_comb
 begin
@@ -214,6 +222,7 @@ begin
         state_next = state;
         valid_next = valid_o;
         instr_next = i_data;
+        speculation_meta = 0;
 
         flush_next = 0;
 
@@ -231,7 +240,7 @@ begin
                 end
 
                 if (j_mispredict | b_mispredict_nt) begin
-                        pc_next = alu_result;
+                        pc_next = target_addr_exe;
                         flush_next = 1;
                 end
 
@@ -260,7 +269,7 @@ begin
 
                 // If misprediction detected, redirect and flush pipeline
                 if (j_mispredict | b_mispredict_nt) begin
-                        pc_next = alu_result;
+                        pc_next = target_addr_exe;
                         flush_next = 1;
                 end
                 else if (b_mispredict_t) begin
@@ -276,15 +285,28 @@ begin
 
                 // All following are speculative
                 else if (inst_is_b) begin
+                        speculation_meta.branch = 1;
+                        speculation_meta.branch_taken = b_predict_taken;
+
                         if (b_predict_taken) begin
-                                pc_next = branch_target;
+                                speculation_meta.target = branch_target;
+                                pc_next = speculation_meta.target;
                         end
+                        else begin
+                                speculation_meta.target = pc_o + 4;
+                                pc_next = pc_o + 4;
+                        end
+
                 end
                 else if (inst_is_ret) begin
+                        speculation_meta.jump = 1;
+                        speculation_meta.target = ras[ras_ptr];
                         pc_next = ras[ras_ptr];
                 end
                 // jalr-not-ret must come after jalr-is-ret
                 else if (inst_is_jalr) begin
+                        speculation_meta.jump = 1;
+                        speculation_meta.target = btb[pc_o[BTB_PTR_SIZE+1:2]];
                         pc_next = btb[pc_o[BTB_PTR_SIZE+1:2]];
                 end
 

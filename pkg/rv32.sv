@@ -157,6 +157,14 @@ package rv32;
                 } j;
         } instr_t;
 
+
+        typedef struct packed {
+                logic branch;
+                logic branch_taken;
+                logic jump;
+                logic [31:0] target;
+        } speculation_meta_t;
+
         /*====================================================================*/
         /*              DECODED INSTRUCTION TYPEDEF                           */
         /*====================================================================*/

@@ -26,6 +26,10 @@ import rv32::*;
 
 `include "hart-sigs.svh"
 
+speculation_meta_t speculation_meta_fet;
+speculation_meta_t speculation_meta_dec;
+speculation_meta_t speculation_meta_exe;
+
 assign irf_we = commit & !(branch_commit | store_commit);
 
 // Integer register file
@@ -54,19 +58,14 @@ csrf csrf(
 //      (1) Fetch
 //======================================
 
-assign jump = !flush & ready_exe & ctrl_exe.jump;
-assign branch = !flush & ready_exe & ctrl_exe.branch;
-
 fetch fetch (
         .*,
-
-        .branch_taken(branch_taken_exe),
-        .alu_result(target_addr_exe),
 
         .pc_o(pc_fet),
         .instr_o(instr),
         .valid_o(valid),
-        .flush_o(flush)
+        .flush_o(flush),
+        .speculation_meta(speculation_meta_fet)
 );
 
 //======================================
@@ -124,10 +123,12 @@ always_ff @(posedge clk or posedge rst)
 begin
         if (rst) begin
                 pc_dec <= 0;
+                speculation_meta_dec <= 0;
                 issue <= 0;
         end
         else begin
                 pc_dec <= pc_fet;
+                speculation_meta_dec <= speculation_meta_fet;
                 issue <= issue_next;
         end
 end
@@ -194,8 +195,6 @@ csru csru (
 );
 
 // Result selection
-
-
 always_comb
 begin
         ready_exe_next = 0;
@@ -236,6 +235,7 @@ begin
                 branch_taken_exe <= 0;
                 target_addr_exe <= 0;
                 csr_result_exe <= 0;
+                speculation_meta_exe <= 0;
         end
         else begin
                 pc_exe <= pc_dec;
@@ -246,6 +246,7 @@ begin
                 branch_taken_exe <= branch_taken;
                 target_addr_exe <= target_addr_exe_next;
                 csr_result_exe <= csr_result;
+                speculation_meta_exe <= speculation_meta_dec;
         end
 end
 
