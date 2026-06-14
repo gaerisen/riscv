@@ -37,6 +37,8 @@ import rv32::*;
         input [31:0] updated_dest,
         input [ROB_BITS-1:0] entry_idx,
 
+        fwding_ifc.commit fwd_ifc,
+
         output logic commit,
         output logic store,
         output logic branch,
@@ -102,6 +104,11 @@ begin
                 pc = 0;
         end
 end
+
+// Forwarding
+assign fwd_ifc.commit_val_valid = commit & !ctrl_ifc.flush;
+assign fwd_ifc.rd_commit = rd[4:0];
+assign fwd_ifc.commit_val = wb;
 
 
 // Stall logic

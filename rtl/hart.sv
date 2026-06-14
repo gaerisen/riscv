@@ -32,6 +32,7 @@ assign irf_we = commit & !(branch_commit | store_commit);
 
 global_ctrl_ifc ctrl_ifc();
 fet_to_dec_ifc fet_dec_ifc();
+fwding_ifc fwd_ifc();
 
 // Integer register file
 irf irf(
@@ -87,6 +88,15 @@ begin
                 csr_val_dec <= fet_dec_ifc.csr_val;
         end
 end
+
+// [Temporary] give fwding network read values
+always_comb
+begin
+        fwd_ifc.rs1 = rs1_dec;
+        fwd_ifc.rs2 = rs2_dec;
+        fwd_ifc.rs1_val = rs1_val_dec;
+        fwd_ifc.rs2_val = rs2_val_dec;
+end
         
 
 //======================================
@@ -131,7 +141,10 @@ end
 //======================================
 
 execute execute (
-        .*
+        .*,
+
+        .fwd_ifc_in(fwd_ifc),
+        .fwd_ifc_out(fwd_ifc)
 );
 
 //======================================

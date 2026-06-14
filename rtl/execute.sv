@@ -11,22 +11,15 @@ import rv32::*;
         input speculation_meta_t speculation_meta_dec,
         input issue,
 
-        input [4:0] rs1_dec,
-        input [31:0] rs1_val_dec,
-        input [4:0] rs2_dec,
-        input [31:0] rs2_val_dec,
+        fwding_ifc.execute_input fwd_ifc_in,
         input [31:0] csr_val_dec,
         input [4:0] rd_dec,
 
         input [31:0] imm,
 
-        input commit,
-        input branch_commit,
-        input store_commit,
-        input [31:0] rd_commit,
-        input [31:0] wb_commit,
-
         global_ctrl_ifc.execute ctrl_ifc,
+
+        fwding_ifc.execute_output fwd_ifc_out,
 
         output logic [31:0] pc_exe,
         output ctrl_t ctrl_exe,
@@ -38,7 +31,6 @@ import rv32::*;
 
 logic [31:0] rs1_value;
 logic [31:0] rs2_value;
-logic [31:0] csr_value;
 
 logic [31:0] alu_result;
 logic [31:0] csr_result;
@@ -47,27 +39,8 @@ logic ready_exe_next;
 logic [31:0] result_exe_next;
 logic [31:0] rd_exe_next;
 
-// Operand forwarding
-always_comb
-begin
-        rs1_value = rs1_val_dec;
-        rs2_value = rs2_val_dec;
-        csr_value = csr_val_dec;
-
-        if (rs1_dec == 0)
-                rs1_value = 0;
-        else if (!ctrl_ifc.flush & ready_exe & ctrl_exe.irf_we & (rs1_dec == rd_exe[4:0]))
-                rs1_value = result_exe;
-        else if (commit & !(branch_commit | store_commit) & (rs1_dec == rd_commit[4:0]))
-                rs1_value = wb_commit;
-
-        if (rs2_dec == 0)
-                rs2_value = 0;
-        else if (!ctrl_ifc.flush & ready_exe & ctrl_exe.irf_we & (rs2_dec == rd_exe[4:0]))
-                rs2_value = result_exe;
-        else if (commit & !(branch_commit | store_commit) & (rs2_dec == rd_commit[4:0]))
-                rs2_value = wb_commit;
-end
+assign rs1_value = fwd_ifc_in.in1;
+assign rs2_value = fwd_ifc_in.in2;
 
 // Ex unit for integral arithmetic and logic instructions
 alu alu (
@@ -97,7 +70,7 @@ csru csru (
         .op(ctrl_dec.csr_op),
         .src(ctrl_dec.csr_src),
 
-        .csr_old(csr_value),
+        .csr_old(csr_val_dec),
 
         .csr_new(csr_result)
 );
@@ -123,9 +96,12 @@ begin
         end
         WB_MEM: result_exe_next = 0; // TODO: Come on, bro
         WB_PC4: result_exe_next = pc_dec + 4;
-        WB_CSR: result_exe_next = csr_value;
+        WB_CSR: result_exe_next = csr_val_dec;
         endcase
 end
+
+logic exe_val_valid_next;
+assign exe_val_valid_next = ready_exe_next & !ctrl_ifc.flush & ctrl_dec.irf_we;
 
 always_ff @(posedge clk or posedge rst)
 begin
@@ -142,6 +118,10 @@ begin
                 ctrl_ifc.branch_result_ready <= 0;
                 ctrl_ifc.branch_taken <= 0;
                 ctrl_ifc.branch_target <= 0;
+
+                fwd_ifc_out.exe_val_valid <= 0;
+                fwd_ifc_out.rd_exe <= 0;
+                fwd_ifc_out.exe_val <= 0;
         end
         else begin
                 pc_exe <= pc_dec;
@@ -156,6 +136,10 @@ begin
                 ctrl_ifc.branch_result_ready <= ready_exe_next;
                 ctrl_ifc.branch_taken <= branch_taken;
                 ctrl_ifc.branch_target <= alu_result;
+
+                fwd_ifc_out.exe_val_valid <= exe_val_valid_next;
+                fwd_ifc_out.rd_exe <= rd_exe_next[4:0];
+                fwd_ifc_out.exe_val <= result_exe_next;
         end
 end
 
