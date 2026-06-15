@@ -6,15 +6,9 @@ import rv32::*;
         input clk,
         input rst,
 
-        input [31:0] pc_dec,
-        input ctrl_t ctrl_dec,
-        input speculation_meta_t speculation_meta_dec,
-        input issue,
+        issue_ifc.execute issue_ifc,
 
         input [31:0] csr_val_dec,
-        input [4:0] rd_dec,
-
-        input [31:0] imm,
 
         global_ctrl_ifc.execute ctrl_ifc,
 
@@ -45,10 +39,13 @@ assign rs2_value = fwd_ifc.in2;
 alu alu (
         .*,
 
-        .op(ctrl_dec.alu_op),
-        .alt(ctrl_dec.alu_alt),
-        .src1(ctrl_dec.alu_src1),
-        .src2(ctrl_dec.alu_src2),
+        .pc(issue_ifc.pc),
+        .imm(issue_ifc.imm),
+
+        .op(issue_ifc.ctrl_word.alu_op),
+        .alt(issue_ifc.ctrl_word.alu_alt),
+        .src1(issue_ifc.ctrl_word.alu_src1),
+        .src2(issue_ifc.ctrl_word.alu_src2),
 
         .result(alu_result)
 );
@@ -57,7 +54,7 @@ alu alu (
 bu bu (
         .*,
 
-        .op(ctrl_dec.branch_op),
+        .op(issue_ifc.ctrl_word.branch_op),
 
         .result(branch_taken)
 );
@@ -66,8 +63,10 @@ bu bu (
 csru csru (
         .*,
 
-        .op(ctrl_dec.csr_op),
-        .src(ctrl_dec.csr_src),
+        .op(issue_ifc.ctrl_word.csr_op),
+        .src(issue_ifc.ctrl_word.csr_src),
+
+        .imm(issue_ifc.imm),
 
         .csr_old(csr_val_dec),
 
@@ -78,15 +77,15 @@ always_comb
 begin
         ready_exe_next = 0;
         result_exe_next = 0;
-        rd_exe_next = {27'b0, rd_dec};
+        rd_exe_next = {27'b0, issue_ifc.rd};
 
         if (!ctrl_ifc.flush) begin
-                ready_exe_next = issue;
+                ready_exe_next = issue_ifc.issue;
         end
 
-        unique case (ctrl_dec.wb_src)
+        unique case (issue_ifc.ctrl_word.wb_src)
         WB_ALU: begin // Decoder lets default value thru for stores
-                if (ctrl_dec.store) begin
+                if (issue_ifc.ctrl_word.store) begin
                         result_exe_next = rs2_value;
                         rd_exe_next = alu_result;
                 end
@@ -94,13 +93,13 @@ begin
                         result_exe_next = alu_result;
         end
         WB_MEM: result_exe_next = 0; // TODO: Come on, bro
-        WB_PC4: result_exe_next = pc_dec + 4;
+        WB_PC4: result_exe_next = issue_ifc.pc + 4;
         WB_CSR: result_exe_next = csr_val_dec;
         endcase
 end
 
 logic exe_val_valid_next;
-assign exe_val_valid_next = ready_exe_next & !ctrl_ifc.flush & ctrl_dec.irf_we;
+assign exe_val_valid_next = ready_exe_next & !ctrl_ifc.flush & issue_ifc.ctrl_word.irf_we;
 
 always_ff @(posedge clk or posedge rst)
 begin
@@ -123,15 +122,15 @@ begin
                 fwd_ifc.exe_val <= 0;
         end
         else begin
-                pc_exe <= pc_dec;
-                ctrl_exe <= ctrl_dec;
+                pc_exe <= issue_ifc.pc;
+                ctrl_exe <= issue_ifc.ctrl_word;
                 rd_exe <= rd_exe_next;
                 ready_exe <= ready_exe_next;
                 result_exe <= result_exe_next;
                 csr_result_exe <= csr_result;
 
-                ctrl_ifc.branch_pc <= pc_dec;
-                ctrl_ifc.speculation_meta <= speculation_meta_dec;
+                ctrl_ifc.branch_pc <= issue_ifc.pc;
+                ctrl_ifc.speculation_meta <= issue_ifc.speculation_meta;
                 ctrl_ifc.branch_result_ready <= ready_exe_next;
                 ctrl_ifc.branch_taken <= branch_taken;
                 ctrl_ifc.branch_target <= alu_result;

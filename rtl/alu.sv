@@ -11,7 +11,7 @@ import rv32::*;
 
         input [31:0] rs1_value,
         input [31:0] rs2_value,
-        input [31:0] pc_dec,
+        input [31:0] pc,
         input [31:0] imm,
 
         output logic [31:0] result
@@ -29,7 +29,7 @@ begin
         unique case(src1)
         ZERO: in1 = 0;
         RS1: in1 = rs1_value;
-        PC: in1 = pc_dec;
+        PC: in1 = pc;
         endcase
 
         unique case(src2)

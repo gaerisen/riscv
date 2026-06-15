@@ -26,13 +26,12 @@ import rv32::*;
 
 `include "hart-sigs.svh"
 
-speculation_meta_t speculation_meta_dec;
-
 assign irf_we = commit & !(branch_commit | store_commit);
 
 global_ctrl_ifc ctrl_ifc();
 fet_to_dec_ifc fet_dec_ifc();
 fwding_ifc fwd_ifc();
+issue_ifc issue_ifc();
 
 // Integer register file
 irf irf(
@@ -103,37 +102,9 @@ end
 //      (2b) Decode
 //======================================
 
-decoder decoder (
-        .*,
-
-        .imm_o(imm),
-        .rd_o(rd_dec),
-
-        .ctrl_o(ctrl_dec)
+decode decode (
+        .*
 );
-
-always_comb
-begin
-        issue_next = fet_dec_ifc.valid;
-
-        if (ctrl_ifc.stall) begin
-                issue_next = 0;
-        end
-end
-
-always_ff @(posedge clk or posedge rst)
-begin
-        if (rst) begin
-                pc_dec <= 0;
-                speculation_meta_dec <= 0;
-                issue <= 0;
-        end
-        else begin
-                pc_dec <= fet_dec_ifc.pc;
-                speculation_meta_dec <= fet_dec_ifc.speculation_meta;
-                issue <= issue_next;
-        end
-end
 
 
 //======================================
@@ -143,6 +114,15 @@ end
 execute execute (
         .*
 );
+
+logic [11:0] csrd_exe;
+always_ff @(posedge clk or posedge rst)
+begin
+        if (rst)
+                csrd_exe <= 0;
+        else
+                csrd_exe <= csrs_dec;
+end
 
 //======================================
 //      (4) Memory Access
@@ -156,17 +136,13 @@ execute execute (
 rob rob (
         .*,
 
-        .issued_dest({27'b0, rd_dec}),
-        .issued_csr_dest(csrs_dec),
-        .issued_ctrl(ctrl_dec),
-        .issued_pc(pc_dec),
-
         .issued_ptr(rob_ptr_exe),
         
         .update_entry(ready_exe),
         .result(result_exe),
         .csr_result(csr_result_exe),
         .updated_dest(rd_exe),
+        .updated_csr_dest(csrd_exe),
         .entry_idx(rob_ptr_exe),
 
         .store(store_commit),

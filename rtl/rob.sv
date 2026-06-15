@@ -20,11 +20,7 @@ import rv32::*;
         global_ctrl_ifc.rob ctrl_ifc,
 
         // From issue/ex regs
-        input issue,
-        input [31:0] issued_dest,
-        input [11:0] issued_csr_dest,
-        input ctrl_t issued_ctrl,
-        input [31:0] issued_pc,
+        issue_ifc.rob issue_ifc,
 
         // Broadcast ROB entry ptr for the instruction just issued so the
         // pipeline can update the right entry later
@@ -35,6 +31,7 @@ import rv32::*;
         input [31:0] result,
         input [31:0] csr_result,
         input [31:0] updated_dest,
+        input [11:0] updated_csr_dest,
         input [ROB_BITS-1:0] entry_idx,
 
         fwding_ifc.commit fwd_ifc,
@@ -112,8 +109,8 @@ assign fwd_ifc.commit_val = wb;
 
 
 // Stall logic
-assign issued_is_system = issued_ctrl.exception | issued_ctrl.trapret |
-                issued_ctrl.wfi | issued_ctrl.csr_we;
+assign issued_is_system = issue_ifc.ctrl_word.exception | issue_ifc.ctrl_word.trapret |
+                issue_ifc.ctrl_word.wfi | issue_ifc.ctrl_word.csr_we;
 
 assign committed_is_system = rob[rob_head].ctrl_word.exception |
                                 rob[rob_head].ctrl_word.trapret |
@@ -126,7 +123,7 @@ begin
                 sys_in_flight = !(ctrl_ifc.flush | (commit & committed_is_system));
         end
         else begin
-                sys_in_flight = issue & issued_is_system;
+                sys_in_flight = issue_ifc.issue & issued_is_system;
         end
 end
 
@@ -162,7 +159,7 @@ begin
                 rob_head_next = rob_head + 1;
         end
 
-        if (issue) begin
+        if (issue_ifc.issue) begin
                 rob_tail_next = rob_tail + 1;
         end
 end
@@ -177,7 +174,7 @@ begin
                 rob_tail <= rob_tail_next;
                 rob_head <= rob_head_next;
 
-                if (issue)
+                if (issue_ifc.issue)
                         issued_ptr <= rob_tail;
                 else
                         issued_ptr <= 0;
@@ -189,16 +186,15 @@ always_comb
 begin
         rob_issue_next = 0;
 
-        rob_issue_next.ctrl_word = issued_ctrl;
-        rob_issue_next.dest = issued_dest;
-        rob_issue_next.csr_dest = issued_csr_dest;
-        rob_issue_next.pc = issued_pc;
+        rob_issue_next.ctrl_word = issue_ifc.ctrl_word;
+        rob_issue_next.pc = issue_ifc.pc;
 
         rob_update_next = rob[entry_idx];
 
         rob_update_next.value = result;
         rob_update_next.csr_value = csr_result;
         rob_update_next.dest = updated_dest;
+        rob_update_next.csr_dest = updated_csr_dest;
         rob_update_next.ready = 1;
 end
 
@@ -213,7 +209,7 @@ begin
                 if (update_entry) begin
                         rob[entry_idx] <= rob_update_next;
                 end
-                if (issue) begin
+                if (issue_ifc.issue) begin
                         rob[rob_tail] <= rob_issue_next;
                 end
                 if (commit) begin

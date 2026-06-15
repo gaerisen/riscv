@@ -93,7 +93,7 @@ modport csrf_read (
 );
 
 modport decode (
-        input pc, instr, valid
+        input pc, instr, valid, speculation_meta
 );
 
 endinterface
@@ -162,9 +162,9 @@ modport commit (
 endinterface
 
 
-/*====================*/
-/*    ROB Push Ifc    */
-/*====================*/
+/*=================*/
+/*    Issue Ifc    */
+/*=================*/
 interface issue_ifc 
 import rv32::*;
 #(
@@ -176,9 +176,10 @@ ctrl_t ctrl_word;
 logic [31:0] pc;
 logic [31:0] imm;
 logic [4:0] rd;
+speculation_meta_t speculation_meta;
 
 modport decode (
-        output issue, ctrl_word, pc, imm, rd
+        output issue, ctrl_word, pc, imm, rd, speculation_meta
 );
 
 modport rob (
@@ -186,7 +187,7 @@ modport rob (
 );
 
 modport execute (
-        input issue, ctrl_word, imm, rd
+        input issue, ctrl_word, pc, imm, rd, speculation_meta
 );
 
 endinterface
@@ -219,9 +220,9 @@ modport rob (
 endinterface
 
 
-/*===================*/
-/*    ROB Pop Ifc    */
-/*===================*/
+/*==================*/
+/*    Commit Ifc    */
+/*==================*/
 interface commit_ifc 
 import rv32::*;
 #(
