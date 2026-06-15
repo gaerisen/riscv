@@ -8,9 +8,6 @@ import rv32::*;
 
         issue_ifc.execute issue_ifc,
 
-        input [11:0] csrs_dec,
-        input [31:0] csr_val_dec,
-
         global_ctrl_ifc.execute ctrl_ifc,
 
         fwding_ifc.execute fwd_ifc,
@@ -64,7 +61,7 @@ csru csru (
 
         .imm(issue_ifc.imm),
 
-        .csr_old(csr_val_dec),
+        .csr_old(issue_ifc.csr_val),
 
         .csr_new(csr_result)
 );
@@ -90,7 +87,7 @@ begin
         end
         WB_MEM: result_exe_next = 0; // TODO: Come on, bro
         WB_PC4: result_exe_next = issue_ifc.pc + 4;
-        WB_CSR: result_exe_next = csr_val_dec;
+        WB_CSR: result_exe_next = issue_ifc.csr_val;
         endcase
 end
 
@@ -121,7 +118,7 @@ begin
                 cdb_ifc.update <= ready_exe_next;
                 cdb_ifc.dest <= rd_exe_next;
                 cdb_ifc.value <= result_exe_next;
-                cdb_ifc.csr_dest <= csrs_dec;
+                cdb_ifc.csr_dest <= issue_ifc.csrs;
                 cdb_ifc.csr_value <= csr_result;
                 cdb_ifc.tag <= issue_ifc.tag;
 

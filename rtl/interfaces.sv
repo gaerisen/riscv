@@ -93,7 +93,8 @@ modport csrf_read (
 );
 
 modport decode (
-        input pc, instr, valid, speculation_meta
+        input pc, instr, valid, speculation_meta,
+        rs1, rs1_val, rs2, rs2_val, csrs, csr_val
 );
 
 endinterface
@@ -177,12 +178,14 @@ logic issue;
 ctrl_t ctrl_word;
 logic [31:0] pc;
 logic [31:0] imm;
+logic [31:0] csr_val;
 logic [4:0] rd;
+logic [11:0] csrs;
 speculation_meta_t speculation_meta;
 logic [ROB_BITS-1:0] tag;
 
 modport decode (
-        output issue, ctrl_word, pc, imm, rd, speculation_meta
+        output issue, ctrl_word, pc, imm, csr_val, rd, csrs, speculation_meta
 );
 
 modport rob (
@@ -191,7 +194,7 @@ modport rob (
 );
 
 modport execute (
-        input issue, ctrl_word, pc, imm, rd, speculation_meta, tag
+        input issue, ctrl_word, pc, imm, csr_val, rd, csrs, speculation_meta, tag
 );
 
 endinterface

@@ -36,94 +36,23 @@ defparam cdb_ifc.ROB_LEN = ROB_LEN;
 commit_ifc commit_ifc();
 
 // Integer register file
-irf irf(
-        .*
-);
+irf irf(.*);
 
 // Control/status register file
-csrf csrf(
-        .*
-);
+csrf csrf(.*);
 
-//==============================================================================
-//                              PIPELINE
-//==============================================================================
-//======================================
-//      (1) Fetch
-//======================================
+// Pipeline stages
 
+fetch fetch (.*);
 
-fetch fetch (
-        .*
-);
+decode decode (.*);
 
-//======================================
-//      (2a) Reg read 
-//======================================
+execute execute (.*);
 
-logic [4:0] rs1_dec;
-logic [4:0] rs2_dec;
-logic [11:0] csrs_dec;
-logic [31:0] csr_val_dec;
-logic [31:0] rs1_val_dec;
-logic [31:0] rs2_val_dec;
-
-always_ff @(posedge clk or posedge rst)
-begin
-        if (rst) begin
-                rs1_dec <= 0;
-                rs2_dec <= 0;
-                rs1_val_dec <= 0; // direct from irf module
-                rs2_val_dec <= 0; // direct from irf module
-                csrs_dec <= 0;
-                csr_val_dec <= 0;
-        end
-        else begin
-                rs1_dec <= fet_dec_ifc.rs1;
-                rs2_dec <= fet_dec_ifc.rs2;
-                rs1_val_dec <= fet_dec_ifc.rs1_val; // direct from irf module
-                rs2_val_dec <= fet_dec_ifc.rs2_val; // direct from irf module
-                csrs_dec <= fet_dec_ifc.csrs;
-                csr_val_dec <= fet_dec_ifc.csr_val;
-        end
-end
-
-// [Temporary] give fwding network read values
-always_comb
-begin
-        fwd_ifc.rs1 = rs1_dec;
-        fwd_ifc.rs2 = rs2_dec;
-        fwd_ifc.rs1_val = rs1_val_dec;
-        fwd_ifc.rs2_val = rs2_val_dec;
-end
-        
-
-//======================================
-//      (2b) Decode
-//======================================
-
-decode decode (
-        .*
-);
-
-
-//======================================
-//      (3) Execute        
-//======================================
-
-execute execute (
-        .*
-);
-
-//======================================
-//      (4) Reorder & Commit
-//======================================
-rob rob (
-        .*
-);
-
+rob rob (.*);
 defparam rob.ROB_LEN = ROB_LEN;
 
+// Super basic store logic
 always_comb
 begin
         d_addr = 0;
