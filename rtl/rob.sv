@@ -19,33 +19,13 @@ import rv32::*;
 
         global_ctrl_ifc.rob ctrl_ifc,
 
-        // From issue/ex regs
         issue_ifc.rob issue_ifc,
-
-        // Broadcast ROB entry ptr for the instruction just issued so the
-        // pipeline can update the right entry later
-        output logic [ROB_BITS-1:0] issued_ptr,
         
-        // From exe
-        input update_entry,
-        input [31:0] result,
-        input [31:0] csr_result,
-        input [31:0] updated_dest,
-        input [11:0] updated_csr_dest,
-        input [ROB_BITS-1:0] entry_idx,
+        cdb_ifc.rob cdb_ifc,
 
         fwding_ifc.commit fwd_ifc,
 
-        output logic commit,
-        output logic store,
-        output logic branch,
-        output logic exception,
-        output logic trapret,
-        output trap_cause_e trap_cause,
-        output logic [31:0] rd,
-        output logic [31:0] wb,
-        output logic [11:0] csrd,
-        output logic [31:0] csrwb
+        commit_ifc.rob commit_ifc
 );
 
 rob_entry_t rob [ROB_LEN-1:0];
@@ -69,43 +49,42 @@ logic sys_in_flight_state;
 
 logic [31:0] pc; // For debugging
 
+assign commit_ifc.commit = rob[rob_head].ready;
 
 // Commit logic
 
-assign commit = rob[rob_head].ready;
-
 always_comb
 begin
-        if (commit) begin
-                store = rob[rob_head].ctrl_word.store;
-                branch = rob[rob_head].ctrl_word.branch;
-                exception = rob[rob_head].ctrl_word.exception;
-                trap_cause = rob[rob_head].ctrl_word.trap_cause;
-                trapret = rob[rob_head].ctrl_word.trapret;
-                rd = rob[rob_head].dest;
-                wb = rob[rob_head].value;
-                csrd = rob[rob_head].csr_dest;
-                csrwb = rob[rob_head].csr_value;
+        if (commit_ifc.commit) begin
+                commit_ifc.store = rob[rob_head].ctrl_word.store;
+                commit_ifc.branch = rob[rob_head].ctrl_word.branch;
+                commit_ifc.exception = rob[rob_head].ctrl_word.exception;
+                commit_ifc.trap_cause = rob[rob_head].ctrl_word.trap_cause;
+                commit_ifc.trapret = rob[rob_head].ctrl_word.trapret;
+                commit_ifc.dest = rob[rob_head].dest;
+                commit_ifc.value = rob[rob_head].value;
+                commit_ifc.csr_dest = rob[rob_head].csr_dest;
+                commit_ifc.csr_value = rob[rob_head].csr_value;
                 pc = rob[rob_head].pc;
         end
         else begin
-                store = 0;
-                branch = 0;
-                exception = 0;
-                trap_cause = ILLEGAL;
-                trapret = 0;
-                rd = 0;
-                wb = 0;
-                csrd = 0;
-                csrwb = 0;
+                commit_ifc.store = 0;
+                commit_ifc.branch = 0;
+                commit_ifc.exception = 0;
+                commit_ifc.trap_cause = ILLEGAL;
+                commit_ifc.trapret = 0;
+                commit_ifc.dest = 0;
+                commit_ifc.value = 0;
+                commit_ifc.csr_dest = 0;
+                commit_ifc.csr_value = 0;
                 pc = 0;
         end
 end
 
 // Forwarding
-assign fwd_ifc.commit_val_valid = commit & !ctrl_ifc.flush;
-assign fwd_ifc.rd_commit = rd[4:0];
-assign fwd_ifc.commit_val = wb;
+assign fwd_ifc.commit_val_valid = commit_ifc.commit & !ctrl_ifc.flush;
+assign fwd_ifc.rd_commit = commit_ifc.dest[4:0];
+assign fwd_ifc.commit_val = commit_ifc.value;
 
 
 // Stall logic
@@ -120,7 +99,7 @@ assign committed_is_system = rob[rob_head].ctrl_word.exception |
 always_comb
 begin
         if (sys_in_flight_state) begin
-                sys_in_flight = !(ctrl_ifc.flush | (commit & committed_is_system));
+                sys_in_flight = !(ctrl_ifc.flush | (commit_ifc.commit & committed_is_system));
         end
         else begin
                 sys_in_flight = issue_ifc.issue & issued_is_system;
@@ -142,7 +121,8 @@ assign full = rob_tail == (rob_head + {ROB_BITS{1'b1}});
 
 assign ctrl_ifc.stall = full | sys_in_flight;
 
-assign flush_internal = ctrl_ifc.flush | (commit & (trapret | exception));
+assign flush_internal = ctrl_ifc.flush | (commit_ifc.commit &
+                                (commit_ifc.exception | commit_ifc.trapret));
 
 initial begin
         $dumpfile("rob.vcd");
@@ -154,13 +134,15 @@ always_comb
 begin
         rob_head_next = rob_head;
         rob_tail_next = rob_tail;
+        issue_ifc.tag = 0;
 
-        if (commit) begin
+        if (commit_ifc.commit) begin
                 rob_head_next = rob_head + 1;
         end
 
         if (issue_ifc.issue) begin
                 rob_tail_next = rob_tail + 1;
+                issue_ifc.tag = rob_tail;
         end
 end
 
@@ -173,11 +155,6 @@ begin
         else begin
                 rob_tail <= rob_tail_next;
                 rob_head <= rob_head_next;
-
-                if (issue_ifc.issue)
-                        issued_ptr <= rob_tail;
-                else
-                        issued_ptr <= 0;
         end
 end
 
@@ -189,12 +166,13 @@ begin
         rob_issue_next.ctrl_word = issue_ifc.ctrl_word;
         rob_issue_next.pc = issue_ifc.pc;
 
-        rob_update_next = rob[entry_idx];
 
-        rob_update_next.value = result;
-        rob_update_next.csr_value = csr_result;
-        rob_update_next.dest = updated_dest;
-        rob_update_next.csr_dest = updated_csr_dest;
+        rob_update_next = rob[cdb_ifc.tag];
+
+        rob_update_next.value = cdb_ifc.value;
+        rob_update_next.csr_value = cdb_ifc.csr_value;
+        rob_update_next.dest = cdb_ifc.dest;
+        rob_update_next.csr_dest = cdb_ifc.csr_dest;
         rob_update_next.ready = 1;
 end
 
@@ -206,13 +184,13 @@ begin
                 end
         end
         else begin
-                if (update_entry) begin
-                        rob[entry_idx] <= rob_update_next;
+                if (cdb_ifc.update) begin
+                        rob[cdb_ifc.tag] <= rob_update_next;
                 end
                 if (issue_ifc.issue) begin
                         rob[rob_tail] <= rob_issue_next;
                 end
-                if (commit) begin
+                if (commit_ifc.commit) begin
                         rob[rob_head] <= 0;
                 end
         end

@@ -2,8 +2,7 @@
 module hart
 import rv32::*;
 #(
-        parameter int ROB_LEN = 32,
-        localparam int ROB_BITS = $clog2(ROB_LEN)
+        parameter int ROB_LEN = 32
 )
 (
         input clk,
@@ -24,30 +23,26 @@ import rv32::*;
         input logic [31:0] d_data_i
 );
 
-`include "hart-sigs.svh"
-
-assign irf_we = commit & !(branch_commit | store_commit);
-
 global_ctrl_ifc ctrl_ifc();
 fet_to_dec_ifc fet_dec_ifc();
 fwding_ifc fwd_ifc();
+
 issue_ifc issue_ifc();
+defparam issue_ifc.ROB_LEN = ROB_LEN;
+
+cdb_ifc cdb_ifc();
+defparam cdb_ifc.ROB_LEN = ROB_LEN;
+
+commit_ifc commit_ifc();
 
 // Integer register file
 irf irf(
-        .*,
-
-        .we(irf_we),
-        .rd(rd_commit[4:0]),
-        .rd_val(wb_commit)
+        .*
 );
 
 // Control/status register file
 csrf csrf(
-        .*,
-
-        .csrd(csrd_commit),
-        .csr_result(csrwb_commit)
+        .*
 );
 
 //==============================================================================
@@ -66,15 +61,20 @@ fetch fetch (
 //      (2a) Reg read 
 //======================================
 
-assign rs1 = instr.r.rs1;
-assign rs2 = instr.r.rs2;
-assign csrs = instr.i.imm11_0;
+logic [4:0] rs1_dec;
+logic [4:0] rs2_dec;
+logic [11:0] csrs_dec;
+logic [31:0] csr_val_dec;
+logic [31:0] rs1_val_dec;
+logic [31:0] rs2_val_dec;
 
 always_ff @(posedge clk or posedge rst)
 begin
         if (rst) begin
                 rs1_dec <= 0;
                 rs2_dec <= 0;
+                rs1_val_dec <= 0; // direct from irf module
+                rs2_val_dec <= 0; // direct from irf module
                 csrs_dec <= 0;
                 csr_val_dec <= 0;
         end
@@ -115,42 +115,11 @@ execute execute (
         .*
 );
 
-logic [11:0] csrd_exe;
-always_ff @(posedge clk or posedge rst)
-begin
-        if (rst)
-                csrd_exe <= 0;
-        else
-                csrd_exe <= csrs_dec;
-end
-
 //======================================
-//      (4) Memory Access
-//======================================
-
-
-
-//======================================
-//      (5) Writeback/Commit
+//      (4) Reorder & Commit
 //======================================
 rob rob (
-        .*,
-
-        .issued_ptr(rob_ptr_exe),
-        
-        .update_entry(ready_exe),
-        .result(result_exe),
-        .csr_result(csr_result_exe),
-        .updated_dest(rd_exe),
-        .updated_csr_dest(csrd_exe),
-        .entry_idx(rob_ptr_exe),
-
-        .store(store_commit),
-        .branch(branch_commit),
-        .rd(rd_commit),
-        .wb(wb_commit),
-        .csrd(csrd_commit),
-        .csrwb(csrwb_commit)
+        .*
 );
 
 defparam rob.ROB_LEN = ROB_LEN;
@@ -163,11 +132,11 @@ begin
         d_we = 0;
         d_st_op = SB;
 
-        if (store_commit) begin
+        if (commit_ifc.store) begin
                 d_valid = 1;
                 d_we = 1;
-                d_addr = rd_commit;
-                d_data_o = wb_commit;
+                d_addr = commit_ifc.dest;
+                d_data_o = commit_ifc.value;
         end
 end
 endmodule // hart

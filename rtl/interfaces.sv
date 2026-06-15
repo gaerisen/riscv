@@ -168,6 +168,8 @@ endinterface
 interface issue_ifc 
 import rv32::*;
 #(
+        parameter int ROB_LEN = 64,
+        localparam int ROB_BITS = $clog2(ROB_LEN)
 )(
 );
 
@@ -177,17 +179,19 @@ logic [31:0] pc;
 logic [31:0] imm;
 logic [4:0] rd;
 speculation_meta_t speculation_meta;
+logic [ROB_BITS-1:0] tag;
 
 modport decode (
         output issue, ctrl_word, pc, imm, rd, speculation_meta
 );
 
 modport rob (
-        input issue, ctrl_word, pc
+        input issue, ctrl_word, pc,
+        output tag
 );
 
 modport execute (
-        input issue, ctrl_word, pc, imm, rd, speculation_meta
+        input issue, ctrl_word, pc, imm, rd, speculation_meta, tag
 );
 
 endinterface
@@ -196,8 +200,7 @@ endinterface
 /*======================*/
 /*    ROB Update Ifc    */
 /*======================*/
-interface rob_update_ifc
-import rv32::*;
+interface cdb_ifc
 #(
         parameter int ROB_LEN = 64,
         localparam int ROB_BITS = $clog2(ROB_LEN)
@@ -208,13 +211,15 @@ logic update;
 logic [ROB_BITS-1:0] tag;
 logic [31:0] value;
 logic [31:0] dest;
+logic [31:0] csr_value;
+logic [11:0] csr_dest;
 
 modport execute (
-        output update, tag, value, dest
+        output update, tag, value, dest, csr_value, csr_dest
 );
 
 modport rob (
-        input update, tag, value, dest
+        input update, tag, value, dest, csr_value, csr_dest
 );
 
 endinterface
@@ -237,6 +242,8 @@ logic trapret;
 trap_cause_e trap_cause;
 logic [31:0] value;
 logic [31:0] dest;
+logic [31:0] csr_value;
+logic [11:0] csr_dest;
 
 logic irf_select;
 
@@ -244,11 +251,12 @@ assign irf_select = commit & !(store | branch | exception | trapret);
 
 modport rob (
         output commit, store, branch, exception, trapret,
-        trap_cause, value, dest
+        trap_cause, value, dest, csr_value, csr_dest
 );
 
 modport csrf (
-        input commit, exception, trapret, trap_cause
+        input commit, exception, trapret, trap_cause,
+        csr_dest, csr_value
 );
 
 modport irf (

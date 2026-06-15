@@ -1,6 +1,5 @@
 `timescale 1ps / 1ps
 module csrf
-import rv32::*;
 #(
 )(
         input clk,
@@ -9,14 +8,7 @@ import rv32::*;
         // Read/write port
         fet_to_dec_ifc.csrf_read fet_dec_ifc,
 
-        input [11:0] csrd,
-        input [31:0] csr_result,
-
-
-        // System redirect request from ROB commit
-        input exception,
-        input trapret,
-        input trap_cause_e trap_cause,
+        commit_ifc.csrf commit_ifc,
 
         // System redirect signalling for fetch
         global_ctrl_ifc.csrf ctrl_ifc
@@ -83,22 +75,22 @@ begin
         mtval_next = mtval;
         mip_next = mip;
 
-        case (csrd)
-        12'h300: mstatus_next = csr_result;
-        12'h310: mstatush_next = csr_result;
-        12'h301: misa_next = csr_result;
-        12'h304: mie_next = csr_result;
-        12'h305: mtvec_next = csr_result;
-        12'h340: mscratch_next = csr_result;
-        12'h341: mepc_next = csr_result;
-        12'h342: mcause_next = csr_result;
-        12'h343: mtval_next = csr_result;
-        12'h344: mip_next = csr_result;
+        case (commit_ifc.csr_dest)
+        12'h300: mstatus_next = commit_ifc.csr_value;
+        12'h310: mstatush_next = commit_ifc.csr_value;
+        12'h301: misa_next = commit_ifc.csr_value;
+        12'h304: mie_next = commit_ifc.csr_value;
+        12'h305: mtvec_next = commit_ifc.csr_value;
+        12'h340: mscratch_next = commit_ifc.csr_value;
+        12'h341: mepc_next = commit_ifc.csr_value;
+        12'h342: mcause_next = commit_ifc.csr_value;
+        12'h343: mtval_next = commit_ifc.csr_value;
+        12'h344: mip_next = commit_ifc.csr_value;
         default:;
         endcase
 
-        if (exception) begin
-                mcause_next = {28'b0, trap_cause};
+        if (commit_ifc.exception) begin
+                mcause_next = {28'b0, commit_ifc.trap_cause};
         end
 end
 
@@ -143,11 +135,11 @@ begin
         ctrl_ifc.sys_redirect = 0;
         ctrl_ifc.sys_vec = 0;
 
-        if (exception) begin
+        if (commit_ifc.exception) begin
                 ctrl_ifc.sys_redirect = 1;
                 ctrl_ifc.sys_vec = mtvec;
         end
-        if (trapret) begin
+        if (commit_ifc.trapret) begin
                 ctrl_ifc.sys_redirect = 1;
                 ctrl_ifc.sys_vec = mepc;
         end

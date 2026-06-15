@@ -8,18 +8,14 @@ import rv32::*;
 
         issue_ifc.execute issue_ifc,
 
+        input [11:0] csrs_dec,
         input [31:0] csr_val_dec,
 
         global_ctrl_ifc.execute ctrl_ifc,
 
         fwding_ifc.execute fwd_ifc,
 
-        output logic [31:0] pc_exe,
-        output ctrl_t ctrl_exe,
-        output logic ready_exe,
-        output logic [31:0] result_exe,
-        output logic [31:0] csr_result_exe,
-        output logic [31:0] rd_exe
+        cdb_ifc.execute cdb_ifc
 );
 
 logic [31:0] rs1_value;
@@ -104,12 +100,12 @@ assign exe_val_valid_next = ready_exe_next & !ctrl_ifc.flush & issue_ifc.ctrl_wo
 always_ff @(posedge clk or posedge rst)
 begin
         if (rst) begin
-                pc_exe <= 0;
-                ctrl_exe <= 0;
-                rd_exe <= 0;
-                ready_exe <= 0;
-                result_exe <= 0;
-                csr_result_exe <= 0;
+                cdb_ifc.update <= 0;
+                cdb_ifc.dest <= 0;
+                cdb_ifc.value <= 0;
+                cdb_ifc.csr_dest <= 0;
+                cdb_ifc.csr_value <= 0;
+                cdb_ifc.tag <= 0;
 
                 ctrl_ifc.branch_pc <= 0;
                 ctrl_ifc.speculation_meta <= 0;
@@ -122,12 +118,12 @@ begin
                 fwd_ifc.exe_val <= 0;
         end
         else begin
-                pc_exe <= issue_ifc.pc;
-                ctrl_exe <= issue_ifc.ctrl_word;
-                rd_exe <= rd_exe_next;
-                ready_exe <= ready_exe_next;
-                result_exe <= result_exe_next;
-                csr_result_exe <= csr_result;
+                cdb_ifc.update <= ready_exe_next;
+                cdb_ifc.dest <= rd_exe_next;
+                cdb_ifc.value <= result_exe_next;
+                cdb_ifc.csr_dest <= csrs_dec;
+                cdb_ifc.csr_value <= csr_result;
+                cdb_ifc.tag <= issue_ifc.tag;
 
                 ctrl_ifc.branch_pc <= issue_ifc.pc;
                 ctrl_ifc.speculation_meta <= issue_ifc.speculation_meta;
