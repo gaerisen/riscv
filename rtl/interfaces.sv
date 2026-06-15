@@ -99,31 +99,6 @@ modport decode (
 endinterface
 
 
-/*===========================*/
-/*    Decode->Execute Ifc    */
-/*===========================*/
-interface dec_to_exe_ifc 
-import rv32::*;
-#(
-)(
-);
-
-ctrl_t ctrl_word;
-logic [31:0] imm;
-logic [4:0] rd;
-logic issue; // A tad misplaced, but will be replaced by signalling from RSes
-
-modport decode (
-        output ctrl_word, imm, rd, issue
-);
-
-modport execute (
-        input ctrl_word, imm, rd, issue
-);
-
-endinterface
-
-
 /*======================*/
 /*    Forwarding Ifc    */
 /*======================*/
@@ -190,7 +165,7 @@ endinterface
 /*====================*/
 /*    ROB Push Ifc    */
 /*====================*/
-interface rob_push_ifc
+interface issue_ifc 
 import rv32::*;
 #(
 )(
@@ -199,13 +174,19 @@ import rv32::*;
 logic issue;
 ctrl_t ctrl_word;
 logic [31:0] pc;
+logic [31:0] imm;
+logic [4:0] rd;
 
 modport decode (
-        output issue, ctrl_word, pc
+        output issue, ctrl_word, pc, imm, rd
 );
 
 modport rob (
         input issue, ctrl_word, pc
+);
+
+modport execute (
+        input issue, ctrl_word, imm, rd
 );
 
 endinterface
@@ -241,7 +222,7 @@ endinterface
 /*===================*/
 /*    ROB Pop Ifc    */
 /*===================*/
-interface rob_pop_ifc
+interface commit_ifc 
 import rv32::*;
 #(
 )(
