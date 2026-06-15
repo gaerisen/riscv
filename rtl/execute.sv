@@ -11,7 +11,6 @@ import rv32::*;
         input speculation_meta_t speculation_meta_dec,
         input issue,
 
-        fwding_ifc.execute_input fwd_ifc_in,
         input [31:0] csr_val_dec,
         input [4:0] rd_dec,
 
@@ -19,7 +18,7 @@ import rv32::*;
 
         global_ctrl_ifc.execute ctrl_ifc,
 
-        fwding_ifc.execute_output fwd_ifc_out,
+        fwding_ifc.execute fwd_ifc,
 
         output logic [31:0] pc_exe,
         output ctrl_t ctrl_exe,
@@ -39,8 +38,8 @@ logic ready_exe_next;
 logic [31:0] result_exe_next;
 logic [31:0] rd_exe_next;
 
-assign rs1_value = fwd_ifc_in.in1;
-assign rs2_value = fwd_ifc_in.in2;
+assign rs1_value = fwd_ifc.in1;
+assign rs2_value = fwd_ifc.in2;
 
 // Ex unit for integral arithmetic and logic instructions
 alu alu (
@@ -119,9 +118,9 @@ begin
                 ctrl_ifc.branch_taken <= 0;
                 ctrl_ifc.branch_target <= 0;
 
-                fwd_ifc_out.exe_val_valid <= 0;
-                fwd_ifc_out.rd_exe <= 0;
-                fwd_ifc_out.exe_val <= 0;
+                fwd_ifc.exe_val_valid <= 0;
+                fwd_ifc.rd_exe <= 0;
+                fwd_ifc.exe_val <= 0;
         end
         else begin
                 pc_exe <= pc_dec;
@@ -137,9 +136,9 @@ begin
                 ctrl_ifc.branch_taken <= branch_taken;
                 ctrl_ifc.branch_target <= alu_result;
 
-                fwd_ifc_out.exe_val_valid <= exe_val_valid_next;
-                fwd_ifc_out.rd_exe <= rd_exe_next[4:0];
-                fwd_ifc_out.exe_val <= result_exe_next;
+                fwd_ifc.exe_val_valid <= exe_val_valid_next;
+                fwd_ifc.rd_exe <= rd_exe_next[4:0];
+                fwd_ifc.exe_val <= result_exe_next;
         end
 end
 

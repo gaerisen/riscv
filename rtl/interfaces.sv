@@ -175,16 +175,13 @@ modport decode (
                rs2, rs2_val
 );
 
-modport execute_output (
+modport execute (
+        input in1, in2,
         output exe_val_valid, rd_exe, exe_val
 );
 
 modport commit (
         output commit_val_valid, rd_commit, commit_val
-);
-
-modport execute_input (
-        input in1, in2
 );
 
 endinterface
