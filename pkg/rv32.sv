@@ -204,11 +204,20 @@ package rv32;
         /*              TOMASULO BUFFER ENTRY TYPES                           */
         /*====================================================================*/
         typedef struct packed {
-                logic [31:0] pc;
                 ctrl_t ctrl_word;
-                logic [31:0] in1;
-                logic [31:0] in2;
 
+                logic [4:0] label1;
+                logic [31:0] in1;
+                logic in1_ready;
+
+                logic [4:0] label2;
+                logic [31:0] in2;
+                logic in2_ready;
+
+                logic [4:0] rd;
+
+                logic full;
+                logic ready;
         } rs_entry_t;
 
         typedef struct packed {

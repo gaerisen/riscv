@@ -69,6 +69,9 @@ logic [4:0] rs1;
 logic [4:0] rs2;
 logic [11:0] csrs;
 
+logic [5:0] prs1;
+logic [5:0] prs2;
+
 logic [31:0] rs1_val;
 logic [31:0] rs2_val;
 logic [31:0] csr_val;
@@ -81,9 +84,13 @@ modport fetch (
         output pc, instr, valid, speculation_meta
 );
 
-// Need registerfile modports for inline RF read
-modport irf_read (
+modport rat (
         input rs1, rs2,
+        output prs1, prs2       // physical register source addresses
+);
+
+modport irf_read (
+        input prs1, prs2,
         output rs1_val, rs2_val
 );
 
@@ -94,7 +101,50 @@ modport csrf_read (
 
 modport decode (
         input pc, instr, valid, speculation_meta,
-        rs1, rs1_val, rs2, rs2_val, csrs, csr_val
+        prs1, rs1_val, prs2, rs2_val, csrs, csr_val
+);
+
+endinterface
+
+
+/*=================*/
+/*    Issue Ifc    */
+/*=================*/
+interface issue_ifc 
+import rv32::*;
+#(
+        parameter int ROB_LEN = 64,
+        localparam int ROB_BITS = $clog2(ROB_LEN)
+)(
+);
+
+logic issue;
+ctrl_t ctrl_word;
+logic [31:0] pc;
+logic [31:0] imm;
+logic [31:0] csr_val;
+logic [4:0] rd;
+logic [5:0] prd;
+logic [11:0] csrs;
+speculation_meta_t speculation_meta;
+logic [ROB_BITS-1:0] tag;
+
+modport decode (
+        output issue, ctrl_word, pc, imm, csr_val, rd, csrs, speculation_meta
+);
+
+modport rob (
+        input issue, ctrl_word, pc,
+        output tag
+);
+
+modport freelist (
+        input issue, rd,
+        output prd
+);
+
+modport execute (
+        input issue, ctrl_word, pc, imm, csr_val, prd, csrs, speculation_meta, tag
 );
 
 endinterface
@@ -158,43 +208,6 @@ modport execute (
 
 modport commit (
         output commit_val_valid, rd_commit, commit_val
-);
-
-endinterface
-
-
-/*=================*/
-/*    Issue Ifc    */
-/*=================*/
-interface issue_ifc 
-import rv32::*;
-#(
-        parameter int ROB_LEN = 64,
-        localparam int ROB_BITS = $clog2(ROB_LEN)
-)(
-);
-
-logic issue;
-ctrl_t ctrl_word;
-logic [31:0] pc;
-logic [31:0] imm;
-logic [31:0] csr_val;
-logic [4:0] rd;
-logic [11:0] csrs;
-speculation_meta_t speculation_meta;
-logic [ROB_BITS-1:0] tag;
-
-modport decode (
-        output issue, ctrl_word, pc, imm, csr_val, rd, csrs, speculation_meta
-);
-
-modport rob (
-        input issue, ctrl_word, pc,
-        output tag
-);
-
-modport execute (
-        input issue, ctrl_word, pc, imm, csr_val, rd, csrs, speculation_meta, tag
 );
 
 endinterface
