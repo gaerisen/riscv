@@ -11,7 +11,6 @@ module rat
         input clk,
         input rst,
 
-        // Issue ifc
         input [4:0] rs1,
         input [4:0] rs2,
         input [4:0] rd,

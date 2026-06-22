@@ -6,11 +6,10 @@ import rv32::*;
 )(
         input alu_funct3_e op,
         input alu_funct7_e alt,
-        input alu_src1_e src1,
-        input alu_src2_e src2,
+        input alu_src_e src,
 
-        input [31:0] rs1_value,
-        input [31:0] rs2_value,
+        input [31:0] rs1_val,
+        input [31:0] rs2_val,
         input [31:0] pc,
         input [31:0] imm,
 
@@ -22,19 +21,25 @@ logic [31:0] in2;
 
 always_comb
 begin
-        in1 = rs1_value;
-        in2 = rs2_value;
         result = 0;
 
-        unique case(src1)
-        ZERO: in1 = 0;
-        RS1: in1 = rs1_value;
-        PC: in1 = pc;
-        endcase
-
-        unique case(src2)
-        RS2: in2 = rs2_value;
-        IMM: in2 = imm;
+        unique case(src)
+        REG_REG: begin
+                in1 = rs1_val;
+                in2 = rs2_val;
+        end
+        REG_IMM: begin
+                in1 = rs1_val;
+                in2 = imm;
+        end
+        ZERO_IMM: begin
+                in1 = 0;
+                in2 = imm;
+        end
+        PC_IMM: begin
+                in1 = pc;
+                in2 = imm;
+        end
         endcase
 
         unique case(op)

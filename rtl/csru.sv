@@ -4,7 +4,7 @@ import rv32::*;
 #(
 )(
         input [31:0] csr_old,
-        input [31:0] rs1_value,
+        input [31:0] rs1_val,
         input [31:0] imm,
 
         input csr_funct2_e op,
@@ -17,7 +17,7 @@ logic [31:0] mask;
 
 always_comb
 begin
-        mask = rs1_value;
+        mask = rs1_val;
         csr_new = csr_old;
 
         if (src == UIMM)

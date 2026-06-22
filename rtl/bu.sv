@@ -5,8 +5,8 @@ import rv32::*;
 )(
         input branch_funct3_e op,
 
-        input [31:0] rs1_value,
-        input [31:0] rs2_value,
+        input [31:0] rs1_val,
+        input [31:0] rs2_val,
 
         output logic result
 );
@@ -16,12 +16,12 @@ begin
         result = 0;
 
         unique case(op)
-        BEQ: result = rs1_value == rs2_value;
-        BNE: result = rs1_value != rs2_value;
-        BLT: result = $signed(rs1_value) < $signed(rs2_value);
-        BGE: result = $signed(rs1_value) >= $signed(rs2_value);
-        BLTU: result = rs1_value < rs2_value;
-        BGEU: result = rs1_value >= rs2_value;
+        BEQ: result = rs1_val == rs2_val;
+        BNE: result = rs1_val != rs2_val;
+        BLT: result = $signed(rs1_val) < $signed(rs2_val);
+        BGE: result = $signed(rs1_val) >= $signed(rs2_val);
+        BLTU: result = rs1_val < rs2_val;
+        BGEU: result = rs1_val >= rs2_val;
         endcase
 end
 

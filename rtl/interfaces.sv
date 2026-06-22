@@ -65,33 +65,14 @@ instr_t instr;
 logic valid;
 speculation_meta_t speculation_meta;
 
-logic [4:0] rs1;
-logic [4:0] rs2;
 logic [11:0] csrs;
 
-logic [5:0] prs1;
-logic [5:0] prs2;
-
-logic [31:0] rs1_val;
-logic [31:0] rs2_val;
 logic [31:0] csr_val;
 
-assign rs1 = instr.r.rs1;
-assign rs2 = instr.r.rs2;
 assign csrs = instr.i.imm11_0;
 
 modport fetch (
         output pc, instr, valid, speculation_meta
-);
-
-modport rat (
-        input rs1, rs2,
-        output prs1, prs2       // physical register source addresses
-);
-
-modport irf_read (
-        input prs1, prs2,
-        output rs1_val, rs2_val
 );
 
 modport csrf_read (
@@ -101,7 +82,7 @@ modport csrf_read (
 
 modport decode (
         input pc, instr, valid, speculation_meta,
-        prs1, rs1_val, prs2, rs2_val, csrs, csr_val
+        csrs, csr_val
 );
 
 endinterface
@@ -113,6 +94,8 @@ endinterface
 interface issue_ifc 
 import rv32::*;
 #(
+        parameter int PRF_SIZE = 64,
+        localparam int PRF_BITS = $clog2(PRF_SIZE),
         parameter int ROB_LEN = 64,
         localparam int ROB_BITS = $clog2(ROB_LEN)
 )(
@@ -122,15 +105,16 @@ logic issue;
 ctrl_t ctrl_word;
 logic [31:0] pc;
 logic [31:0] imm;
-logic [31:0] csr_val;
-logic [4:0] rd;
-logic [5:0] prd;
-logic [11:0] csrs;
+logic [PRF_BITS-1:0] prs1;
+logic [PRF_BITS-1:0] prs2;
+logic [PRF_BITS-1:0] prd_old;
+logic [PRF_BITS-1:0] prd_new;
 speculation_meta_t speculation_meta;
-logic [ROB_BITS-1:0] tag;
+logic [5:0] tag;
 
 modport decode (
-        output issue, ctrl_word, pc, imm, csr_val, rd, csrs, speculation_meta
+        output issue, ctrl_word, pc, imm, speculation_meta,
+        prs1, prs2, prd_old, prd_new
 );
 
 modport rob (
@@ -138,86 +122,65 @@ modport rob (
         output tag
 );
 
-modport freelist (
-        input issue, rd,
-        output prd
-);
-
-modport execute (
-        input issue, ctrl_word, pc, imm, csr_val, prd, csrs, speculation_meta, tag
+modport rs (
+        input issue, ctrl_word, pc, imm, speculation_meta,
+        prs1, prs2, prd_old, prd_new, tag
 );
 
 endinterface
 
-
-/*======================*/
-/*    Forwarding Ifc    */
-/*======================*/
-interface fwding_ifc
+/*====================*/
+/*    Dispatch Ifc    */
+/*====================*/
+interface dispatch_ifc
+import rv32::*;
 #(
+        parameter int PRF_SIZE = 64,
+        localparam int PRF_BITS = $clog2(PRF_SIZE),
+        parameter int ROB_LEN = 64,
+        localparam int ROB_BITS = $clog2(ROB_LEN)
 )(
 );
 
-logic [4:0] rs1;
-logic [4:0] rs2;
-
+logic dispatch;
+ctrl_t ctrl_word;
+speculation_meta_t speculation_meta;
+logic [PRF_BITS-1:0] prs1;
+logic [PRF_BITS-1:0] prs2;
+logic [PRF_BITS-1:0] prd_old;
+logic [PRF_BITS-1:0] prd_new;
 logic [31:0] rs1_val;
 logic [31:0] rs2_val;
+logic [31:0] pc;
+logic [31:0] imm;
+logic [5:0] tag;
 
-logic exe_val_valid;
-logic [4:0] rd_exe;
-logic [31:0] exe_val;
+modport rs (
+        output prs1, prs2, // Asynchronous
+        output dispatch, ctrl_word, prd_old, prd_new, pc, imm, tag, // Synchronous
+        speculation_meta
+);
 
-logic commit_val_valid;
-logic [4:0] rd_commit;
-logic [31:0] commit_val;
-
-logic [31:0] in1;
-logic [31:0] in2;
-
-always_comb
-begin
-        if (rs1 == 0)
-                in1 = 0;
-        else if (exe_val_valid & (rs1 == rd_exe))
-                in1 = exe_val;
-        else if (commit_val_valid & (rs1 == rd_commit))
-                in1 = commit_val;
-        else
-                in1 = rs1_val;
-                
-        if (rs2 == 0)
-                in2 = 0;
-        else if (exe_val_valid & (rs2 == rd_exe))
-                in2 = exe_val;
-        else if (commit_val_valid & (rs2 == rd_commit))
-                in2 = commit_val;
-        else
-                in2 = rs2_val;
-end
-
-modport decode (
-        output rs1, rs1_val,
-               rs2, rs2_val
+modport prf (
+        input prs1, prs2,
+        output rs1_val, rs2_val
 );
 
 modport execute (
-        input in1, in2,
-        output exe_val_valid, rd_exe, exe_val
+        input dispatch, ctrl_word, rs1_val, rs2_val, pc, imm, prd_old, prd_new,
+        tag, speculation_meta
 );
 
-modport commit (
-        output commit_val_valid, rd_commit, commit_val
-);
-
-endinterface
+endinterface: dispatch_ifc
 
 
-/*======================*/
-/*    ROB Update Ifc    */
-/*======================*/
+/*=======================*/
+/*    Common Data Ifc    */
+/*=======================*/
 interface cdb_ifc
 #(
+        parameter int PRF_SIZE = 64,
+        localparam int PRF_BITS = $clog2(PRF_SIZE),
         parameter int ROB_LEN = 64,
         localparam int ROB_BITS = $clog2(ROB_LEN)
 )(
@@ -226,16 +189,23 @@ interface cdb_ifc
 logic update;
 logic [ROB_BITS-1:0] tag;
 logic [31:0] value;
-logic [31:0] dest;
-logic [31:0] csr_value;
-logic [11:0] csr_dest;
+logic [PRF_BITS-1:0] dest;
+logic [PRF_BITS-1:0] dest_old;
 
 modport execute (
-        output update, tag, value, dest, csr_value, csr_dest
+        output update, tag, value, dest, dest_old
+);
+
+modport rs (
+        input update, dest
+);
+
+modport prf (
+        input dest, value
 );
 
 modport rob (
-        input update, tag, value, dest, csr_value, csr_dest
+        input update, tag, value, dest, dest_old
 );
 
 endinterface
@@ -257,7 +227,8 @@ logic exception;
 logic trapret;
 trap_cause_e trap_cause;
 logic [31:0] value;
-logic [31:0] dest;
+logic [5:0] dest;
+logic [5:0] dest_old;
 logic [31:0] csr_value;
 logic [11:0] csr_dest;
 
@@ -267,7 +238,7 @@ assign irf_select = commit & !(store | branch | exception | trapret);
 
 modport rob (
         output commit, store, branch, exception, trapret,
-        trap_cause, value, dest, csr_value, csr_dest
+        trap_cause, value, dest, dest_old, csr_value, csr_dest
 );
 
 modport csrf (
@@ -277,6 +248,10 @@ modport csrf (
 
 modport irf (
         input irf_select, dest, value
+);
+
+modport decode (
+        input commit, dest_old
 );
 
 endinterface

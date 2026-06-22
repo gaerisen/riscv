@@ -23,8 +23,6 @@ import rv32::*;
         
         cdb_ifc.rob cdb_ifc,
 
-        fwding_ifc.commit fwd_ifc,
-
         commit_ifc.rob commit_ifc
 );
 
@@ -62,9 +60,8 @@ begin
                 commit_ifc.trap_cause = rob[rob_head].ctrl_word.trap_cause;
                 commit_ifc.trapret = rob[rob_head].ctrl_word.trapret;
                 commit_ifc.dest = rob[rob_head].dest;
+                commit_ifc.dest_old = rob[rob_head].dest_old;
                 commit_ifc.value = rob[rob_head].value;
-                commit_ifc.csr_dest = rob[rob_head].csr_dest;
-                commit_ifc.csr_value = rob[rob_head].csr_value;
                 pc = rob[rob_head].pc;
         end
         else begin
@@ -74,18 +71,11 @@ begin
                 commit_ifc.trap_cause = ILLEGAL;
                 commit_ifc.trapret = 0;
                 commit_ifc.dest = 0;
+                commit_ifc.dest_old = 0;
                 commit_ifc.value = 0;
-                commit_ifc.csr_dest = 0;
-                commit_ifc.csr_value = 0;
                 pc = 0;
         end
 end
-
-// Forwarding
-assign fwd_ifc.commit_val_valid = commit_ifc.commit & !ctrl_ifc.flush;
-assign fwd_ifc.rd_commit = commit_ifc.dest[4:0];
-assign fwd_ifc.commit_val = commit_ifc.value;
-
 
 // Stall logic
 assign issued_is_system = issue_ifc.ctrl_word.exception | issue_ifc.ctrl_word.trapret |
@@ -170,9 +160,8 @@ begin
         rob_update_next = rob[cdb_ifc.tag];
 
         rob_update_next.value = cdb_ifc.value;
-        rob_update_next.csr_value = cdb_ifc.csr_value;
         rob_update_next.dest = cdb_ifc.dest;
-        rob_update_next.csr_dest = cdb_ifc.csr_dest;
+        rob_update_next.dest_old = cdb_ifc.dest_old;
         rob_update_next.ready = 1;
 end
 

@@ -11,17 +11,14 @@ import rv32::*;
         output logic [4:0] rd
 );
 
-// Extract register identifiers (always same location)
-assign rd = instr.r.rd;
-
 // Combinational decode step
 always_comb
 begin
         // Default to NOP
         imm = 0;
+        rd = 0;
         ctrl_word.alu_op = ADDSUB;
-        ctrl_word.alu_src1 = ZERO;
-        ctrl_word.alu_src2 = IMM;
+        ctrl_word.alu_src = ZERO_IMM;
         ctrl_word.branch = 0;
         ctrl_word.jump = 0;
         ctrl_word.load = 0;
@@ -49,10 +46,9 @@ begin
                                                 // fallback set above
                 LUI: begin
                         imm[31:12] = instr.u.imm31_12;
+                        rd = instr.u.rd;
                         
                         ctrl_word.alu_op = ADDSUB;
-                        ctrl_word.alu_src1 = ZERO;
-                        ctrl_word.alu_src2 = IMM;
 
                         ctrl_word.irf_we = 1;
                         ctrl_word.wb_src = WB_ALU;
@@ -60,10 +56,10 @@ begin
 
                 AUIPC: begin
                         imm[31:12] = instr.u.imm31_12;
+                        rd = instr.u.rd;
                         
                         ctrl_word.alu_op = ADDSUB;
-                        ctrl_word.alu_src1 = PC;
-                        ctrl_word.alu_src2 = IMM;
+                        ctrl_word.alu_src = PC_IMM;
 
                         ctrl_word.irf_we = 1;
                         ctrl_word.wb_src = WB_ALU;
@@ -74,10 +70,10 @@ begin
                         imm[19:12] = instr.j.imm19_12;
                         imm[11] = instr.j.imm11;
                         imm[10:1] = instr.j.imm10_1;
+                        rd = instr.j.rd;
 
                         ctrl_word.alu_op = ADDSUB;
-                        ctrl_word.alu_src1 = PC;
-                        ctrl_word.alu_src2 = IMM;
+                        ctrl_word.alu_src = PC_IMM;
 
                         ctrl_word.jump = 1;
 
@@ -88,10 +84,10 @@ begin
                 JALR: begin
                         imm[31:12] = {20{instr.i.imm11_0[11]}};
                         imm[11:0] = instr.i.imm11_0;
+                        rd = instr.i.rd;
 
                         ctrl_word.alu_op = ADDSUB;
-                        ctrl_word.alu_src1 = RS1;
-                        ctrl_word.alu_src2 = IMM;
+                        ctrl_word.alu_src = REG_IMM;
 
                         ctrl_word.jump = 1;
 
@@ -110,8 +106,7 @@ begin
                         imm[4:1] = instr.b.imm4_1;
 
                         ctrl_word.alu_op = ADDSUB;
-                        ctrl_word.alu_src1 = PC;
-                        ctrl_word.alu_src2 = IMM;
+                        ctrl_word.alu_src = PC_IMM;
 
                         ctrl_word.branch = 1;
                         ctrl_word.branch_op = branch_funct3_e'(instr.b.funct3);
@@ -124,10 +119,10 @@ begin
                 LOAD: begin
                         imm[31:12] = {20{instr.i.imm11_0[11]}};
                         imm[11:0] = instr.i.imm11_0;
+                        rd = instr.i.rd;
 
                         ctrl_word.alu_op = ADDSUB;
-                        ctrl_word.alu_src1 = RS1;
-                        ctrl_word.alu_src2 = IMM;
+                        ctrl_word.alu_src = REG_IMM;
 
                         ctrl_word.load = 1;
                         ctrl_word.load_op = load_funct3_e'(instr.i.funct3);
@@ -146,8 +141,7 @@ begin
                         imm[4:0] = instr.s.imm4_0;
 
                         ctrl_word.alu_op = ADDSUB;
-                        ctrl_word.alu_src1 = RS1;
-                        ctrl_word.alu_src2 = IMM;
+                        ctrl_word.alu_src = REG_IMM;
 
                         ctrl_word.store = 1;
                         ctrl_word.store_op = store_funct3_e'(instr.s.funct3);
@@ -159,10 +153,10 @@ begin
                 ALUI: begin
                         imm[31:12] = {20{instr.i.imm11_0[11]}};
                         imm[11:0] = instr.i.imm11_0;
+                        rd = instr.i.rd;
 
                         ctrl_word.alu_op = alu_funct3_e'(instr.i.funct3);
-                        ctrl_word.alu_src1 = RS1;
-                        ctrl_word.alu_src2 = IMM;
+                        ctrl_word.alu_src = REG_IMM;
 
                         if (alu_funct3_e'(instr.i.funct3) == SR)
                                 ctrl_word.alu_alt = alu_funct7_e'(instr.r.funct7);
@@ -172,14 +166,15 @@ begin
                 end
 
                 ALUR: begin
+                        rd = instr.r.rd;
+
                         if (instr.r.funct7 != NORM &
                                 instr.r.funct7 != ALT)
                                 ctrl_word.exception = 1;
 
                         ctrl_word.alu_alt = alu_funct7_e'(instr.r.funct7);
                         ctrl_word.alu_op = alu_funct3_e'(instr.i.funct3);
-                        ctrl_word.alu_src1 = RS1;
-                        ctrl_word.alu_src2 = RS2;
+                        ctrl_word.alu_src = REG_REG;
 
                         ctrl_word.irf_we = 1;
                         ctrl_word.wb_src = WB_ALU;
@@ -221,10 +216,11 @@ begin
                                 end
                         end
                         else begin
+                                imm = {27'b0, instr.i.rs1};
+                                rd = instr.i.rd;
+
                                 ctrl_word.csr_op = csr_funct2_e'(instr.i.funct3[1:0]);
                                 ctrl_word.csr_src = csr_src_e'(instr.i.funct3[2]);
-
-                                imm = {27'b0, instr.i.rs1};
 
                                 ctrl_word.csr_we = 1;
                                 ctrl_word.irf_we = 1;

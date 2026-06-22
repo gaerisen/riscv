@@ -2,9 +2,9 @@
 module hart
 import rv32::*;
 #(
-        parameter int ROB_LEN = 32
-)
-(
+        parameter int ROB_LEN = 64,
+        parameter int PRF_SIZE = 64
+)(
         input clk,
         input rst,
 
@@ -25,18 +25,27 @@ import rv32::*;
 
 global_ctrl_ifc ctrl_ifc();
 fet_to_dec_ifc fet_dec_ifc();
-fwding_ifc fwd_ifc();
 
 issue_ifc issue_ifc();
 defparam issue_ifc.ROB_LEN = ROB_LEN;
+
+dispatch_ifc dispatch_ifc();
 
 cdb_ifc cdb_ifc();
 defparam cdb_ifc.ROB_LEN = ROB_LEN;
 
 commit_ifc commit_ifc();
 
+logic [63:0] prf_ready;
+logic [5:0] prd_new;
+
 // Integer register file
-irf irf(.*);
+prf prf(
+        .*,
+
+        .prd_new_from_rat(prd_new)
+);
+defparam prf.PRF_SIZE = PRF_SIZE;
 
 // Control/status register file
 csrf csrf(.*);
@@ -45,7 +54,9 @@ csrf csrf(.*);
 
 fetch fetch (.*);
 
-decode decode (.*);
+issue issue (.*);
+
+rs rs (.*);
 
 execute execute (.*);
 
@@ -64,7 +75,7 @@ begin
         if (commit_ifc.store) begin
                 d_valid = 1;
                 d_we = 1;
-                d_addr = commit_ifc.dest;
+                d_addr = 0;
                 d_data_o = commit_ifc.value;
         end
 end

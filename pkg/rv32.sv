@@ -80,16 +80,13 @@ package rv32;
         /*====================================================================*/
         /*          ALU SOURCE ENUMS                                          */
         /*====================================================================*/
-        typedef enum logic [1:0] {
-                ZERO    = 2'b00,
-                RS1     = 2'b01,
-                PC      = 2'b10
-        } alu_src1_e;
 
-        typedef enum logic {
-                RS2     = 1'b0,
-                IMM     = 1'b1
-        } alu_src2_e;
+        typedef enum logic [1:0] {
+                REG_REG,
+                REG_IMM,
+                ZERO_IMM,
+                PC_IMM
+        } alu_src_e;
 
         typedef enum logic [1:0] {
                 WB_ALU     = 2'b00,
@@ -183,8 +180,7 @@ package rv32;
                 logic csr_we;
 
                 // Source enums
-                alu_src1_e alu_src1;
-                alu_src2_e alu_src2;
+                alu_src_e alu_src;
                 wb_src_e wb_src;
                 csr_src_e csr_src;
 
@@ -205,24 +201,29 @@ package rv32;
         /*====================================================================*/
         typedef struct packed {
                 ctrl_t ctrl_word;
+                speculation_meta_t speculation_meta;
 
-                logic [4:0] label1;
-                logic [31:0] in1;
+                logic [5:0] prs1;
                 logic in1_ready;
 
-                logic [4:0] label2;
-                logic [31:0] in2;
+                logic [5:0] prs2;
                 logic in2_ready;
 
-                logic [4:0] rd;
+                logic [5:0] prd_old;
+                logic [5:0] prd_new;
 
+                logic [31:0] pc;
+                logic [31:0] imm;
+
+                logic [5:0] tag;
                 logic full;
                 logic ready;
         } rs_entry_t;
 
         typedef struct packed {
                 ctrl_t ctrl_word;
-                logic [31:0] dest;
+                logic [5:0] dest;
+                logic [5:0] dest_old;
                 logic [31:0] value;
                 logic [11:0] csr_dest;
                 logic [31:0] csr_value;

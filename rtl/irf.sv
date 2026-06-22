@@ -9,11 +9,27 @@ module irf
 
         fet_to_dec_ifc.irf_read fet_dec_ifc,
 
+        output logic [PRF_SIZE-1:0] prf_ready,
+
         commit_ifc.irf commit_ifc
 );
 
 logic [31:0] x [0:PRF_SIZE-1] /*verilator public_flat_rw*/;
+logic [PRF_SIZE-1:0] prf_ready_next;
 
+
+// Ready signal logic
+always_ff @(posedge clk or posedge rst)
+begin
+        if (rst) begin
+                prf_ready <= 0;
+        end
+        else begin
+                prf_ready <= prf_ready_next;
+        end
+end
+
+// Read/Write logic
 always_comb
 begin
         fet_dec_ifc.rs1_val = x[fet_dec_ifc.prs1];
