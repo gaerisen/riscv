@@ -50,6 +50,9 @@ logic [31:0] branch_target;
 
 logic b_predict_taken;
 
+logic speculating;
+logic speculating_next;
+
 // Prediction registers
 logic [1:0] b_pred [0:B_PRED_SIZE-1];
 
@@ -226,6 +229,7 @@ begin
         instr_next = i_data;
         fet_dec_ifc.speculation_meta = 0;
 
+        speculating_next = speculating;
         flush_next = 0;
 
         unique case (state)
@@ -239,16 +243,19 @@ begin
                 // we're waiting on here.
                 if (ctrl_ifc.sys_redirect) begin
                         pc_next = ctrl_ifc.sys_vec;
+                        speculating_next = 0;
                 end
 
                 if (j_mispredict | b_mispredict_nt) begin
                         pc_next = ctrl_ifc.branch_target;
                         flush_next = 1;
+                        speculating_next = 0;
                 end
 
                 if (b_mispredict_t) begin
                         pc_next = ctrl_ifc.branch_pc + 4;
                         flush_next = 1;
+                        speculating_next = 0;
                 end
 
                 // Doesn't matter how stall goes low; if it does, we're good
@@ -259,29 +266,9 @@ begin
         end
 
         STREAMING: begin
-                if (!i_data_ready) begin
-                        valid_next = 0;
-                        state_next = STALLED;
-                end
-                else if (ctrl_ifc.stall) begin
-                        valid_next = 0;
-                        pc_next = fet_dec_ifc.pc;
-                        state_next = STALLED;
-                end
-
-                // If misprediction detected, redirect and flush pipeline
-                if (j_mispredict | b_mispredict_nt) begin
-                        pc_next = ctrl_ifc.branch_target;
-                        flush_next = 1;
-                end
-                else if (b_mispredict_t) begin
-                        pc_next = ctrl_ifc.branch_pc + 4;
-                        flush_next = 1;
-                end
-
                 // Next cases should all be mutually exclusive; each relies on a
                 // unique opcode in current inst. Any order works.
-                else if (inst_is_jump) begin
+                if (inst_is_jump) begin
                         pc_next = jump_target;
                 end
 
@@ -292,32 +279,60 @@ begin
 
                         if (b_predict_taken) begin
                                 fet_dec_ifc.speculation_meta.target = branch_target;
-                                pc_next = fet_dec_ifc.speculation_meta.target;
+                                pc_next = branch_target;
                         end
                         else begin
                                 fet_dec_ifc.speculation_meta.target = fet_dec_ifc.pc + 4;
                                 pc_next = fet_dec_ifc.pc + 4;
                         end
-
+                        speculating_next = 1;
                 end
                 else if (inst_is_ret) begin
                         fet_dec_ifc.speculation_meta.jump = 1;
                         fet_dec_ifc.speculation_meta.target = ras[ras_ptr];
                         pc_next = ras[ras_ptr];
+                        speculating_next = 1;
                 end
                 // jalr-not-ret must come after jalr-is-ret
                 else if (inst_is_jalr) begin
                         fet_dec_ifc.speculation_meta.jump = 1;
                         fet_dec_ifc.speculation_meta.target = btb[fet_dec_ifc.pc[BTB_PTR_SIZE+1:2]];
                         pc_next = btb[fet_dec_ifc.pc[BTB_PTR_SIZE+1:2]];
+                        speculating_next = 1;
                 end
+
+                // If misprediction detected, redirect and flush pipeline
+                if (j_mispredict | b_mispredict_nt) begin
+                        pc_next = ctrl_ifc.branch_target;
+                        flush_next = 1;
+                        speculating_next = 0;
+                end
+                else if (b_mispredict_t) begin
+                        pc_next = ctrl_ifc.branch_pc + 4;
+                        flush_next = 1;
+                        speculating_next = 0;
+                end
+
 
                 // Sys redirects clobber normal control flow
                 if (ctrl_ifc.sys_redirect) begin
                         pc_next = ctrl_ifc.sys_vec;
                         flush_next = 1;
+                        speculating_next = 0;
                 end
 
+                if (!i_data_ready) begin
+                        valid_next = 0;
+                        state_next = STALLED;
+                end
+                else if (ctrl_ifc.stall) begin
+                        valid_next = 0;
+                        pc_next = fet_dec_ifc.pc;
+                        state_next = STALLED;
+                end
+
+
+                fet_dec_ifc.speculation_meta.speculative = speculating;
         end
         endcase
 end
@@ -329,14 +344,20 @@ begin
                 fet_dec_ifc.pc <= 0;
                 fet_dec_ifc.instr <= 32'h13;
                 fet_dec_ifc.valid <= 0;
+
                 ctrl_ifc.flush <= 0;
+
+                speculating <= 0;
                 state <= STALLED;
         end
         else begin
                 fet_dec_ifc.pc <= pc_next;
                 fet_dec_ifc.instr <= instr_next;
                 fet_dec_ifc.valid <= valid_next;
+
                 ctrl_ifc.flush <= flush_next;
+
+                speculating <= speculating_next;
                 state <= state_next;
         end
 

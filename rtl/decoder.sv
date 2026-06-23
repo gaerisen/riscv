@@ -106,7 +106,9 @@ begin
                         imm[4:1] = instr.b.imm4_1;
 
                         ctrl_word.alu_op = ADDSUB;
-                        ctrl_word.alu_src = PC_IMM;
+                        ctrl_word.alu_src = REG_REG; // ALU actually does pc+imm
+                                                // but res stations need to wait
+                                                // for regs to resolve for BU
 
                         ctrl_word.branch = 1;
                         ctrl_word.branch_op = branch_funct3_e'(instr.b.funct3);

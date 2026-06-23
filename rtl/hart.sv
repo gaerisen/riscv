@@ -26,6 +26,7 @@ import rv32::*;
 global_ctrl_ifc ctrl_ifc();
 fet_to_dec_ifc fet_dec_ifc();
 
+reserv_ifc reserv_ifc();
 issue_ifc issue_ifc();
 defparam issue_ifc.ROB_LEN = ROB_LEN;
 

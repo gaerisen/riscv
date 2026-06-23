@@ -7,6 +7,8 @@
 interface global_ctrl_ifc
 import rv32::*;
 #(
+        parameter int ROB_LEN = 64,
+        localparam int ROB_BITS = $clog2(ROB_LEN)
 )(
 );
 
@@ -21,8 +23,11 @@ logic [31:0] branch_target;
 
 logic rs_stall;
 logic rob_stall;
+logic [ROB_BITS-1:0] tag;
 logic stall;
 logic flush;
+
+logic [31:0][5:0] rat;
 
 assign stall = rs_stall | rob_stall;
 
@@ -38,21 +43,23 @@ modport csrf (
 );
 
 modport rob (
-        input flush,
-        output rob_stall
+        input flush, branch_pc, speculation_meta, tag,
+        input branch_result_ready, branch_taken, branch_target,
+        output rob_stall, rat
 );
 
 modport decode (
-        input flush, stall
+        input flush, stall, rat
 );
 
 modport execute (
         input flush,
-        output branch_pc, speculation_meta,
+        output branch_pc, speculation_meta, tag,
         output branch_result_ready, branch_taken, branch_target
 );
 
 modport rs (
+        input flush,
         output rs_stall
 );
 
@@ -119,20 +126,58 @@ logic [PRF_BITS-1:0] prd_old;
 logic [PRF_BITS-1:0] prd_new;
 speculation_meta_t speculation_meta;
 logic [5:0] tag;
+logic [31:0][PRF_BITS-1:0] rat;
 
 modport decode (
         output issue, ctrl_word, pc, imm, speculation_meta,
-        prs1, prs2, prd_old, prd_new
+        prs1, prs2, prd_old, prd_new, rat
 );
 
 modport rob (
-        input issue, ctrl_word, pc,
+        input issue, ctrl_word, pc, rat,
         output tag
 );
 
 modport rs (
         input issue, ctrl_word, pc, imm, speculation_meta,
         prs1, prs2, prd_old, prd_new, tag
+);
+
+endinterface
+
+
+/*=================*/
+/*    Reserv Ifc    */
+/*=================*/
+interface reserv_ifc
+import rv32::*;
+#(
+        parameter int PRF_SIZE = 64,
+        localparam int PRF_BITS = $clog2(PRF_SIZE),
+        parameter int ROB_LEN = 64,
+        localparam int ROB_BITS = $clog2(ROB_LEN)
+)(
+);
+
+logic issue;
+ctrl_t ctrl_word;
+logic [31:0] pc;
+logic [31:0] imm;
+logic [PRF_BITS-1:0] prs1;
+logic [PRF_BITS-1:0] prs2;
+logic [PRF_BITS-1:0] prd_old;
+logic [PRF_BITS-1:0] prd_new;
+speculation_meta_t speculation_meta;
+logic [31:0][PRF_BITS-1:0] rat;
+
+modport decode (
+        output issue, ctrl_word, pc, imm, speculation_meta,
+        prs1, prs2, prd_old, prd_new
+);
+
+modport rs (
+        input issue, ctrl_word, pc, imm, speculation_meta,
+        prs1, prs2, prd_old, prd_new
 );
 
 endinterface

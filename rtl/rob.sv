@@ -45,6 +45,9 @@ logic committed_is_system;
 logic sys_in_flight;
 logic sys_in_flight_state;
 
+logic b_mispredict;
+logic j_mispredict;
+
 logic [31:0] pc; // For debugging
 
 assign commit_ifc.commit = rob[rob_head].ready;
@@ -59,9 +62,8 @@ begin
                 commit_ifc.exception = rob[rob_head].ctrl_word.exception;
                 commit_ifc.trap_cause = rob[rob_head].ctrl_word.trap_cause;
                 commit_ifc.trapret = rob[rob_head].ctrl_word.trapret;
-                commit_ifc.dest = rob[rob_head].dest;
-                commit_ifc.dest_old = rob[rob_head].dest_old;
-                commit_ifc.value = rob[rob_head].value;
+                commit_ifc.dest = rob[rob_head].prd;
+                commit_ifc.dest_old = rob[rob_head].prd_old;
                 pc = rob[rob_head].pc;
         end
         else begin
@@ -72,7 +74,6 @@ begin
                 commit_ifc.trapret = 0;
                 commit_ifc.dest = 0;
                 commit_ifc.dest_old = 0;
-                commit_ifc.value = 0;
                 pc = 0;
         end
 end
@@ -107,12 +108,27 @@ begin
 end
 
 
+// Stall logic
 assign full = rob_tail == (rob_head + {ROB_BITS{1'b1}});
-
 assign ctrl_ifc.rob_stall = full | sys_in_flight;
 
+// Flush logic
 assign flush_internal = ctrl_ifc.flush | (commit_ifc.commit &
                                 (commit_ifc.exception | commit_ifc.trapret));
+
+// RAT rollback logic
+assign b_mispredict = ctrl_ifc.speculation_meta.branch && ctrl_ifc.branch_result_ready &&
+                (ctrl_ifc.speculation_meta.branch_taken != ctrl_ifc.branch_taken);
+
+assign j_mispredict = ctrl_ifc.speculation_meta.jump &&
+                (ctrl_ifc.speculation_meta.target != ctrl_ifc.branch_target);
+
+always_ff @(posedge clk or posedge rst)
+begin
+        if (b_mispredict | j_mispredict) begin
+                ctrl_ifc.rat = rob[ctrl_ifc.tag].rat;
+        end
+end
 
 initial begin
         $dumpfile("rob.vcd");
@@ -155,13 +171,13 @@ begin
 
         rob_issue_next.ctrl_word = issue_ifc.ctrl_word;
         rob_issue_next.pc = issue_ifc.pc;
+        rob_issue_next.rat = issue_ifc.rat;
 
 
         rob_update_next = rob[cdb_ifc.tag];
 
-        rob_update_next.value = cdb_ifc.value;
-        rob_update_next.dest = cdb_ifc.dest;
-        rob_update_next.dest_old = cdb_ifc.dest_old;
+        rob_update_next.prd = cdb_ifc.dest;
+        rob_update_next.prd_old = cdb_ifc.dest_old;
         rob_update_next.ready = 1;
 end
 

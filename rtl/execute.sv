@@ -21,19 +21,47 @@ logic branch_taken;
 logic ready_exe_next;
 logic [31:0] result_exe_next;
 logic [PRF_BITS-1:0] rd_exe_next;
+logic [31:0] alu_in1;
+logic [31:0] alu_in2;
+
+always_comb
+begin
+        unique case(dispatch_ifc.ctrl_word.alu_src)
+        REG_REG: begin
+                if (dispatch_ifc.ctrl_word.branch) begin
+                        alu_in1 = dispatch_ifc.pc;
+                        alu_in2 = dispatch_ifc.imm;
+                end
+                else begin
+                        alu_in1 = dispatch_ifc.rs1_val;
+                        alu_in2 = dispatch_ifc.rs2_val;
+                end
+        end
+        REG_IMM: begin
+                alu_in1 = dispatch_ifc.rs1_val;
+                alu_in2 = dispatch_ifc.imm;
+        end
+        ZERO_IMM: begin
+                alu_in1 = 0;
+                alu_in2 = dispatch_ifc.imm;
+        end
+        PC_IMM: begin
+                alu_in1 = dispatch_ifc.pc;
+                alu_in2 = dispatch_ifc.imm;
+        end
+        endcase
+end
+
 
 // Ex unit for integral arithmetic and logic instructions
 alu alu (
         .*,
 
-        .pc(dispatch_ifc.pc),
-        .imm(dispatch_ifc.imm),
-        .rs1_val(dispatch_ifc.rs1_val),
-        .rs2_val(dispatch_ifc.rs2_val),
+        .in1(alu_in1),
+        .in2(alu_in2),
 
         .op(dispatch_ifc.ctrl_word.alu_op),
         .alt(dispatch_ifc.ctrl_word.alu_alt),
-        .src(dispatch_ifc.ctrl_word.alu_src),
 
         .result(alu_result)
 );
@@ -102,6 +130,7 @@ begin
 
                 ctrl_ifc.branch_pc <= 0;
                 ctrl_ifc.speculation_meta <= 0;
+                ctrl_ifc.tag <= 0;
                 ctrl_ifc.branch_result_ready <= 0;
                 ctrl_ifc.branch_taken <= 0;
                 ctrl_ifc.branch_target <= 0;
@@ -115,6 +144,7 @@ begin
 
                 ctrl_ifc.branch_pc <= dispatch_ifc.pc;
                 ctrl_ifc.speculation_meta <= dispatch_ifc.speculation_meta;
+                ctrl_ifc.tag <= dispatch_ifc.tag;
                 ctrl_ifc.branch_result_ready <= ready_exe_next;
                 ctrl_ifc.branch_taken <= branch_taken;
                 ctrl_ifc.branch_target <= alu_result;

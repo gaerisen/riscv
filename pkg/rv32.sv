@@ -156,6 +156,7 @@ package rv32;
 
 
         typedef struct packed {
+                logic speculative;
                 logic branch;
                 logic branch_taken;
                 logic jump;
@@ -200,8 +201,8 @@ package rv32;
         /*              TOMASULO BUFFER ENTRY TYPES                           */
         /*====================================================================*/
         typedef struct packed {
-                ctrl_t ctrl_word;
                 speculation_meta_t speculation_meta;
+                ctrl_t ctrl_word;
 
                 logic [5:0] prs1;
                 logic in1_ready;
@@ -222,12 +223,10 @@ package rv32;
 
         typedef struct packed {
                 ctrl_t ctrl_word;
-                logic [5:0] dest;
-                logic [5:0] dest_old;
-                logic [31:0] value;
-                logic [11:0] csr_dest;
-                logic [31:0] csr_value;
+                logic [5:0] prd;
+                logic [5:0] prd_old;
                 logic [31:0] pc;
+                logic [31:0][5:0] rat;
                 logic ready;
         } rob_entry_t;
 

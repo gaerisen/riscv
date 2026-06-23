@@ -10,6 +10,8 @@ module rat
 )(
         input clk,
         input rst,
+        input flush,
+        input [31:0][PRF_BITS-1:0] rat_flush,
 
         input [4:0] rs1,
         input [4:0] rs2,
@@ -20,6 +22,8 @@ module rat
         output logic [PRF_BITS-1:0] prd_old,
         output logic [PRF_BITS-1:0] prd_new,
 
+        output logic [31:0][PRF_BITS-1:0] rat,
+
         input commit,
         input [PRF_BITS-1:0] free_prd
 );
@@ -29,7 +33,6 @@ initial begin
         $dumpvars(0, rat);
 end
 
-logic [PRF_BITS-1:0] rat [0:31];
 logic [PRF_BITS-1:0] free [0:FREE_SIZE-1];
 logic [FREE_BITS-1:0] free_head;
 logic [FREE_BITS-1:0] free_tail;
@@ -81,6 +84,9 @@ begin
                 for (int i = 0; i < PRF_SIZE - 32; i++) begin
                         free[i] <= i[5:0] + 32;
                 end
+        end
+        else if (flush) begin
+                rat <= rat_flush;
         end
         else begin
                 rat[rd] <= prd_new;

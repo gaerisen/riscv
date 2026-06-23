@@ -5,8 +5,9 @@ import rv32::*;
 #(
         parameter int PRF_SIZE = 64,
         localparam int PRF_BITS = $clog2(PRF_SIZE),
-        parameter int NUM_ENTRIES = 8,
-        localparam int ENTRIES_BITS = $clog2(NUM_ENTRIES),
+        parameter int NUM_ENTRIES = 1,
+//        localparam int ENTRIES_BITS = $clog2(NUM_ENTRIES),
+        localparam int ENTRIES_BITS = 1,
         parameter int ROB_SIZE = 64,
         localparam int ROB_BITS = $clog2(ROB_SIZE)
 
@@ -18,6 +19,7 @@ import rv32::*;
 
         global_ctrl_ifc.rs ctrl_ifc,
 
+        reserv_ifc.rs reserv_ifc,
         issue_ifc.rs issue_ifc,
 
         cdb_ifc.rs cdb_ifc,
@@ -135,34 +137,34 @@ begin
                 entries_next[dispatch_idx] = 0;
         end
         
-        if (issue_ifc.issue) begin
-                entries_next[fill_idx].ctrl_word = issue_ifc.ctrl_word;
-                entries_next[fill_idx].prs1 = issue_ifc.prs1;
-                entries_next[fill_idx].prs2 = issue_ifc.prs2;
-                entries_next[fill_idx].prd_old = issue_ifc.prd_old;
-                entries_next[fill_idx].prd_new = issue_ifc.prd_new;
-                entries_next[fill_idx].imm = issue_ifc.imm;
-                entries_next[fill_idx].pc = issue_ifc.pc;
-                entries_next[fill_idx].tag = issue_ifc.tag;
-                entries_next[fill_idx].speculation_meta = issue_ifc.speculation_meta;
+        if (reserv_ifc.issue) begin
+                entries_next[fill_idx].ctrl_word = reserv_ifc.ctrl_word;
+                entries_next[fill_idx].prs1 = reserv_ifc.prs1;
+                entries_next[fill_idx].prs2 = reserv_ifc.prs2;
+                entries_next[fill_idx].prd_old = reserv_ifc.prd_old;
+                entries_next[fill_idx].prd_new = reserv_ifc.prd_new;
+                entries_next[fill_idx].imm = reserv_ifc.imm;
+                entries_next[fill_idx].pc = reserv_ifc.pc;
+                entries_next[fill_idx].tag = issue_ifc.tag + 1;
+                entries_next[fill_idx].speculation_meta = reserv_ifc.speculation_meta;
 
-                unique case (issue_ifc.ctrl_word.alu_src)
+                unique case (reserv_ifc.ctrl_word.alu_src)
                 REG_REG: begin
-                        entries_next[fill_idx].in1_ready = prf_ready[issue_ifc.prs1];
-                        entries_next[fill_idx].in2_ready = prf_ready[issue_ifc.prs2];
+                        entries_next[fill_idx].in1_ready = prf_ready[reserv_ifc.prs1];
+                        entries_next[fill_idx].in2_ready = prf_ready[reserv_ifc.prs2];
 
-                        if (cdb_ifc.update && issue_ifc.prs1 == cdb_ifc.dest) begin
+                        if (cdb_ifc.update && reserv_ifc.prs1 == cdb_ifc.dest) begin
                                 entries_next[fill_idx].in1_ready = 1;
                         end
 
-                        if (cdb_ifc.update && issue_ifc.prs2 == cdb_ifc.dest) begin
+                        if (cdb_ifc.update && reserv_ifc.prs2 == cdb_ifc.dest) begin
                                 entries_next[fill_idx].in2_ready = 1;
                         end
                 end
                 REG_IMM: begin
-                        entries_next[fill_idx].in1_ready = prf_ready[issue_ifc.prs1];
+                        entries_next[fill_idx].in1_ready = prf_ready[reserv_ifc.prs1];
 
-                        if (cdb_ifc.update && issue_ifc.prs1 == cdb_ifc.dest) begin
+                        if (cdb_ifc.update && reserv_ifc.prs1 == cdb_ifc.dest) begin
                                 entries_next[fill_idx].in1_ready = 1;
                         end
 
@@ -195,6 +197,14 @@ begin
                         entries_next[i].ready = 
                                         entries_next[i].in1_ready && 
                                         entries_next[i].in2_ready;
+                end
+        end
+
+        if (ctrl_ifc.flush) begin
+                for (int i = 0; i < NUM_ENTRIES; i++) begin
+                        if (entries_next[i].speculation_meta.speculative) begin
+                                entries_next[i] = 0;
+                        end
                 end
         end
 end

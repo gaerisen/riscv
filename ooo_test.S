@@ -1,19 +1,16 @@
 .globl _start
 _start:
-        li a0, 0x10
-        addi a1, a0, 0x1f
-        andi t0, a1, 0x20
-        or a0, a1, t0
-        slli t0, a0, 4
-        slli t1, a0, 8
-        slli t2, a0, 16
-        slli t3, a0, 24
+        li a0, 1
+        li a1, 2
+        li t0, 1000
+
+fib_loop:
+        add a2, a1, a0
+        mv a0, a1
+        mv a1, a2
+        blt a2, t0, fib_loop
         nop
-        nop
-        nop
-        nop
-        nop
-        nop
+
 halt:
         j halt
          
