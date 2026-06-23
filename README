@@ -4,5 +4,5 @@ An educational* core in SystemVerilog with Verilator/C++ unit tests.
 
 *this is code for it doesn't work and maybe never will.
 
-Target architecture: Rv32imac, f/d maybe. Full Tomasulo-scheme OoO execution.
-Current architecture: Impossible to tell.
+Target architecture: RV32IMAC, F+D maybe. Multiple-issue OoO execution.
+Current architecture: RV32I, OoO trying its best
