@@ -19,8 +19,12 @@ speculation_meta_t speculation_meta;
 logic branch_taken;
 logic [31:0] branch_target;
 
+logic rs_stall;
+logic rob_stall;
 logic stall;
 logic flush;
+
+assign stall = rs_stall | rob_stall;
 
 modport fetch (
         input stall, sys_redirect, sys_vec,
@@ -35,7 +39,7 @@ modport csrf (
 
 modport rob (
         input flush,
-        output stall
+        output rob_stall
 );
 
 modport decode (
@@ -46,6 +50,10 @@ modport execute (
         input flush,
         output branch_pc, speculation_meta,
         output branch_result_ready, branch_taken, branch_target
+);
+
+modport rs (
+        output rs_stall
 );
 
 endinterface

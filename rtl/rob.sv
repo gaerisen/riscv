@@ -109,7 +109,7 @@ end
 
 assign full = rob_tail == (rob_head + {ROB_BITS{1'b1}});
 
-assign ctrl_ifc.stall = full | sys_in_flight;
+assign ctrl_ifc.rob_stall = full | sys_in_flight;
 
 assign flush_internal = ctrl_ifc.flush | (commit_ifc.commit &
                                 (commit_ifc.exception | commit_ifc.trapret));

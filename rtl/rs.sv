@@ -5,7 +5,7 @@ import rv32::*;
 #(
         parameter int PRF_SIZE = 64,
         localparam int PRF_BITS = $clog2(PRF_SIZE),
-        parameter int NUM_ENTRIES = 4,
+        parameter int NUM_ENTRIES = 8,
         localparam int ENTRIES_BITS = $clog2(NUM_ENTRIES),
         parameter int ROB_SIZE = 64,
         localparam int ROB_BITS = $clog2(ROB_SIZE)
@@ -15,6 +15,8 @@ import rv32::*;
         input rst,
 
         input logic [PRF_SIZE-1:0] prf_ready,
+
+        global_ctrl_ifc.rs ctrl_ifc,
 
         issue_ifc.rs issue_ifc,
 
@@ -41,6 +43,8 @@ speculation_meta_t speculation_meta_next;
 
 logic full;
 
+assign ctrl_ifc.rs_stall = full;
+
 // Entry selection
 always_comb
 begin
@@ -48,14 +52,14 @@ begin
         fill_idx = 0;
 
         dispatch_next = 0;
-        full = 0;
+        full = 1;
 
         for (int i = 0; i < NUM_ENTRIES; i++) begin
+                full = full & entries[i].full;
                 if (!entries[i].full) begin
                         fill_idx = i[ENTRIES_BITS-1:0];
                         break;
                 end
-                full = 1;
         end
 
         for (int i = 0; i < NUM_ENTRIES; i++) begin
@@ -126,11 +130,15 @@ begin
         for (int i = 0; i < 8; i++) begin
                 entries_next[i] = entries[i];
         end
+
+        if (dispatch_next) begin
+                entries_next[dispatch_idx] = 0;
+        end
         
         if (issue_ifc.issue) begin
                 entries_next[fill_idx].ctrl_word = issue_ifc.ctrl_word;
                 entries_next[fill_idx].prs1 = issue_ifc.prs1;
-                entries_next[fill_idx].prs1 = issue_ifc.prs2;
+                entries_next[fill_idx].prs2 = issue_ifc.prs2;
                 entries_next[fill_idx].prd_old = issue_ifc.prd_old;
                 entries_next[fill_idx].prd_new = issue_ifc.prd_new;
                 entries_next[fill_idx].imm = issue_ifc.imm;
@@ -188,10 +196,6 @@ begin
                                         entries_next[i].in1_ready && 
                                         entries_next[i].in2_ready;
                 end
-        end
-
-        if (dispatch_next) begin
-                entries_next[dispatch_idx] = 0;
         end
 end
 

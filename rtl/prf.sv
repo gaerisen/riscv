@@ -25,13 +25,19 @@ begin
                 for (int i = 0; i < PRF_SIZE; i++) begin
                         prf[i] <= 0;
                 end
-
-                dispatch_ifc.rs1_val <= 0;
-                dispatch_ifc.rs2_val <= 0;
         end
         else if (cdb_ifc.dest != 0) begin
                 prf[cdb_ifc.dest] <= cdb_ifc.value;
+        end
+end
 
+always_ff @(posedge clk or posedge rst)
+begin
+        if (rst) begin
+                dispatch_ifc.rs1_val <= 0;
+                dispatch_ifc.rs2_val <= 0;
+        end
+        else begin
                 dispatch_ifc.rs1_val <= prf[dispatch_ifc.prs1];
                 dispatch_ifc.rs2_val <= prf[dispatch_ifc.prs2];
         end

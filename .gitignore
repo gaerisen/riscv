@@ -5,6 +5,7 @@ obj_dir/
 *.elf
 *.bin
 *.hex
+*.dump
 *.vcd
 *.dat
 *.txt
