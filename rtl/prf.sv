@@ -47,7 +47,7 @@ end
 always_ff @(posedge clk or posedge rst)
 begin
         if (rst) begin // Lowest order regs map directly to arch regs at reset
-                prf_ready <= {{(PRF_SIZE-5){1'b0}}, 5'h1f};
+                prf_ready <= {{(PRF_SIZE-32){1'b0}}, 32'hffffffff};
         end
         else begin
                 if (prd_new_from_rat != 0) begin

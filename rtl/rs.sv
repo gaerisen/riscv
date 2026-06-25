@@ -19,7 +19,6 @@ import rv32::*;
 
         global_ctrl_ifc.rs ctrl_ifc,
 
-        reserv_ifc.rs reserv_ifc,
         issue_ifc.rs issue_ifc,
 
         cdb_ifc.rs cdb_ifc,
@@ -30,6 +29,8 @@ import rv32::*;
 
 rs_entry_t entries [NUM_ENTRIES-1:0];
 rs_entry_t entries_next [NUM_ENTRIES-1:0];
+rs_entry_t overflow_next;
+rs_entry_t overflow;
 
 logic [ENTRIES_BITS-1:0] fill_idx;
 logic [ENTRIES_BITS-1:0] dispatch_idx;
@@ -54,20 +55,24 @@ begin
         fill_idx = 0;
 
         dispatch_next = 0;
-        full = 1;
-
-        for (int i = 0; i < NUM_ENTRIES; i++) begin
-                full = full & entries[i].full;
-                if (!entries[i].full) begin
-                        fill_idx = i[ENTRIES_BITS-1:0];
-                        break;
-                end
-        end
 
         for (int i = 0; i < NUM_ENTRIES; i++) begin
                 if (entries[i].ready) begin
                         dispatch_idx = i[ENTRIES_BITS-1:0];
                         dispatch_next = 1;
+                        break;
+                end
+        end
+
+        // Check that next cycle will require one more entry
+        full = !dispatch_next;
+
+        // Flag the next entry to fill; either an empty one or one getting
+        // dispatched
+        for (int i = 0; i < NUM_ENTRIES; i++) begin
+                full = full & entries[i].full;
+                if ((i[ENTRIES_BITS-1:0] == dispatch_idx) || !entries[i].full) begin
+                        fill_idx = i[ENTRIES_BITS-1:0];
                         break;
                 end
         end
@@ -129,62 +134,74 @@ end
 // New entry construction
 always_comb
 begin
+        overflow_next = overflow;
+
         for (int i = 0; i < 8; i++) begin
                 entries_next[i] = entries[i];
         end
-
-        if (dispatch_next) begin
-                entries_next[dispatch_idx] = 0;
-        end
         
-        if (reserv_ifc.issue) begin
-                entries_next[fill_idx].ctrl_word = reserv_ifc.ctrl_word;
-                entries_next[fill_idx].prs1 = reserv_ifc.prs1;
-                entries_next[fill_idx].prs2 = reserv_ifc.prs2;
-                entries_next[fill_idx].prd_old = reserv_ifc.prd_old;
-                entries_next[fill_idx].prd_new = reserv_ifc.prd_new;
-                entries_next[fill_idx].imm = reserv_ifc.imm;
-                entries_next[fill_idx].pc = reserv_ifc.pc;
-                entries_next[fill_idx].tag = issue_ifc.tag + 1;
-                entries_next[fill_idx].speculation_meta = reserv_ifc.speculation_meta;
+        if (issue_ifc.issue) begin
+                overflow_next.ctrl_word = issue_ifc.ctrl_word;
+                overflow_next.prs1 = issue_ifc.prs1;
+                overflow_next.prs2 = issue_ifc.prs2;
+                overflow_next.prd_old = issue_ifc.prd_old;
+                overflow_next.prd_new = issue_ifc.prd_new;
+                overflow_next.imm = issue_ifc.imm;
+                overflow_next.pc = issue_ifc.pc;
+                overflow_next.tag = issue_ifc.tag;
+                overflow_next.speculation_meta = issue_ifc.speculation_meta;
 
-                unique case (reserv_ifc.ctrl_word.alu_src)
+                unique case (issue_ifc.ctrl_word.alu_src)
                 REG_REG: begin
-                        entries_next[fill_idx].in1_ready = prf_ready[reserv_ifc.prs1];
-                        entries_next[fill_idx].in2_ready = prf_ready[reserv_ifc.prs2];
+                        overflow_next.in1_ready = prf_ready[issue_ifc.prs1];
+                        overflow_next.in2_ready = prf_ready[issue_ifc.prs2];
 
-                        if (cdb_ifc.update && reserv_ifc.prs1 == cdb_ifc.dest) begin
-                                entries_next[fill_idx].in1_ready = 1;
+                        if (cdb_ifc.update && issue_ifc.prs1 == cdb_ifc.dest) begin
+                                overflow_next.in1_ready = 1;
                         end
 
-                        if (cdb_ifc.update && reserv_ifc.prs2 == cdb_ifc.dest) begin
-                                entries_next[fill_idx].in2_ready = 1;
+                        if (cdb_ifc.update && issue_ifc.prs2 == cdb_ifc.dest) begin
+                                overflow_next.in2_ready = 1;
                         end
                 end
                 REG_IMM: begin
-                        entries_next[fill_idx].in1_ready = prf_ready[reserv_ifc.prs1];
+                        overflow_next.in1_ready = prf_ready[issue_ifc.prs1];
 
-                        if (cdb_ifc.update && reserv_ifc.prs1 == cdb_ifc.dest) begin
-                                entries_next[fill_idx].in1_ready = 1;
+                        if (cdb_ifc.update && issue_ifc.prs1 == cdb_ifc.dest) begin
+                                overflow_next.in1_ready = 1;
                         end
 
-                        entries_next[fill_idx].in2_ready = 1;
+                        overflow_next.in2_ready = 1;
                 end
                 ZERO_IMM: begin
-                        entries_next[fill_idx].in1_ready = 1;
-                        entries_next[fill_idx].in2_ready = 1;
+                        overflow_next.in1_ready = 1;
+                        overflow_next.in2_ready = 1;
                 end
                 PC_IMM: begin
-                        entries_next[fill_idx].in1_ready = 1;
-                        entries_next[fill_idx].in2_ready = 1;
+                        overflow_next.in1_ready = 1;
+                        overflow_next.in2_ready = 1;
                 end
                 endcase
 
-                entries_next[fill_idx].full = 1;
-                entries_next[fill_idx].ready = 
-                                entries_next[fill_idx].in1_ready && 
-                                entries_next[fill_idx].in2_ready;
+                overflow_next.full = full;
+                overflow_next.ready = 
+                                overflow_next.in1_ready && 
+                                overflow_next.in2_ready;
         end
+        if (dispatch_next) begin
+                entries_next[dispatch_idx] = 0;
+        end
+
+        if (issue_ifc.issue & ~full) begin
+                entries_next[fill_idx] = overflow_next;
+                entries_next[fill_idx].full = 1;
+        end
+
+        if (overflow.full & dispatch_next) begin
+                entries_next[fill_idx] = overflow;
+                overflow_next = 0;
+        end
+
 
         if (cdb_ifc.update) begin
                 for (int i = 0; i < NUM_ENTRIES; i++) begin
@@ -215,10 +232,14 @@ begin
         if (rst) begin
                 for (int i = 0; i < NUM_ENTRIES; i++)
                         entries[i] <= 0;
+
+                overflow <= 0;
         end
         else begin
                 for (int i = 0; i < NUM_ENTRIES; i++)
                         entries[i] <= entries_next[i];
+
+                overflow <= overflow_next;
         end
 end
 

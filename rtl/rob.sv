@@ -49,6 +49,7 @@ logic b_mispredict;
 logic j_mispredict;
 
 logic [31:0] pc; // For debugging
+logic [31:0] value;
 
 assign commit_ifc.commit = rob[rob_head].ready;
 
@@ -65,6 +66,7 @@ begin
                 commit_ifc.dest = rob[rob_head].prd;
                 commit_ifc.dest_old = rob[rob_head].prd_old;
                 pc = rob[rob_head].pc;
+                value = rob[rob_head].value;
         end
         else begin
                 commit_ifc.store = 0;
@@ -75,6 +77,7 @@ begin
                 commit_ifc.dest = 0;
                 commit_ifc.dest_old = 0;
                 pc = 0;
+                value = rob[rob_head].value;
         end
 end
 
@@ -127,6 +130,9 @@ always_ff @(posedge clk or posedge rst)
 begin
         if (b_mispredict | j_mispredict) begin
                 ctrl_ifc.rat = rob[ctrl_ifc.tag].rat;
+                ctrl_ifc.free_list = rob[ctrl_ifc.tag].free_list;
+                ctrl_ifc.free_head = rob[ctrl_ifc.tag].free_head;
+                ctrl_ifc.free_tail = rob[ctrl_ifc.tag].free_tail;
         end
 end
 
@@ -172,12 +178,16 @@ begin
         rob_issue_next.ctrl_word = issue_ifc.ctrl_word;
         rob_issue_next.pc = issue_ifc.pc;
         rob_issue_next.rat = issue_ifc.rat;
+        rob_issue_next.free_list = issue_ifc.free_list;
+        rob_issue_next.free_head = issue_ifc.free_head;
+        rob_issue_next.free_tail = issue_ifc.free_tail;
 
 
         rob_update_next = rob[cdb_ifc.tag];
 
         rob_update_next.prd = cdb_ifc.dest;
         rob_update_next.prd_old = cdb_ifc.dest_old;
+        rob_update_next.value = cdb_ifc.value;
         rob_update_next.ready = 1;
 end
 

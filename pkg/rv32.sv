@@ -227,6 +227,10 @@ package rv32;
                 logic [5:0] prd_old;
                 logic [31:0] pc;
                 logic [31:0][5:0] rat;
+                logic [31:0][5:0] free_list;
+                logic [4:0] free_head;
+                logic [4:0] free_tail;
+                logic [31:0] value;
                 logic ready;
         } rob_entry_t;
 

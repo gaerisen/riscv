@@ -8,7 +8,11 @@ interface global_ctrl_ifc
 import rv32::*;
 #(
         parameter int ROB_LEN = 64,
-        localparam int ROB_BITS = $clog2(ROB_LEN)
+        localparam int ROB_BITS = $clog2(ROB_LEN),
+        parameter int PRF_SIZE = 64,
+        localparam int PRF_BITS = $clog2(PRF_SIZE),
+        localparam int FREE_SIZE = PRF_SIZE - 32,
+        localparam int FREE_BITS = $clog2(FREE_SIZE)
 )(
 );
 
@@ -27,7 +31,10 @@ logic [ROB_BITS-1:0] tag;
 logic stall;
 logic flush;
 
-logic [31:0][5:0] rat;
+logic [31:0][PRF_BITS-1:0] rat;
+logic [FREE_SIZE-1:0][PRF_BITS-1:0] free_list;
+logic [FREE_BITS-1:0] free_head;
+logic [FREE_BITS-1:0] free_tail;
 
 assign stall = rs_stall | rob_stall;
 
@@ -45,11 +52,11 @@ modport csrf (
 modport rob (
         input flush, branch_pc, speculation_meta, tag,
         input branch_result_ready, branch_taken, branch_target,
-        output rob_stall, rat
+        output rob_stall, rat, free_list, free_head, free_tail
 );
 
 modport decode (
-        input flush, stall, rat
+        input flush, stall, rat, free_list, free_head, free_tail
 );
 
 modport execute (
@@ -112,7 +119,9 @@ import rv32::*;
         parameter int PRF_SIZE = 64,
         localparam int PRF_BITS = $clog2(PRF_SIZE),
         parameter int ROB_LEN = 64,
-        localparam int ROB_BITS = $clog2(ROB_LEN)
+        localparam int ROB_BITS = $clog2(ROB_LEN),
+        localparam int FREE_SIZE = PRF_SIZE - 32,
+        localparam int FREE_BITS = $clog2(FREE_SIZE)
 )(
 );
 
@@ -126,15 +135,19 @@ logic [PRF_BITS-1:0] prd_old;
 logic [PRF_BITS-1:0] prd_new;
 speculation_meta_t speculation_meta;
 logic [5:0] tag;
+
 logic [31:0][PRF_BITS-1:0] rat;
+logic [FREE_SIZE-1:0][PRF_BITS-1:0] free_list;
+logic [FREE_BITS-1:0] free_head;
+logic [FREE_BITS-1:0] free_tail;
 
 modport decode (
         output issue, ctrl_word, pc, imm, speculation_meta,
-        prs1, prs2, prd_old, prd_new, rat
+        prs1, prs2, prd_old, prd_new, rat, free_list, free_head, free_tail
 );
 
 modport rob (
-        input issue, ctrl_word, pc, rat,
+        input issue, ctrl_word, pc, rat, free_list, free_head, free_tail,
         output tag
 );
 
@@ -146,41 +159,6 @@ modport rs (
 endinterface
 
 
-/*=================*/
-/*    Reserv Ifc    */
-/*=================*/
-interface reserv_ifc
-import rv32::*;
-#(
-        parameter int PRF_SIZE = 64,
-        localparam int PRF_BITS = $clog2(PRF_SIZE),
-        parameter int ROB_LEN = 64,
-        localparam int ROB_BITS = $clog2(ROB_LEN)
-)(
-);
-
-logic issue;
-ctrl_t ctrl_word;
-logic [31:0] pc;
-logic [31:0] imm;
-logic [PRF_BITS-1:0] prs1;
-logic [PRF_BITS-1:0] prs2;
-logic [PRF_BITS-1:0] prd_old;
-logic [PRF_BITS-1:0] prd_new;
-speculation_meta_t speculation_meta;
-logic [31:0][PRF_BITS-1:0] rat;
-
-modport decode (
-        output issue, ctrl_word, pc, imm, speculation_meta,
-        prs1, prs2, prd_old, prd_new
-);
-
-modport rs (
-        input issue, ctrl_word, pc, imm, speculation_meta,
-        prs1, prs2, prd_old, prd_new
-);
-
-endinterface
 
 /*====================*/
 /*    Dispatch Ifc    */
