@@ -5,9 +5,8 @@ import rv32::*;
 #(
         parameter int PRF_SIZE = 64,
         localparam int PRF_BITS = $clog2(PRF_SIZE),
-        parameter int NUM_ENTRIES = 1,
-//        localparam int ENTRIES_BITS = $clog2(NUM_ENTRIES),
-        localparam int ENTRIES_BITS = 1,
+        parameter int NUM_ENTRIES = 4,
+        localparam int ENTRIES_BITS = $clog2(NUM_ENTRIES),
         parameter int ROB_SIZE = 64,
         localparam int ROB_BITS = $clog2(ROB_SIZE)
 
@@ -57,10 +56,20 @@ begin
         dispatch_next = 0;
 
         for (int i = 0; i < NUM_ENTRIES; i++) begin
-                if (entries[i].ready) begin
+                if (entries[i].ready & ~entries[i].speculation_meta.speculative) begin
                         dispatch_idx = i[ENTRIES_BITS-1:0];
                         dispatch_next = 1;
                         break;
+                end
+        end
+
+        if (~dispatch_next) begin
+                for (int i = 0; i < NUM_ENTRIES; i++) begin
+                        if (entries[i].ready) begin
+                                dispatch_idx = i[ENTRIES_BITS-1:0];
+                                dispatch_next = 1;
+                                break;
+                        end
                 end
         end
 
@@ -71,7 +80,14 @@ begin
         // dispatched
         for (int i = 0; i < NUM_ENTRIES; i++) begin
                 full = full & entries[i].full;
-                if ((i[ENTRIES_BITS-1:0] == dispatch_idx) || !entries[i].full) begin
+                if (!entries[i].full) begin
+                        fill_idx = i[ENTRIES_BITS-1:0];
+                        break;
+                end
+        end
+
+        for (int i = 0; i < NUM_ENTRIES; i++) begin
+                if (dispatch_next && (dispatch_idx == i[ENTRIES_BITS-1:0])) begin
                         fill_idx = i[ENTRIES_BITS-1:0];
                         break;
                 end
@@ -185,7 +201,7 @@ begin
 
                 overflow_next.full = full;
                 overflow_next.ready = 
-                                overflow_next.in1_ready && 
+                                overflow_next.in1_ready &
                                 overflow_next.in2_ready;
         end
         if (dispatch_next) begin
@@ -212,7 +228,7 @@ begin
                                 entries_next[i].in2_ready = 1;
                         end
                         entries_next[i].ready = 
-                                        entries_next[i].in1_ready && 
+                                        entries_next[i].in1_ready &
                                         entries_next[i].in2_ready;
                 end
         end

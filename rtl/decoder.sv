@@ -143,7 +143,8 @@ begin
                         imm[4:0] = instr.s.imm4_0;
 
                         ctrl_word.alu_op = ADDSUB;
-                        ctrl_word.alu_src = REG_IMM;
+                        ctrl_word.alu_src = REG_REG; // ALU takes REG_IMM, but
+                                                // execution requires both regs
 
                         ctrl_word.store = 1;
                         ctrl_word.store_op = store_funct3_e'(instr.s.funct3);

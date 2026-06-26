@@ -209,6 +209,7 @@ endinterface: dispatch_ifc
 /*    Common Data Ifc    */
 /*=======================*/
 interface cdb_ifc
+import rv32::*;
 #(
         parameter int PRF_SIZE = 64,
         localparam int PRF_BITS = $clog2(PRF_SIZE),
@@ -218,13 +219,15 @@ interface cdb_ifc
 );
 
 logic update;
+speculation_meta_t speculation_meta;
 logic [ROB_BITS-1:0] tag;
 logic [31:0] value;
+logic branch_taken;
 logic [PRF_BITS-1:0] dest;
 logic [PRF_BITS-1:0] dest_old;
 
 modport execute (
-        output update, tag, value, dest, dest_old
+        output update, tag, value, dest, dest_old, speculation_meta, branch_taken
 );
 
 modport rs (
@@ -236,7 +239,7 @@ modport prf (
 );
 
 modport rob (
-        input update, tag, value, dest, dest_old
+        input update, tag, value, dest, dest_old, speculation_meta, branch_taken
 );
 
 endinterface

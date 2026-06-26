@@ -161,6 +161,7 @@ package rv32;
                 logic branch_taken;
                 logic jump;
                 logic [31:0] target;
+                logic [31:0] spec_mask;
         } speculation_meta_t;
 
         /*====================================================================*/
@@ -231,6 +232,7 @@ package rv32;
                 logic [4:0] free_head;
                 logic [4:0] free_tail;
                 logic [31:0] value;
+                logic flush;
                 logic ready;
         } rob_entry_t;
 

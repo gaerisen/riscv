@@ -120,11 +120,11 @@ assign flush_internal = ctrl_ifc.flush | (commit_ifc.commit &
                                 (commit_ifc.exception | commit_ifc.trapret));
 
 // RAT rollback logic
-assign b_mispredict = ctrl_ifc.speculation_meta.branch && ctrl_ifc.branch_result_ready &&
-                (ctrl_ifc.speculation_meta.branch_taken != ctrl_ifc.branch_taken);
+assign b_mispredict = cdb_ifc.speculation_meta.branch &&
+                (cdb_ifc.speculation_meta.branch_taken != cdb_ifc.branch_taken);
 
-assign j_mispredict = ctrl_ifc.speculation_meta.jump &&
-                (ctrl_ifc.speculation_meta.target != ctrl_ifc.branch_target);
+assign j_mispredict = cdb_ifc.speculation_meta.jump &&
+                (cdb_ifc.speculation_meta.target != cdb_ifc.value);
 
 always_ff @(posedge clk or posedge rst)
 begin
@@ -160,9 +160,13 @@ end
 
 always_ff @(posedge clk or posedge rst)
 begin
-        if (rst | flush_internal) begin
+        if (rst) begin
                 rob_tail <= 0;
                 rob_head <= 0;
+        end
+        else if (j_mispredict | b_mispredict) begin
+                rob_tail <= rob_tail_next;
+                rob_head <= cdb_ifc.tag + 1;
         end
         else begin
                 rob_tail <= rob_tail_next;
@@ -189,12 +193,18 @@ begin
         rob_update_next.prd_old = cdb_ifc.dest_old;
         rob_update_next.value = cdb_ifc.value;
         rob_update_next.ready = 1;
+        rob_update_next.flush = j_mispredict | b_mispredict;
 end
 
 always_ff @(posedge clk or posedge rst)
 begin
-        if (rst | flush_internal) begin
+        if (rst) begin
                 for (int i = 0; i < ROB_LEN; i++) begin
+                        rob[i] <= 0;
+                end
+        end
+        else if (j_mispredict | b_mispredict) begin
+                for (logic [ROB_BITS-1:0] i = cdb_ifc.tag; i < rob_tail; i++) begin
                         rob[i] <= 0;
                 end
         end

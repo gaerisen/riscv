@@ -32,6 +32,10 @@ begin
                         alu_in1 = dispatch_ifc.pc;
                         alu_in2 = dispatch_ifc.imm;
                 end
+                else if (dispatch_ifc.ctrl_word.store) begin
+                        alu_in1 = dispatch_ifc.rs1_val;
+                        alu_in2 = dispatch_ifc.imm;
+                end
                 else begin
                         alu_in1 = dispatch_ifc.rs1_val;
                         alu_in2 = dispatch_ifc.rs2_val;
@@ -134,6 +138,8 @@ begin
                 ctrl_ifc.branch_result_ready <= 0;
                 ctrl_ifc.branch_taken <= 0;
                 ctrl_ifc.branch_target <= 0;
+                cdb_ifc.speculation_meta <= 0;
+                cdb_ifc.branch_taken <= 0;
         end
         else begin
                 cdb_ifc.update <= ready_exe_next;
@@ -141,6 +147,8 @@ begin
                 cdb_ifc.dest_old <= dispatch_ifc.prd_old;
                 cdb_ifc.value <= result_exe_next;
                 cdb_ifc.tag <= dispatch_ifc.tag;
+                cdb_ifc.speculation_meta <= dispatch_ifc.speculation_meta;
+                cdb_ifc.branch_taken <= branch_taken;
 
                 ctrl_ifc.branch_pc <= dispatch_ifc.pc;
                 ctrl_ifc.speculation_meta <= dispatch_ifc.speculation_meta;
