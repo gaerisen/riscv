@@ -5,8 +5,9 @@ import rv32::*;
 #(
         parameter int PRF_SIZE = 64,
         localparam int PRF_BITS = $clog2(PRF_SIZE),
-        parameter int NUM_ENTRIES = 8,
-        localparam int ENTRIES_BITS = $clog2(NUM_ENTRIES),
+        parameter int NUM_ENTRIES = 1,
+//        localparam int ENTRIES_BITS = $clog2(NUM_ENTRIES),
+        localparam int ENTRIES_BITS = 1,
         parameter int ROB_SIZE = 64,
         localparam int ROB_BITS = $clog2(ROB_SIZE)
 
@@ -46,19 +47,23 @@ logic full;
 
 assign ctrl_ifc.rs_stall = full;
 
+int lowest_tag;
+
 // Entry selection
 always_comb
 begin
+        lowest_tag = ROB_SIZE;
+
         dispatch_idx = 0;
         fill_idx = 0;
 
         dispatch_next = 0;
 
         for (int i = 0; i < NUM_ENTRIES; i++) begin
-                if (entries[i].ready) begin
+                if (entries[i].ready & (int'(entries[i].tag) < lowest_tag)) begin
                         dispatch_idx = i[ENTRIES_BITS-1:0];
                         dispatch_next = 1;
-                        break;
+                        lowest_tag = int'(entries[i].tag);
                 end
         end
 
