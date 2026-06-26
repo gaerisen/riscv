@@ -10,15 +10,12 @@ import rv32::*;
 
         dispatch_ifc.execute dispatch_ifc,
 
-        global_ctrl_ifc.execute ctrl_ifc,
-
         cdb_ifc.execute cdb_ifc
 );
 
 logic [31:0] alu_result;
 logic [31:0] csr_result;
 logic branch_taken;
-logic ready_exe_next;
 logic [31:0] result_exe_next;
 logic [PRF_BITS-1:0] rd_exe_next;
 logic [31:0] alu_in1;
@@ -100,14 +97,8 @@ csru csru (
 
 always_comb
 begin
-        ready_exe_next = 0;
         result_exe_next = 0;
         rd_exe_next = dispatch_ifc.prd_new;
-
-        if (!ctrl_ifc.flush) begin
-                ready_exe_next = dispatch_ifc.dispatch;
-
-        end
 
         unique case (dispatch_ifc.ctrl_word.wb_src)
         WB_ALU: begin // Decoder lets default value thru for stores
@@ -131,31 +122,25 @@ begin
                 cdb_ifc.dest_old <= 0;
                 cdb_ifc.value <= 0;
                 cdb_ifc.tag <= 0;
-
-                ctrl_ifc.branch_pc <= 0;
-                ctrl_ifc.speculation_meta <= 0;
-                ctrl_ifc.tag <= 0;
-                ctrl_ifc.branch_result_ready <= 0;
-                ctrl_ifc.branch_taken <= 0;
-                ctrl_ifc.branch_target <= 0;
-                cdb_ifc.speculation_meta <= 0;
                 cdb_ifc.branch_taken <= 0;
+                cdb_ifc.pc <= 0;
+                cdb_ifc.target_addr <= 0;
+
+                ctrl_ifc.tag <= 0;
         end
         else begin
-                cdb_ifc.update <= ready_exe_next;
+                cdb_ifc.update <= dispatch_ifc.dispatch;
                 cdb_ifc.dest <= rd_exe_next;
                 cdb_ifc.dest_old <= dispatch_ifc.prd_old;
                 cdb_ifc.value <= result_exe_next;
                 cdb_ifc.tag <= dispatch_ifc.tag;
-                cdb_ifc.speculation_meta <= dispatch_ifc.speculation_meta;
                 cdb_ifc.branch_taken <= branch_taken;
+                cdb_ifc.pc <= dispatch_ifc.pc;
+                cdb_ifc.target_addr <= alu_result; // Technically redundant for
+                                                // branches, but nice for jumps
+                                                // and stores
 
-                ctrl_ifc.branch_pc <= dispatch_ifc.pc;
-                ctrl_ifc.speculation_meta <= dispatch_ifc.speculation_meta;
                 ctrl_ifc.tag <= dispatch_ifc.tag;
-                ctrl_ifc.branch_result_ready <= ready_exe_next;
-                ctrl_ifc.branch_taken <= branch_taken;
-                ctrl_ifc.branch_target <= alu_result;
         end
 end
 

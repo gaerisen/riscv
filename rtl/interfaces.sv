@@ -5,7 +5,6 @@
 /*    Global Control Ifc    */
 /*==========================*/
 interface global_ctrl_ifc
-import rv32::*;
 #(
         parameter int ROB_LEN = 64,
         localparam int ROB_BITS = $clog2(ROB_LEN),
@@ -18,12 +17,6 @@ import rv32::*;
 
 logic sys_redirect;
 logic [31:0] sys_vec;
-
-logic [31:0] branch_pc;
-logic branch_result_ready;
-speculation_meta_t speculation_meta;
-logic branch_taken;
-logic [31:0] branch_target;
 
 logic rs_stall;
 logic rob_stall;
@@ -40,8 +33,6 @@ assign stall = rs_stall | rob_stall;
 
 modport fetch (
         input stall, sys_redirect, sys_vec,
-        input branch_pc, speculation_meta,
-        input branch_result_ready, branch_taken, branch_target,
         output flush
 );
 
@@ -50,8 +41,7 @@ modport csrf (
 );
 
 modport rob (
-        input flush, branch_pc, speculation_meta, tag,
-        input branch_result_ready, branch_taken, branch_target,
+        input flush, tag,
         output rob_stall, rat, free_list, free_head, free_tail
 );
 
@@ -59,14 +49,7 @@ modport decode (
         input flush, stall, rat, free_list, free_head, free_tail
 );
 
-modport execute (
-        input flush,
-        output branch_pc, speculation_meta, tag,
-        output branch_result_ready, branch_taken, branch_target
-);
-
 modport rs (
-        input flush,
         output rs_stall
 );
 
@@ -148,11 +131,12 @@ modport decode (
 
 modport rob (
         input issue, ctrl_word, pc, rat, free_list, free_head, free_tail,
+        speculation_meta,
         output tag
 );
 
 modport rs (
-        input issue, ctrl_word, pc, imm, speculation_meta,
+        input issue, ctrl_word, pc, imm,
         prs1, prs2, prd_old, prd_new, tag
 );
 
@@ -175,7 +159,6 @@ import rv32::*;
 
 logic dispatch;
 ctrl_t ctrl_word;
-speculation_meta_t speculation_meta;
 logic [PRF_BITS-1:0] prs1;
 logic [PRF_BITS-1:0] prs2;
 logic [PRF_BITS-1:0] prd_old;
@@ -188,8 +171,7 @@ logic [5:0] tag;
 
 modport rs (
         output prs1, prs2, // Asynchronous
-        output dispatch, ctrl_word, prd_old, prd_new, pc, imm, tag, // Synchronous
-        speculation_meta
+        output dispatch, ctrl_word, prd_old, prd_new, pc, imm, tag // Synchronous
 );
 
 modport prf (
@@ -199,7 +181,7 @@ modport prf (
 
 modport execute (
         input dispatch, ctrl_word, rs1_val, rs2_val, pc, imm, prd_old, prd_new,
-        tag, speculation_meta
+        tag
 );
 
 endinterface: dispatch_ifc
@@ -219,15 +201,35 @@ import rv32::*;
 );
 
 logic update;
-speculation_meta_t speculation_meta;
 logic [ROB_BITS-1:0] tag;
+
 logic [31:0] value;
 logic branch_taken;
+logic [31:0] target_addr;
+logic [31:0] pc;
+
 logic [PRF_BITS-1:0] dest;
 logic [PRF_BITS-1:0] dest_old;
 
+speculation_meta_t speculation_meta;
+logic branch_mis_t;
+logic branch_mis_nt;
+logic jump_mis;
+logic misspec;
+
+assign branch_mis_t = speculation_meta.branch &
+        (speculation_meta.branch_taken & ~branch_taken);
+
+assign branch_mis_nt = speculation_meta.branch &
+        (~speculation_meta.branch_taken & branch_taken);
+
+assign jump_mis = speculation_meta.jump & 
+        (speculation_meta.target != target_addr);
+
+assign misspec = branch_mis_t | branch_mis_nt | jump_mis;
+
 modport execute (
-        output update, tag, value, dest, dest_old, speculation_meta, branch_taken
+        output update, tag, value, dest, dest_old, branch_taken, target_addr, pc
 );
 
 modport rs (
@@ -239,7 +241,13 @@ modport prf (
 );
 
 modport rob (
-        input update, tag, value, dest, dest_old, speculation_meta, branch_taken
+        input update, tag, value, dest, dest_old, misspec,
+        output speculation_meta
+);
+
+modport fetch (
+        input update, speculation_meta, branch_taken,
+        branch_mis_t, branch_mis_nt, jump_mis, target_addr, pc
 );
 
 endinterface

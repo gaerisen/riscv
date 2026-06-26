@@ -21,6 +21,8 @@ import rv32::*;
         // Control flow change signals
         global_ctrl_ifc.fetch ctrl_ifc,
 
+        cdb_ifc.fetch cdb_ifc,
+
         // Output to decode stage
         fet_to_dec_ifc.fetch fet_dec_ifc
 );
@@ -49,9 +51,6 @@ logic [31:0] jump_target;
 logic [31:0] branch_target;
 
 logic b_predict_taken;
-
-logic speculating;
-logic speculating_next;
 
 // Prediction registers
 logic [1:0] b_pred [0:B_PRED_SIZE-1];
@@ -132,13 +131,13 @@ assign b_predict_taken = inst_is_b & b_pred[fet_dec_ifc.pc[B_PRED_PTR_SIZE+1:2]]
 logic inc_predictor;
 logic dec_predictor;
 
-assign inc_predictor =  ctrl_ifc.branch_result_ready &
-                        ctrl_ifc.speculation_meta.branch &
-                        ctrl_ifc.branch_taken;
+assign inc_predictor =  cdb_ifc.update &
+                        cdb_ifc.speculation_meta.branch &
+                        cdb_ifc.branch_taken;
 
-assign dec_predictor =  ctrl_ifc.branch_result_ready &
-                        ctrl_ifc.speculation_meta.branch &
-                        !ctrl_ifc.branch_taken;
+assign dec_predictor =  cdb_ifc.update &
+                        cdb_ifc.speculation_meta.branch &
+                        ~cdb_ifc.branch_taken;
 
 // Update predictor whenever a branch is resolved
 always_ff @(posedge clk or posedge rst)
@@ -150,19 +149,19 @@ begin
         end
         else begin
                 if (inc_predictor) begin
-                        unique case (b_pred[ctrl_ifc.branch_pc[B_PRED_PTR_SIZE+1:2]])
-                        2'b00: b_pred[ctrl_ifc.branch_pc[B_PRED_PTR_SIZE+1:2]] = 2'b01;
-                        2'b01: b_pred[ctrl_ifc.branch_pc[B_PRED_PTR_SIZE+1:2]] = 2'b10;
-                        2'b10: b_pred[ctrl_ifc.branch_pc[B_PRED_PTR_SIZE+1:2]] = 2'b11;
-                        2'b11: b_pred[ctrl_ifc.branch_pc[B_PRED_PTR_SIZE+1:2]] = 2'b11;
+                        unique case (b_pred[cdb_ifc.pc[B_PRED_PTR_SIZE+1:2]])
+                        2'b00: b_pred[cdb_ifc.pc[B_PRED_PTR_SIZE+1:2]] = 2'b01;
+                        2'b01: b_pred[cdb_ifc.pc[B_PRED_PTR_SIZE+1:2]] = 2'b10;
+                        2'b10: b_pred[cdb_ifc.pc[B_PRED_PTR_SIZE+1:2]] = 2'b11;
+                        2'b11: b_pred[cdb_ifc.pc[B_PRED_PTR_SIZE+1:2]] = 2'b11;
                         endcase
                 end
                 else if (dec_predictor) begin
-                        unique case (b_pred[ctrl_ifc.branch_pc[B_PRED_PTR_SIZE+1:2]])
-                        2'b00: b_pred[ctrl_ifc.branch_pc[B_PRED_PTR_SIZE+1:2]] = 2'b00;
-                        2'b01: b_pred[ctrl_ifc.branch_pc[B_PRED_PTR_SIZE+1:2]] = 2'b00;
-                        2'b10: b_pred[ctrl_ifc.branch_pc[B_PRED_PTR_SIZE+1:2]] = 2'b01;
-                        2'b11: b_pred[ctrl_ifc.branch_pc[B_PRED_PTR_SIZE+1:2]] = 2'b10;
+                        unique case (b_pred[cdb_ifc.pc[B_PRED_PTR_SIZE+1:2]])
+                        2'b00: b_pred[cdb_ifc.pc[B_PRED_PTR_SIZE+1:2]] = 2'b00;
+                        2'b01: b_pred[cdb_ifc.pc[B_PRED_PTR_SIZE+1:2]] = 2'b00;
+                        2'b10: b_pred[cdb_ifc.pc[B_PRED_PTR_SIZE+1:2]] = 2'b01;
+                        2'b11: b_pred[cdb_ifc.pc[B_PRED_PTR_SIZE+1:2]] = 2'b10;
                         endcase
                 end
         end
@@ -174,8 +173,8 @@ end
 
 logic update_btb;
 
-assign update_btb =     ctrl_ifc.branch_result_ready & !ctrl_ifc.flush &
-                        ctrl_ifc.speculation_meta.jump;
+assign update_btb =     cdb_ifc.update & ~ctrl_ifc.flush &
+                        cdb_ifc.speculation_meta.jump;
 
 always @(posedge clk or posedge rst)
 begin
@@ -189,7 +188,7 @@ begin
                 // proves to be a problem, add signalling to only update with
                 // targets from jalr-not-rets
                 if (update_btb) begin
-                        btb[ctrl_ifc.branch_pc[BTB_PTR_SIZE+1:2]] = ctrl_ifc.branch_target;
+                        btb[cdb_ifc.pc[BTB_PTR_SIZE+1:2]] = cdb_ifc.target_addr;
                 end
         end
 end
@@ -201,24 +200,6 @@ end
 logic stall;
 assign stall = !i_data_ready | ctrl_ifc.stall;
 
-logic j_mispredict;
-logic b_mispredict_t;
-logic b_mispredict_nt;
-
-assign j_mispredict =   ctrl_ifc.branch_result_ready &
-                        ctrl_ifc.speculation_meta.jump &
-                        (ctrl_ifc.speculation_meta.target != ctrl_ifc.branch_target);
-
-assign b_mispredict_t =         ctrl_ifc.branch_result_ready & !ctrl_ifc.flush &
-                                ctrl_ifc.speculation_meta.branch &
-                                ctrl_ifc.speculation_meta.branch_taken &
-                                !ctrl_ifc.branch_taken;
-
-assign b_mispredict_nt =        ctrl_ifc.branch_result_ready & !ctrl_ifc.flush &
-                                ctrl_ifc.speculation_meta.branch &
-                                !ctrl_ifc.speculation_meta.branch_taken &
-                                ctrl_ifc.branch_taken;
-
 // State switch logic
 always_comb
 begin
@@ -229,7 +210,6 @@ begin
         instr_next = i_data;
         fet_dec_ifc.speculation_meta = 0;
 
-        speculating_next = speculating;
         flush_next = 0;
 
         unique case (state)
@@ -243,19 +223,16 @@ begin
                 // we're waiting on here.
                 if (ctrl_ifc.sys_redirect) begin
                         pc_next = ctrl_ifc.sys_vec;
-                        speculating_next = 0;
                 end
 
-                if (j_mispredict | b_mispredict_nt) begin
-                        pc_next = ctrl_ifc.branch_target;
+                if (cdb_ifc.branch_mis_nt | cdb_ifc.jump_mis) begin
+                        pc_next = cdb_ifc.target_addr;
                         flush_next = 1;
-                        speculating_next = 0;
                 end
 
-                if (b_mispredict_t) begin
-                        pc_next = ctrl_ifc.branch_pc + 4;
+                if (cdb_ifc.branch_mis_t) begin
+                        pc_next = cdb_ifc.pc + 4;
                         flush_next = 1;
-                        speculating_next = 0;
                 end
 
                 // Doesn't matter how stall goes low; if it does, we're good
@@ -285,40 +262,33 @@ begin
                                 fet_dec_ifc.speculation_meta.target = fet_dec_ifc.pc + 4;
                                 pc_next = fet_dec_ifc.pc + 4;
                         end
-                        speculating_next = 1;
                 end
                 else if (inst_is_ret) begin
                         fet_dec_ifc.speculation_meta.jump = 1;
                         fet_dec_ifc.speculation_meta.target = ras[ras_ptr];
                         pc_next = ras[ras_ptr];
-                        speculating_next = 1;
                 end
                 // jalr-not-ret must come after jalr-is-ret
                 else if (inst_is_jalr) begin
                         fet_dec_ifc.speculation_meta.jump = 1;
                         fet_dec_ifc.speculation_meta.target = btb[fet_dec_ifc.pc[BTB_PTR_SIZE+1:2]];
                         pc_next = btb[fet_dec_ifc.pc[BTB_PTR_SIZE+1:2]];
-                        speculating_next = 1;
                 end
 
-                // If misprediction detected, redirect and flush pipeline
-                if (j_mispredict | b_mispredict_nt) begin
-                        pc_next = ctrl_ifc.branch_target;
+                if (cdb_ifc.branch_mis_nt | cdb_ifc.jump_mis) begin
+                        pc_next = cdb_ifc.target_addr;
                         flush_next = 1;
-                        speculating_next = 0;
-                end
-                else if (b_mispredict_t) begin
-                        pc_next = ctrl_ifc.branch_pc + 4;
-                        flush_next = 1;
-                        speculating_next = 0;
                 end
 
+                if (cdb_ifc.branch_mis_t) begin
+                        pc_next = cdb_ifc.pc + 4;
+                        flush_next = 1;
+                end
 
                 // Sys redirects clobber normal control flow
                 if (ctrl_ifc.sys_redirect) begin
                         pc_next = ctrl_ifc.sys_vec;
                         flush_next = 1;
-                        speculating_next = 0;
                 end
 
                 if (!i_data_ready) begin
@@ -330,9 +300,6 @@ begin
                         pc_next = fet_dec_ifc.pc;
                         state_next = STALLED;
                 end
-
-
-                fet_dec_ifc.speculation_meta.speculative = speculating;
         end
         endcase
 end
@@ -347,7 +314,6 @@ begin
 
                 ctrl_ifc.flush <= 0;
 
-                speculating <= 0;
                 state <= STALLED;
         end
         else begin
@@ -357,7 +323,6 @@ begin
 
                 ctrl_ifc.flush <= flush_next;
 
-                speculating <= speculating_next;
                 state <= state_next;
         end
 

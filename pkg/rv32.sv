@@ -202,7 +202,6 @@ package rv32;
         /*              TOMASULO BUFFER ENTRY TYPES                           */
         /*====================================================================*/
         typedef struct packed {
-                speculation_meta_t speculation_meta;
                 ctrl_t ctrl_word;
 
                 logic [5:0] prs1;
@@ -224,9 +223,13 @@ package rv32;
 
         typedef struct packed {
                 ctrl_t ctrl_word;
+                speculation_meta_t speculation_meta;
+
                 logic [5:0] prd;
                 logic [5:0] prd_old;
+
                 logic [31:0] pc;
+
                 logic [31:0][5:0] rat;
                 logic [31:0][5:0] free_list;
                 logic [4:0] free_head;

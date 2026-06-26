@@ -5,7 +5,7 @@ import rv32::*;
 #(
         parameter int PRF_SIZE = 64,
         localparam int PRF_BITS = $clog2(PRF_SIZE),
-        parameter int NUM_ENTRIES = 4,
+        parameter int NUM_ENTRIES = 8,
         localparam int ENTRIES_BITS = $clog2(NUM_ENTRIES),
         parameter int ROB_SIZE = 64,
         localparam int ROB_BITS = $clog2(ROB_SIZE)
@@ -41,7 +41,6 @@ logic [PRF_BITS-1:0] prd_new_next;
 logic [31:0] pc_next;
 logic [31:0] imm_next;
 logic [ROB_BITS-1:0] tag_next;
-speculation_meta_t speculation_meta_next;
 
 logic full;
 
@@ -56,20 +55,10 @@ begin
         dispatch_next = 0;
 
         for (int i = 0; i < NUM_ENTRIES; i++) begin
-                if (entries[i].ready & ~entries[i].speculation_meta.speculative) begin
+                if (entries[i].ready) begin
                         dispatch_idx = i[ENTRIES_BITS-1:0];
                         dispatch_next = 1;
                         break;
-                end
-        end
-
-        if (~dispatch_next) begin
-                for (int i = 0; i < NUM_ENTRIES; i++) begin
-                        if (entries[i].ready) begin
-                                dispatch_idx = i[ENTRIES_BITS-1:0];
-                                dispatch_next = 1;
-                                break;
-                        end
                 end
         end
 
@@ -108,7 +97,6 @@ begin
         pc_next = 0;
         imm_next = 0;
         tag_next = 0;
-        speculation_meta_next = 0;
 
         if (dispatch_next) begin
                 dispatch_ifc.prs1 = entries[dispatch_idx].prs1;
@@ -120,7 +108,6 @@ begin
                 pc_next = entries[dispatch_idx].pc;
                 imm_next = entries[dispatch_idx].imm;
                 tag_next = entries[dispatch_idx].tag;
-                speculation_meta_next = entries[dispatch_idx].speculation_meta;
         end
 end
 
@@ -134,7 +121,6 @@ begin
                 dispatch_ifc.pc <= 0;
                 dispatch_ifc.imm <= 0;
                 dispatch_ifc.tag <= 0;
-                dispatch_ifc.speculation_meta <= 0;
         end
         else begin
                 dispatch_ifc.dispatch <= dispatch_next;
@@ -144,7 +130,6 @@ begin
                 dispatch_ifc.pc <= pc_next;
                 dispatch_ifc.imm <= imm_next;
                 dispatch_ifc.tag <= tag_next;
-                dispatch_ifc.speculation_meta <= speculation_meta_next;
         end
 end
 // New entry construction
@@ -165,25 +150,24 @@ begin
                 overflow_next.imm = issue_ifc.imm;
                 overflow_next.pc = issue_ifc.pc;
                 overflow_next.tag = issue_ifc.tag;
-                overflow_next.speculation_meta = issue_ifc.speculation_meta;
 
                 unique case (issue_ifc.ctrl_word.alu_src)
                 REG_REG: begin
                         overflow_next.in1_ready = prf_ready[issue_ifc.prs1];
                         overflow_next.in2_ready = prf_ready[issue_ifc.prs2];
 
-                        if (cdb_ifc.update && issue_ifc.prs1 == cdb_ifc.dest) begin
+                        if (cdb_ifc.update && (issue_ifc.prs1 == cdb_ifc.dest)) begin
                                 overflow_next.in1_ready = 1;
                         end
 
-                        if (cdb_ifc.update && issue_ifc.prs2 == cdb_ifc.dest) begin
+                        if (cdb_ifc.update && (issue_ifc.prs2 == cdb_ifc.dest)) begin
                                 overflow_next.in2_ready = 1;
                         end
                 end
                 REG_IMM: begin
                         overflow_next.in1_ready = prf_ready[issue_ifc.prs1];
 
-                        if (cdb_ifc.update && issue_ifc.prs1 == cdb_ifc.dest) begin
+                        if (cdb_ifc.update && (issue_ifc.prs1 == cdb_ifc.dest)) begin
                                 overflow_next.in1_ready = 1;
                         end
 
@@ -221,24 +205,26 @@ begin
 
         if (cdb_ifc.update) begin
                 for (int i = 0; i < NUM_ENTRIES; i++) begin
-                        if (entries[i].prs1 == cdb_ifc.dest) begin
+                        if (entries_next[i].prs1 == cdb_ifc.dest) begin
                                 entries_next[i].in1_ready = 1;
                         end
-                        else if (entries[i].prs2 == cdb_ifc.dest) begin
+                        else if (entries_next[i].prs2 == cdb_ifc.dest) begin
                                 entries_next[i].in2_ready = 1;
                         end
                         entries_next[i].ready = 
                                         entries_next[i].in1_ready &
                                         entries_next[i].in2_ready;
                 end
-        end
 
-        if (ctrl_ifc.flush) begin
-                for (int i = 0; i < NUM_ENTRIES; i++) begin
-                        if (entries_next[i].speculation_meta.speculative) begin
-                                entries_next[i] = 0;
-                        end
+                if (overflow_next.prs1 == cdb_ifc.dest) begin
+                        overflow_next.in1_ready = 1;
                 end
+                else if (overflow_next.prs2 == cdb_ifc.dest) begin
+                        overflow_next.in2_ready = 1;
+                end
+                overflow_next.ready = 
+                                overflow_next.in1_ready &
+                                overflow_next.in2_ready;
         end
 end
 
