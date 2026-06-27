@@ -111,7 +111,7 @@ int hart::run_tests(int cycles)
                         pulse();
 
                         // Workaround for checking exit status without memory iface
-                        if (dut->d_addr == 0x1000) {
+                        if (dut->d_valid) {
                                 status = !(dut->d_data_o == 1);
                                 break;
                         }

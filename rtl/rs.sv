@@ -39,6 +39,7 @@ logic dispatch_next;
 ctrl_t ctrl_word_next;
 logic [PRF_BITS-1:0] prd_old_next;
 logic [PRF_BITS-1:0] prd_new_next;
+logic [11:0] csrd_next;
 logic [31:0] pc_next;
 logic [31:0] imm_next;
 logic [ROB_BITS-1:0] tag_next;
@@ -94,11 +95,13 @@ begin
         // Signals needed for register read go out immediately
         dispatch_ifc.prs1 = 0;
         dispatch_ifc.prs2 = 0;
+        dispatch_ifc.csrs = 0;
 
         // Signals not involved in register read go out as pipeline registers
         ctrl_word_next = 0;
         prd_new_next = 0;
         prd_old_next = 0;
+        csrd_next = 0;
         pc_next = 0;
         imm_next = 0;
         tag_next = 0;
@@ -106,10 +109,12 @@ begin
         if (dispatch_next) begin
                 dispatch_ifc.prs1 = entries[dispatch_idx].prs1;
                 dispatch_ifc.prs2 = entries[dispatch_idx].prs2;
+                dispatch_ifc.csrs = entries[dispatch_idx].csrs;
 
                 ctrl_word_next = entries[dispatch_idx].ctrl_word;
                 prd_new_next = entries[dispatch_idx].prd_new;
                 prd_old_next = entries[dispatch_idx].prd_old;
+                csrd_next = entries[dispatch_idx].csrs;
                 pc_next = entries[dispatch_idx].pc;
                 imm_next = entries[dispatch_idx].imm;
                 tag_next = entries[dispatch_idx].tag;
@@ -123,6 +128,7 @@ begin
                 dispatch_ifc.ctrl_word <= 0;
                 dispatch_ifc.prd_new <= 0;
                 dispatch_ifc.prd_old <= 0;
+                dispatch_ifc.csrd <= 0;
                 dispatch_ifc.pc <= 0;
                 dispatch_ifc.imm <= 0;
                 dispatch_ifc.tag <= 0;
@@ -132,6 +138,7 @@ begin
                 dispatch_ifc.ctrl_word <= ctrl_word_next;
                 dispatch_ifc.prd_new <= prd_new_next;
                 dispatch_ifc.prd_old <= prd_old_next;
+                dispatch_ifc.csrd <= csrd_next;
                 dispatch_ifc.pc <= pc_next;
                 dispatch_ifc.imm <= imm_next;
                 dispatch_ifc.tag <= tag_next;
@@ -150,6 +157,7 @@ begin
                 overflow_next.ctrl_word = issue_ifc.ctrl_word;
                 overflow_next.prs1 = issue_ifc.prs1;
                 overflow_next.prs2 = issue_ifc.prs2;
+                overflow_next.csrs = issue_ifc.csrs;
                 overflow_next.prd_old = issue_ifc.prd_old;
                 overflow_next.prd_new = issue_ifc.prd_new;
                 overflow_next.imm = issue_ifc.imm;

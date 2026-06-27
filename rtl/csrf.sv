@@ -6,7 +6,7 @@ module csrf
         input rst,
 
         // Read/write port
-        fet_to_dec_ifc.csrf_read fet_dec_ifc,
+        dispatch_ifc.csrf dispatch_ifc,
 
         commit_ifc.csrf commit_ifc,
 
@@ -35,27 +35,30 @@ logic [31:0] mip, mip_next;
 //      CSR READ
 //==================================
 
-always_comb
+always_ff @(posedge clk or posedge rst)
 begin
-        fet_dec_ifc.csr_val = 0;
-
-        case (fet_dec_ifc.csrs)
-        12'hf11: fet_dec_ifc.csr_val = mvendorid;
-        12'hf12: fet_dec_ifc.csr_val = marchid;
-        12'hf13: fet_dec_ifc.csr_val = mimpid;
-        12'hf14: fet_dec_ifc.csr_val = mhartid;
-        12'h300: fet_dec_ifc.csr_val = mstatus;
-        12'h310: fet_dec_ifc.csr_val = mstatush;
-        12'h301: fet_dec_ifc.csr_val = misa;
-        12'h304: fet_dec_ifc.csr_val = mie;
-        12'h305: fet_dec_ifc.csr_val = mtvec;
-        12'h340: fet_dec_ifc.csr_val = mscratch;
-        12'h341: fet_dec_ifc.csr_val = mepc;
-        12'h342: fet_dec_ifc.csr_val = mcause;
-        12'h343: fet_dec_ifc.csr_val = mtval;
-        12'h344: fet_dec_ifc.csr_val = mip;
-        default:;
-        endcase
+        if (rst) begin
+                dispatch_ifc.csr_val = 0;
+        end
+        else begin
+                case (dispatch_ifc.csrs)
+                12'hf11: dispatch_ifc.csr_val = mvendorid;
+                12'hf12: dispatch_ifc.csr_val = marchid;
+                12'hf13: dispatch_ifc.csr_val = mimpid;
+                12'hf14: dispatch_ifc.csr_val = mhartid;
+                12'h300: dispatch_ifc.csr_val = mstatus;
+                12'h310: dispatch_ifc.csr_val = mstatush;
+                12'h301: dispatch_ifc.csr_val = misa;
+                12'h304: dispatch_ifc.csr_val = mie;
+                12'h305: dispatch_ifc.csr_val = mtvec;
+                12'h340: dispatch_ifc.csr_val = mscratch;
+                12'h341: dispatch_ifc.csr_val = mepc;
+                12'h342: dispatch_ifc.csr_val = mcause;
+                12'h343: dispatch_ifc.csr_val = mtval;
+                12'h344: dispatch_ifc.csr_val = mip;
+                default: dispatch_ifc.csr_val = 0;
+                endcase
+        end
 end
 
 //==================================
@@ -76,16 +79,16 @@ begin
         mip_next = mip;
 
         case (commit_ifc.csr_dest)
-        12'h300: mstatus_next = commit_ifc.csr_value;
-        12'h310: mstatush_next = commit_ifc.csr_value;
-        12'h301: misa_next = commit_ifc.csr_value;
-        12'h304: mie_next = commit_ifc.csr_value;
-        12'h305: mtvec_next = commit_ifc.csr_value;
-        12'h340: mscratch_next = commit_ifc.csr_value;
-        12'h341: mepc_next = commit_ifc.csr_value;
-        12'h342: mcause_next = commit_ifc.csr_value;
-        12'h343: mtval_next = commit_ifc.csr_value;
-        12'h344: mip_next = commit_ifc.csr_value;
+        12'h300: mstatus_next = commit_ifc.csr_val;
+        12'h310: mstatush_next = commit_ifc.csr_val;
+        12'h301: misa_next = commit_ifc.csr_val;
+        12'h304: mie_next = commit_ifc.csr_val;
+        12'h305: mtvec_next = commit_ifc.csr_val;
+        12'h340: mscratch_next = commit_ifc.csr_val;
+        12'h341: mepc_next = commit_ifc.csr_val;
+        12'h342: mcause_next = commit_ifc.csr_val;
+        12'h343: mtval_next = commit_ifc.csr_val;
+        12'h344: mip_next = commit_ifc.csr_val;
         default:;
         endcase
 

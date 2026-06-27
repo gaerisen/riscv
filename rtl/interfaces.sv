@@ -114,6 +114,7 @@ logic [31:0] pc;
 logic [31:0] imm;
 logic [PRF_BITS-1:0] prs1;
 logic [PRF_BITS-1:0] prs2;
+logic [11:0] csrs;
 logic [PRF_BITS-1:0] prd_old;
 logic [PRF_BITS-1:0] prd_new;
 speculation_meta_t speculation_meta;
@@ -126,7 +127,7 @@ logic [FREE_BITS-1:0] free_tail;
 
 modport decode (
         output issue, ctrl_word, pc, imm, speculation_meta,
-        prs1, prs2, prd_old, prd_new, rat, free_list, free_head, free_tail
+        prs1, prs2, csrs, prd_old, prd_new, rat, free_list, free_head, free_tail
 );
 
 modport rob (
@@ -137,7 +138,7 @@ modport rob (
 
 modport rs (
         input issue, ctrl_word, pc, imm,
-        prs1, prs2, prd_old, prd_new, tag
+        prs1, prs2, csrs, prd_old, prd_new, tag
 );
 
 endinterface
@@ -163,15 +164,18 @@ logic [PRF_BITS-1:0] prs1;
 logic [PRF_BITS-1:0] prs2;
 logic [PRF_BITS-1:0] prd_old;
 logic [PRF_BITS-1:0] prd_new;
+logic [11:0] csrs;
+logic [11:0] csrd;
 logic [31:0] rs1_val;
 logic [31:0] rs2_val;
+logic [31:0] csr_val;
 logic [31:0] pc;
 logic [31:0] imm;
 logic [5:0] tag;
 
 modport rs (
-        output prs1, prs2, // Asynchronous
-        output dispatch, ctrl_word, prd_old, prd_new, pc, imm, tag // Synchronous
+        output prs1, prs2, csrs, // Asynchronous
+        output dispatch, ctrl_word, prd_old, prd_new, csrd, pc, imm, tag // Synchronous
 );
 
 modport prf (
@@ -179,9 +183,14 @@ modport prf (
         output rs1_val, rs2_val
 );
 
+modport csrf (
+        input csrs,
+        output csr_val
+);
+
 modport execute (
         input dispatch, ctrl_word, rs1_val, rs2_val, pc, imm, prd_old, prd_new,
-        tag
+        tag, csr_val, csrd
 );
 
 endinterface: dispatch_ifc
@@ -211,25 +220,29 @@ logic [31:0] pc;
 logic [PRF_BITS-1:0] dest;
 logic [PRF_BITS-1:0] dest_old;
 
+logic [11:0] csrd;
+logic [31:0] csr_result;
+
 speculation_meta_t speculation_meta;
 logic branch_mis_t;
 logic branch_mis_nt;
 logic jump_mis;
 logic misspec;
 
-assign branch_mis_t = speculation_meta.branch &
+assign branch_mis_t = update & speculation_meta.branch &
         (speculation_meta.branch_taken & ~branch_taken);
 
-assign branch_mis_nt = speculation_meta.branch &
+assign branch_mis_nt = update & speculation_meta.branch &
         (~speculation_meta.branch_taken & branch_taken);
 
-assign jump_mis = speculation_meta.jump & 
+assign jump_mis = update & speculation_meta.jump & 
         (speculation_meta.target != target_addr);
 
 assign misspec = branch_mis_t | branch_mis_nt | jump_mis;
 
 modport execute (
-        output update, tag, value, dest, dest_old, branch_taken, target_addr, pc
+        output update, tag, value, dest, dest_old, branch_taken, target_addr, pc,
+        csrd, csr_result
 );
 
 modport rs (
@@ -241,7 +254,7 @@ modport prf (
 );
 
 modport rob (
-        input update, tag, value, dest, dest_old, misspec,
+        input update, tag, value, dest, dest_old, misspec, csrd, csr_result,
         output speculation_meta
 );
 
@@ -271,7 +284,7 @@ trap_cause_e trap_cause;
 logic [31:0] value;
 logic [5:0] dest;
 logic [5:0] dest_old;
-logic [31:0] csr_value;
+logic [31:0] csr_val;
 logic [11:0] csr_dest;
 
 logic irf_select;
@@ -280,12 +293,12 @@ assign irf_select = commit & !(store | branch | exception | trapret);
 
 modport rob (
         output commit, store, branch, exception, trapret,
-        trap_cause, value, dest, dest_old, csr_value, csr_dest
+        trap_cause, value, dest, dest_old, csr_val, csr_dest
 );
 
 modport csrf (
         input commit, exception, trapret, trap_cause,
-        csr_dest, csr_value
+        csr_dest, csr_val
 );
 
 modport irf (

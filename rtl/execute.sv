@@ -110,7 +110,7 @@ begin
         end
         WB_MEM: result_exe_next = 0; // TODO: Come on, bro
         WB_PC4: result_exe_next = dispatch_ifc.pc + 32'h4;
-        WB_CSR: result_exe_next = 0;
+        WB_CSR: result_exe_next = dispatch_ifc.csr_val;
         endcase
 end
 
@@ -120,6 +120,8 @@ begin
                 cdb_ifc.update <= 0;
                 cdb_ifc.dest <= 0;
                 cdb_ifc.dest_old <= 0;
+                cdb_ifc.csrd <= 0;
+                cdb_ifc.csr_result <= 0;
                 cdb_ifc.value <= 0;
                 cdb_ifc.tag <= 0;
                 cdb_ifc.branch_taken <= 0;
@@ -132,6 +134,8 @@ begin
                 cdb_ifc.update <= dispatch_ifc.dispatch;
                 cdb_ifc.dest <= rd_exe_next;
                 cdb_ifc.dest_old <= dispatch_ifc.prd_old;
+                cdb_ifc.csrd <= dispatch_ifc.csrd;
+                cdb_ifc.csr_result <= csr_result;
                 cdb_ifc.value <= result_exe_next;
                 cdb_ifc.tag <= dispatch_ifc.tag;
                 cdb_ifc.branch_taken <= branch_taken;

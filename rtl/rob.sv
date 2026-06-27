@@ -43,7 +43,6 @@ logic sys_in_flight;
 logic sys_in_flight_state;
 
 logic [31:0] pc; // For debugging
-logic [31:0] value;
 
 assign commit_ifc.commit = rob[rob_head].ready;
 
@@ -61,8 +60,10 @@ begin
                 commit_ifc.trapret = rob[rob_head].ctrl_word.trapret;
                 commit_ifc.dest = rob[rob_head].prd;
                 commit_ifc.dest_old = rob[rob_head].prd_old;
+                commit_ifc.value = rob[rob_head].value;
+                commit_ifc.csr_dest = rob[rob_head].csrd;
+                commit_ifc.csr_val = rob[rob_head].csr_val;
                 pc = rob[rob_head].pc;
-                value = rob[rob_head].value;
         end
         else begin
                 commit_ifc.store = 0;
@@ -72,8 +73,10 @@ begin
                 commit_ifc.trapret = 0;
                 commit_ifc.dest = 0;
                 commit_ifc.dest_old = 0;
+                commit_ifc.value = 0;
+                commit_ifc.csr_dest = 0;
+                commit_ifc.csr_val = 0;
                 pc = 0;
-                value = rob[rob_head].value;
         end
 end
 
@@ -127,20 +130,20 @@ initial begin
         $dumpvars(0, rob);
 end
 
+assign issue_ifc.tag = rob_tail;
+
 // ROB pointer update logic
 always_comb
 begin
         rob_head_next = rob_head;
         rob_tail_next = rob_tail;
-        issue_ifc.tag = 0;
 
         if (commit_ifc.commit) begin
                 rob_head_next = rob_head + 1;
         end
 
-        if (issue_ifc.issue & ~ctrl_ifc.flush & ~ctrl_ifc.rob_stall) begin
+        if (issue_ifc.issue & ~ctrl_ifc.flush) begin
                 rob_tail_next = rob_tail + 1;
-                issue_ifc.tag = rob_tail;
         end
 
         if (cdb_ifc.misspec) begin
@@ -178,6 +181,8 @@ begin
                 rob_next[cdb_ifc.tag].prd = cdb_ifc.dest;
                 rob_next[cdb_ifc.tag].prd_old = cdb_ifc.dest_old;
                 rob_next[cdb_ifc.tag].value = cdb_ifc.value;
+                rob_next[cdb_ifc.tag].csrd = cdb_ifc.csrd;
+                rob_next[cdb_ifc.tag].csr_val = cdb_ifc.csr_result;
                 rob_next[cdb_ifc.tag].ready = 1;
         end
 

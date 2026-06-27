@@ -222,6 +222,8 @@ begin
                                 imm = {27'b0, instr.i.rs1};
                                 rd = instr.i.rd;
 
+                                ctrl_word.alu_src = REG_IMM;
+
                                 ctrl_word.csr_op = csr_funct2_e'(instr.i.funct3[1:0]);
                                 ctrl_word.csr_src = csr_src_e'(instr.i.funct3[2]);
 

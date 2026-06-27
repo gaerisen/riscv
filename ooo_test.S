@@ -3,6 +3,9 @@ _start:
         li a0, 1
         li a1, 2
         li t0, 1000
+        la t1, halt
+        csrw mepc, t1
+        mret 
 
 fib_loop:
         add a2, a1, a0

@@ -41,6 +41,7 @@ logic [PRF_BITS-1:0] free_push_next;
 
 logic [4:0] rs1;
 logic [4:0] rs2;
+logic [11:0] csrs;
 logic [PRF_BITS-1:0] prs1;
 logic [PRF_BITS-1:0] prs2;
 logic [PRF_BITS-1:0] prd_old;
@@ -51,6 +52,7 @@ logic [PRF_BITS-1:0] prd_old;
 assign instr = fet_dec_ifc.instr;
 assign rs1 = instr.r.rs1;
 assign rs2 = instr.r.rs2;
+assign csrs = instr.i.imm11_0;
 decoder decoder (.*);
 
 
@@ -144,6 +146,7 @@ begin
                 issue_ifc.imm <= 0;
                 issue_ifc.prs1 <= 0;
                 issue_ifc.prs2 <= 0;
+                issue_ifc.csrs <= 0;
                 issue_ifc.prd_old <= 0;
                 issue_ifc.prd_new <= 0;
                 issue_ifc.speculation_meta <= 0;
@@ -158,6 +161,7 @@ begin
                 issue_ifc.imm <= imm;
                 issue_ifc.prs1 <= prs1;
                 issue_ifc.prs2 <= prs2;
+                issue_ifc.csrs <= csrs;
                 issue_ifc.prd_old <= prd_old;
                 issue_ifc.prd_new <= prd_new;
                 issue_ifc.speculation_meta <= fet_dec_ifc.speculation_meta;

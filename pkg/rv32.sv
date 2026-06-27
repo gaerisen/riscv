@@ -210,6 +210,8 @@ package rv32;
                 logic [5:0] prs2;
                 logic in2_ready;
 
+                logic [11:0] csrs;
+
                 logic [5:0] prd_old;
                 logic [5:0] prd_new;
 
@@ -228,12 +230,14 @@ package rv32;
                 logic [5:0] prd;
                 logic [5:0] prd_old;
 
+                logic [11:0] csrd;
+                logic [31:0] csr_val;
+
                 logic [31:0] pc;
 
                 logic [31:0][5:0] rat;
-                logic [31:0][5:0] free_list;
                 logic [4:0] free_head;
-                logic [4:0] free_tail;
+                logic [31:0] prf_ready;
                 logic [31:0] value;
                 logic flush;
                 logic ready;
