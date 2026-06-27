@@ -185,7 +185,7 @@ begin
         end
 
         if (cdb_ifc.misspec) begin
-                for (logic [ROB_BITS-1:0] i = cdb_ifc.tag + 1; i != rob_tail; i++) begin
+                for (logic [ROB_BITS-1:0] i = cdb_ifc.tag; i++ != rob_tail;) begin
                         rob_next[i] = 0;
                 end
         end

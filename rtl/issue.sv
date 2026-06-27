@@ -124,7 +124,7 @@ end
 // ============
 always_comb
 begin
-        issue_next = fet_dec_ifc.valid;
+        issue_next = fet_dec_ifc.valid & ~cdb_ifc.misspec;
 
         if (ctrl_ifc.stall) begin
                 issue_next = 0;
