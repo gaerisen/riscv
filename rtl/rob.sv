@@ -119,9 +119,6 @@ always_ff @(posedge clk or posedge rst)
 begin
         if (cdb_ifc.misspec) begin
                 ctrl_ifc.rat = rob[ctrl_ifc.tag].rat;
-                ctrl_ifc.free_list = rob[ctrl_ifc.tag].free_list;
-                ctrl_ifc.free_head = rob[ctrl_ifc.tag].free_head;
-                ctrl_ifc.free_tail = rob[ctrl_ifc.tag].free_tail;
         end
 end
 
@@ -175,9 +172,10 @@ begin
                 rob_next[rob_tail].rat = issue_ifc.rat;
                 rob_next[rob_tail].free_head = issue_ifc.free_head;
                 rob_next[rob_tail].speculation_meta = issue_ifc.speculation_meta;
+                rob_next[rob_tail].valid = 1;
         end
 
-        if (cdb_ifc.update & ~rob[cdb_ifc.tag].flush) begin
+        if (cdb_ifc.update & rob[cdb_ifc.tag].valid) begin
                 rob_next[cdb_ifc.tag].prd = cdb_ifc.dest;
                 rob_next[cdb_ifc.tag].prd_old = cdb_ifc.dest_old;
                 rob_next[cdb_ifc.tag].value = cdb_ifc.value;
@@ -189,7 +187,6 @@ begin
         if (cdb_ifc.misspec) begin
                 for (logic [ROB_BITS-1:0] i = cdb_ifc.tag + 1; i != rob_tail; i++) begin
                         rob_next[i] = 0;
-                        rob_next[i].flush = 1;
                 end
         end
 

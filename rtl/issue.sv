@@ -65,12 +65,12 @@ assign prd_old = rat[rd];
 
 always_comb
 begin
+        free_head_next = free_head;
+
         if (ctrl_ifc.flush) begin
-                free_head_next = ctrl_ifc.free_head;
                 rat_next = ctrl_ifc.rat;
         end
         else begin
-                free_head_next = free_head;
                 rat_next = rat;
         end
 

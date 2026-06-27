@@ -221,7 +221,7 @@ begin
                         if (entries_next[i].prs1 == cdb_ifc.dest) begin
                                 entries_next[i].in1_ready = 1;
                         end
-                        else if (entries_next[i].prs2 == cdb_ifc.dest) begin
+                        if (entries_next[i].prs2 == cdb_ifc.dest) begin
                                 entries_next[i].in2_ready = 1;
                         end
                         entries_next[i].ready = 
@@ -232,7 +232,7 @@ begin
                 if (overflow_next.prs1 == cdb_ifc.dest) begin
                         overflow_next.in1_ready = 1;
                 end
-                else if (overflow_next.prs2 == cdb_ifc.dest) begin
+                if (overflow_next.prs2 == cdb_ifc.dest) begin
                         overflow_next.in2_ready = 1;
                 end
                 overflow_next.ready = 

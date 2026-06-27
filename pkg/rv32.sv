@@ -239,7 +239,8 @@ package rv32;
                 logic [4:0] free_head;
                 logic [31:0] prf_ready;
                 logic [31:0] value;
-                logic flush;
+                
+                logic valid;
                 logic ready;
         } rob_entry_t;
 
