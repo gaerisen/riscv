@@ -218,6 +218,7 @@ begin
 
         if (cdb_ifc.update) begin
                 for (int i = 0; i < NUM_ENTRIES; i++) begin
+                        if (~entries_next[i].full) continue;
                         if (entries_next[i].prs1 == cdb_ifc.dest) begin
                                 entries_next[i].in1_ready = 1;
                         end
@@ -229,15 +230,17 @@ begin
                                         entries_next[i].in2_ready;
                 end
 
-                if (overflow_next.prs1 == cdb_ifc.dest) begin
-                        overflow_next.in1_ready = 1;
+                if (overflow_next.full) begin
+                        if (overflow_next.prs1 == cdb_ifc.dest) begin
+                                overflow_next.in1_ready = 1;
+                        end
+                        if (overflow_next.prs2 == cdb_ifc.dest) begin
+                                overflow_next.in2_ready = 1;
+                        end
+                        overflow_next.ready = 
+                                        overflow_next.in1_ready &
+                                        overflow_next.in2_ready;
                 end
-                if (overflow_next.prs2 == cdb_ifc.dest) begin
-                        overflow_next.in2_ready = 1;
-                end
-                overflow_next.ready = 
-                                overflow_next.in1_ready &
-                                overflow_next.in2_ready;
         end
 end
 

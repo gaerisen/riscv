@@ -240,19 +240,13 @@ begin
         end
 
         STREAMING: begin
-                if (ctrl_ifc.stall) begin
+                if (ctrl_ifc.external_stall) begin
                         valid_next = 0;
                         state_next = STALLED;
                 end
 
-                // Next cases should all be mutually exclusive; each relies on a
-                // unique opcode in current inst. Any order works.
-                if (inst_is_jump) begin
-                        pc_next = jump_target;
-                end
-
                 // All following are speculative
-                else if (inst_is_b) begin
+                if (inst_is_b) begin
                         fet_dec_ifc.speculation_meta.branch = 1;
                         fet_dec_ifc.speculation_meta.branch_taken = b_predict_taken;
 
@@ -277,6 +271,14 @@ begin
                         pc_next = btb[fet_dec_ifc.pc[BTB_PTR_SIZE+1:2]];
                 end
 
+
+                // Next cases should all be mutually exclusive; each relies on a
+                // unique opcode in current inst. Any order works.
+                if (inst_is_jump) begin
+                        pc_next = jump_target;
+                end
+
+
                 if (cdb_ifc.branch_mis_nt | cdb_ifc.jump_mis) begin
                         pc_next = cdb_ifc.target_addr;
                         flush_next = 1;
@@ -291,6 +293,13 @@ begin
                 if (ctrl_ifc.sys_redirect) begin
                         pc_next = ctrl_ifc.sys_vec;
                         flush_next = 1;
+                end
+
+
+                if (ctrl_ifc.internal_stall) begin
+                        valid_next = 0;
+                        pc_next = fet_dec_ifc.pc;
+                        state_next = STALLED;
                 end
 
         end

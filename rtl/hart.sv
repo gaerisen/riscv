@@ -24,6 +24,7 @@ import rv32::*;
 );
 
 global_ctrl_ifc ctrl_ifc(
+        .*,
         .external_stall(~i_data_ready)
 );
 

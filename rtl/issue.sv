@@ -73,7 +73,7 @@ begin
 
         // Issue first; should be overwritten by rollback (although this isn't
         // strictly necessary since issue_next goes low on rb)
-        if ((rd != 0) & issue_ifc.issue) begin
+        if ((rd != 0) & issue_next) begin
                 free_head_next = free_head + 1;
                 prd_new = free_list[free_head];
                 rat_next[rd] = prd_new;
@@ -81,7 +81,6 @@ begin
 
         if (cdb_ifc.rollback) begin
                 rat_next = cdb_ifc.rat;
-                free_list_next = cdb_ifc.free_list;
                 free_head_next = cdb_ifc.free_head;
         end
 
@@ -119,7 +118,7 @@ end
 // ============
 always_comb
 begin
-        issue_next = 1;
+        issue_next = fet_dec_ifc.valid;
 
         if (ctrl_ifc.stall | cdb_ifc.rollback) begin
                 issue_next = 0;
@@ -150,7 +149,7 @@ begin
                 issue_ifc.free_head <= 0;
                 issue_ifc.free_tail <= 0;
         end
-        else if (issue_ifc.issue) begin
+        else if (issue_next) begin
                 issue_ifc.ctrl_word <= ctrl_word;
                 issue_ifc.pc <= fet_dec_ifc.pc;
                 issue_ifc.imm <= imm;

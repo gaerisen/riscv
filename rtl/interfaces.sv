@@ -13,6 +13,8 @@ interface global_ctrl_ifc
         localparam int FREE_SIZE = PRF_SIZE - 32,
         localparam int FREE_BITS = $clog2(FREE_SIZE)
 )(
+        input clk,
+        input rst,
         input external_stall
 );
 
@@ -23,6 +25,7 @@ logic rs_stall;
 logic rob_stall;
 logic [ROB_BITS-1:0] tag;
 logic stall;
+logic internal_stall;
 logic flush;
 
 logic [31:0][PRF_BITS-1:0] rat;
@@ -30,10 +33,26 @@ logic [FREE_SIZE-1:0][PRF_BITS-1:0] free_list;
 logic [FREE_BITS-1:0] free_head;
 logic [FREE_BITS-1:0] free_tail;
 
-assign stall = rs_stall | rob_stall | external_stall;
+assign internal_stall = rs_stall | rob_stall;
+assign stall = internal_stall | external_stall;
+
+logic stall_exit;
+logic stall_dly;
+
+always @(posedge clk or posedge rst)
+begin
+        if (rst) begin
+                stall_dly <= 0;
+        end
+        else begin
+                stall_dly <= internal_stall;
+        end
+end
+
+assign stall_exit = stall_dly & ~internal_stall;
 
 modport fetch (
-        input stall, sys_redirect, sys_vec,
+        input internal_stall, external_stall, stall, sys_redirect, sys_vec,
         output flush
 );
 
