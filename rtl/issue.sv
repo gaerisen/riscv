@@ -31,13 +31,13 @@ logic [4:0] rd;
 logic issue_next;
 
 logic [31:0][PRF_BITS-1:0] rat;
-logic [31:0][PRF_BITS-1:0] rat_next;
 logic [FREE_SIZE-1:0][PRF_BITS-1:0] free_list;
 logic [FREE_BITS-1:0] free_head;
 logic [FREE_BITS-1:0] free_tail;
+logic [31:0][PRF_BITS-1:0] rat_next;
+logic [FREE_SIZE-1:0][PRF_BITS-1:0] free_list_next;
 logic [FREE_BITS-1:0] free_head_next;
 logic [FREE_BITS-1:0] free_tail_next;
-logic [PRF_BITS-1:0] free_push_next;
 
 logic [4:0] rs1;
 logic [4:0] rs2;
@@ -65,37 +65,32 @@ assign prd_old = rat[rd];
 
 always_comb
 begin
-        free_head_next = free_head;
-
-        if (ctrl_ifc.flush) begin
-                rat_next = ctrl_ifc.rat;
-        end
-        else begin
-                rat_next = rat;
-        end
-
+        rat_next = rat;
         free_tail_next = free_tail;
-        free_push_next = free_list[free_tail];
+        free_head_next = free_head;
+        free_list_next = free_list;
         prd_new = 0;
 
-
-        if ((rd != 0) & issue_next) begin
-                if (ctrl_ifc.flush) begin
-                        free_head_next = ctrl_ifc.free_head + 1;
-                        prd_new = free_list[ctrl_ifc.free_head];
-                end
-                else begin
-                        free_head_next = free_head + 1;
-                        prd_new = free_list[free_head];
-                end
+        // Issue first; should be overwritten by rollback (although this isn't
+        // strictly necessary since issue_next goes low on rb)
+        if ((rd != 0) & issue_ifc.issue) begin
+                free_head_next = free_head + 1;
+                prd_new = free_list[free_head];
                 rat_next[rd] = prd_new;
         end
 
-        if (commit_ifc.commit && commit_ifc.dest_old != 0) begin
-                free_tail_next = free_tail + 1;
-                free_push_next = commit_ifc.dest_old;
+        if (cdb_ifc.rollback) begin
+                rat_next = cdb_ifc.rat;
+                free_list_next = cdb_ifc.free_list;
+                free_head_next = cdb_ifc.free_head;
         end
 
+        // Commit should override rollback; anything committing has no control
+        // dependencies
+        if (commit_ifc.commit && commit_ifc.dest_old != 0) begin
+                free_tail_next = free_tail + 1;
+                free_list_next[free_tail] = commit_ifc.dest_old;
+        end
 end
 
 always_ff @(posedge clk or posedge rst)
@@ -112,7 +107,7 @@ begin
         end
         else begin
                 rat <= rat_next;
-                free_list[free_tail] <= free_push_next;
+                free_list <= free_list_next;
                 free_head <= free_head_next;
                 free_tail <= free_tail_next;
         end
@@ -124,9 +119,9 @@ end
 // ============
 always_comb
 begin
-        issue_next = fet_dec_ifc.valid & ~cdb_ifc.misspec;
+        issue_next = 1;
 
-        if (ctrl_ifc.stall) begin
+        if (ctrl_ifc.stall | cdb_ifc.rollback) begin
                 issue_next = 0;
         end
 end
@@ -155,7 +150,7 @@ begin
                 issue_ifc.free_head <= 0;
                 issue_ifc.free_tail <= 0;
         end
-        else if (issue_next) begin
+        else if (issue_ifc.issue) begin
                 issue_ifc.ctrl_word <= ctrl_word;
                 issue_ifc.pc <= fet_dec_ifc.pc;
                 issue_ifc.imm <= imm;

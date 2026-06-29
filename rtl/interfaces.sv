@@ -13,6 +13,7 @@ interface global_ctrl_ifc
         localparam int FREE_SIZE = PRF_SIZE - 32,
         localparam int FREE_BITS = $clog2(FREE_SIZE)
 )(
+        input external_stall
 );
 
 logic sys_redirect;
@@ -29,7 +30,7 @@ logic [FREE_SIZE-1:0][PRF_BITS-1:0] free_list;
 logic [FREE_BITS-1:0] free_head;
 logic [FREE_BITS-1:0] free_tail;
 
-assign stall = rs_stall | rob_stall;
+assign stall = rs_stall | rob_stall | external_stall;
 
 modport fetch (
         input stall, sys_redirect, sys_vec,
@@ -205,7 +206,9 @@ import rv32::*;
         parameter int PRF_SIZE = 64,
         localparam int PRF_BITS = $clog2(PRF_SIZE),
         parameter int ROB_LEN = 64,
-        localparam int ROB_BITS = $clog2(ROB_LEN)
+        localparam int ROB_BITS = $clog2(ROB_LEN),
+        localparam int FREE_SIZE = PRF_SIZE - 32,
+        localparam int FREE_BITS = $clog2(FREE_SIZE)
 )(
 );
 
@@ -227,7 +230,12 @@ speculation_meta_t speculation_meta;
 logic branch_mis_t;
 logic branch_mis_nt;
 logic jump_mis;
-logic misspec;
+logic rollback;
+
+logic [31:0][PRF_BITS-1:0] rat;
+logic [FREE_SIZE-1:0][PRF_BITS-1:0] free_list;
+logic [FREE_BITS-1:0] free_head;
+logic [FREE_BITS-1:0] free_tail;
 
 assign branch_mis_t = update & speculation_meta.branch &
         (speculation_meta.branch_taken & ~branch_taken);
@@ -238,7 +246,7 @@ assign branch_mis_nt = update & speculation_meta.branch &
 assign jump_mis = update & speculation_meta.jump & 
         (speculation_meta.target != target_addr);
 
-assign misspec = branch_mis_t | branch_mis_nt | jump_mis;
+assign rollback = branch_mis_t | branch_mis_nt | jump_mis;
 
 modport execute (
         output update, tag, value, dest, dest_old, branch_taken, target_addr, pc,
@@ -254,8 +262,8 @@ modport prf (
 );
 
 modport rob (
-        input update, tag, value, dest, dest_old, misspec, csrd, csr_result,
-        output speculation_meta
+        input update, tag, value, dest, dest_old, rollback, csrd, csr_result,
+        output speculation_meta, rat, free_list, free_head, free_tail
 );
 
 modport fetch (

@@ -23,7 +23,10 @@ import rv32::*;
         input logic [31:0] d_data_i
 );
 
-global_ctrl_ifc ctrl_ifc();
+global_ctrl_ifc ctrl_ifc(
+        .external_stall(~i_data_ready)
+);
+
 fet_to_dec_ifc fet_dec_ifc();
 
 issue_ifc issue_ifc();

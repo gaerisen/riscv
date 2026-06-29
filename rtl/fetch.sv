@@ -197,9 +197,6 @@ end
 //      MAIN FETCH FSM
 //=================================
 
-logic stall;
-assign stall = !i_data_ready | ctrl_ifc.stall;
-
 // State switch logic
 always_comb
 begin
@@ -236,13 +233,18 @@ begin
                 end
 
                 // Doesn't matter how stall goes low; if it does, we're good
-                if (!stall) begin
+                if (!ctrl_ifc.stall) begin
                         valid_next = 1;
                         state_next = STREAMING;
                 end
         end
 
         STREAMING: begin
+                if (ctrl_ifc.stall) begin
+                        valid_next = 0;
+                        state_next = STALLED;
+                end
+
                 // Next cases should all be mutually exclusive; each relies on a
                 // unique opcode in current inst. Any order works.
                 if (inst_is_jump) begin
@@ -291,15 +293,6 @@ begin
                         flush_next = 1;
                 end
 
-                if (!i_data_ready) begin
-                        valid_next = 0;
-                        state_next = STALLED;
-                end
-                else if (ctrl_ifc.stall) begin
-                        valid_next = 0;
-                        pc_next = fet_dec_ifc.pc;
-                        state_next = STALLED;
-                end
         end
         endcase
 end

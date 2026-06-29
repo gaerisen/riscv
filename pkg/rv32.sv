@@ -237,7 +237,9 @@ package rv32;
 
                 logic [31:0][5:0] rat;
                 logic [4:0] free_head;
-                logic [31:0] prf_ready;
+                logic [4:0] free_tail;
+                logic [31:0][5:0] free_list;
+
                 logic [31:0] value;
                 
                 logic valid;

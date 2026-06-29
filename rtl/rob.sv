@@ -47,6 +47,10 @@ logic [31:0] pc; // For debugging
 assign commit_ifc.commit = rob[rob_head].ready;
 
 assign cdb_ifc.speculation_meta = rob[cdb_ifc.tag].speculation_meta;
+assign cdb_ifc.rat = rob[cdb_ifc.tag].rat;
+assign cdb_ifc.free_list = rob[cdb_ifc.tag].free_list;
+assign cdb_ifc.free_head = rob[cdb_ifc.tag].free_head;
+assign cdb_ifc.free_tail = rob[cdb_ifc.tag].free_tail;
 
 // Commit logic
 
@@ -115,13 +119,6 @@ assign full = rob_tail == (rob_head + {ROB_BITS{1'b1}});
 assign ctrl_ifc.rob_stall = full | sys_in_flight;
 
 
-always_ff @(posedge clk or posedge rst)
-begin
-        if (cdb_ifc.misspec) begin
-                ctrl_ifc.rat = rob[ctrl_ifc.tag].rat;
-        end
-end
-
 initial begin
         $dumpfile("rob.vcd");
         $dumpvars(0, rob);
@@ -143,7 +140,7 @@ begin
                 rob_tail_next = rob_tail + 1;
         end
 
-        if (cdb_ifc.misspec) begin
+        if (cdb_ifc.rollback) begin
                 rob_tail_next = cdb_ifc.tag + 1;
         end
 end
@@ -171,6 +168,8 @@ begin
                 rob_next[rob_tail].pc = issue_ifc.pc;
                 rob_next[rob_tail].rat = issue_ifc.rat;
                 rob_next[rob_tail].free_head = issue_ifc.free_head;
+                rob_next[rob_tail].free_tail = issue_ifc.free_tail;
+                rob_next[rob_tail].free_list = issue_ifc.free_list;
                 rob_next[rob_tail].speculation_meta = issue_ifc.speculation_meta;
                 rob_next[rob_tail].valid = 1;
         end
@@ -184,7 +183,7 @@ begin
                 rob_next[cdb_ifc.tag].ready = 1;
         end
 
-        if (cdb_ifc.misspec) begin
+        if (cdb_ifc.rollback) begin
                 for (logic [ROB_BITS-1:0] i = cdb_ifc.tag; i++ != rob_tail;) begin
                         rob_next[i] = 0;
                 end
