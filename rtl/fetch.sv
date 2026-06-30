@@ -235,7 +235,6 @@ begin
                 // Doesn't matter how stall goes low; if it does, we're good
                 if (!ctrl_ifc.stall) begin
                         valid_next = 1;
-                        pc_next = fet_dec_ifc.pc + 4;
                         state_next = STREAMING;
                 end
         end
@@ -291,8 +290,12 @@ begin
                         flush_next = 1;
                 end
 
-
-                if (ctrl_ifc.stall) begin
+                if (ctrl_ifc.internal_stall) begin
+                        valid_next = 0;
+                        pc_next = fet_dec_ifc.pc;
+                        state_next = STALLED;
+                end
+                if (ctrl_ifc.external_stall) begin
                         valid_next = 0;
                         state_next = STALLED;
                 end

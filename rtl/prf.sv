@@ -7,14 +7,11 @@ module prf
         input clk,
         input rst,
 
-        // Read ports
+        issue_ifc.prf issue_ifc,
+
         dispatch_ifc.prf dispatch_ifc,
 
-        cdb_ifc.prf cdb_ifc,
-
-        // Ready signals
-        input [PRF_BITS-1:0] prd_new_from_rat,
-        output logic [PRF_SIZE-1:0] prf_ready
+        cdb_ifc.prf cdb_ifc
 );
 
 logic [31:0] prf [0:PRF_SIZE-1];
@@ -43,20 +40,36 @@ begin
         end
 end
 
-// Ready signal logic
-always_ff @(posedge clk or posedge rst)
+logic [PRF_SIZE-1:0] preg_ready;
+logic [PRF_SIZE-1:0] preg_ready_next;
+
+always_comb
 begin
-        if (rst) begin // Lowest order regs map directly to arch regs at reset
-                prf_ready <= {{(PRF_SIZE-32){1'b0}}, 32'hffffffff};
+        preg_ready_next = preg_ready;
+
+        if (cdb_ifc.update) begin
+                preg_ready_next[cdb_ifc.dest] = 1;
         end
-        else begin
-                if (prd_new_from_rat != 0) begin
-                        prf_ready[prd_new_from_rat] <= 0;
-                end
-                if (cdb_ifc.dest != 0) begin
-                        prf_ready[cdb_ifc.dest] <= 1;
-                end
+
+        if (cdb_ifc.rollback) begin
+                preg_ready_next = cdb_ifc.preg_ready;
+        end
+
+        if (issue_ifc.issue) begin
+                preg_ready_next[issue_ifc.prd_new] = 0;
         end
 end
+
+always_ff @(posedge clk or posedge rst)
+begin
+        if (rst) begin
+                preg_ready <= 64'hffffffff;
+        end
+        else begin
+                preg_ready <= preg_ready_next;
+        end
+end
+
+assign issue_ifc.preg_ready = preg_ready;
 
 endmodule: prf

@@ -15,10 +15,9 @@ import rv32::*;
 
         fet_to_dec_ifc.decode fet_dec_ifc,
 
-        // Broadcasted so PRF can update ready flags
-        output logic [PRF_BITS-1:0] prd_new,
-
         issue_ifc.decode issue_ifc,
+
+        cdb_ifc.decode cdb_ifc,
 
         commit_ifc.decode commit_ifc
 );
@@ -45,6 +44,7 @@ logic [11:0] csrs;
 logic [PRF_BITS-1:0] prs1;
 logic [PRF_BITS-1:0] prs2;
 logic [PRF_BITS-1:0] prd_old;
+logic [PRF_BITS-1:0] prd_new;
 
 // ==========
 //   Decode
@@ -113,14 +113,15 @@ begin
 end
 
 
+
 // ============
 //   Dispatch
 // ============
 always_comb
 begin
-        issue_next = fet_dec_ifc.valid | ctrl_ifc.stall_exit;
+        issue_next = fet_dec_ifc.valid;
 
-        if (ctrl_ifc.stall | cdb_ifc.rollback) begin
+        if (ctrl_ifc.internal_stall | cdb_ifc.rollback) begin
                 issue_next = 0;
         end
 end
@@ -145,9 +146,7 @@ begin
                 issue_ifc.prd_new <= 0;
                 issue_ifc.speculation_meta <= 0;
                 issue_ifc.rat <= 0;
-                issue_ifc.free_list <= 0;
                 issue_ifc.free_head <= 0;
-                issue_ifc.free_tail <= 0;
         end
         else if (issue_next) begin
                 issue_ifc.ctrl_word <= ctrl_word;
@@ -160,9 +159,7 @@ begin
                 issue_ifc.prd_new <= prd_new;
                 issue_ifc.speculation_meta <= fet_dec_ifc.speculation_meta;
                 issue_ifc.rat <= rat;
-                issue_ifc.free_list <= free_list;
                 issue_ifc.free_head <= free_head;
-                issue_ifc.free_tail <= free_tail;
         end
 end
 

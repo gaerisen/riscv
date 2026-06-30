@@ -48,9 +48,8 @@ assign commit_ifc.commit = rob[rob_head].ready;
 
 assign cdb_ifc.speculation_meta = rob[cdb_ifc.tag].speculation_meta;
 assign cdb_ifc.rat = rob[cdb_ifc.tag].rat;
-assign cdb_ifc.free_list = rob[cdb_ifc.tag].free_list;
 assign cdb_ifc.free_head = rob[cdb_ifc.tag].free_head;
-assign cdb_ifc.free_tail = rob[cdb_ifc.tag].free_tail;
+assign cdb_ifc.preg_ready = rob[cdb_ifc.tag].preg_ready;
 
 // Commit logic
 
@@ -168,8 +167,7 @@ begin
                 rob_next[rob_tail].pc = issue_ifc.pc;
                 rob_next[rob_tail].rat = issue_ifc.rat;
                 rob_next[rob_tail].free_head = issue_ifc.free_head;
-                rob_next[rob_tail].free_tail = issue_ifc.free_tail;
-                rob_next[rob_tail].free_list = issue_ifc.free_list;
+                rob_next[rob_tail].preg_ready = issue_ifc.preg_ready;
                 rob_next[rob_tail].speculation_meta = issue_ifc.speculation_meta;
                 rob_next[rob_tail].valid = 1;
         end

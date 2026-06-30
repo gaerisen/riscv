@@ -40,15 +40,9 @@ defparam cdb_ifc.ROB_LEN = ROB_LEN;
 
 commit_ifc commit_ifc();
 
-logic [63:0] prf_ready;
-logic [5:0] prd_new;
 
 // Integer register file
-prf prf(
-        .*,
-
-        .prd_new_from_rat(prd_new)
-);
+prf prf(.*);
 defparam prf.PRF_SIZE = PRF_SIZE;
 
 // Control/status register file

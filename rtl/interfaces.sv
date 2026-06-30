@@ -66,7 +66,7 @@ modport rob (
 );
 
 modport decode (
-        input flush, stall, stall_exit, rat, free_list, free_head, free_tail
+        input flush, internal_stall, stall_exit, rat, free_list, free_head, free_tail
 );
 
 modport rs (
@@ -141,23 +141,27 @@ speculation_meta_t speculation_meta;
 logic [5:0] tag;
 
 logic [31:0][PRF_BITS-1:0] rat;
-logic [FREE_SIZE-1:0][PRF_BITS-1:0] free_list;
 logic [FREE_BITS-1:0] free_head;
-logic [FREE_BITS-1:0] free_tail;
+
+logic [PRF_SIZE-1:0] preg_ready;
 
 modport decode (
         output issue, ctrl_word, pc, imm, speculation_meta,
-        prs1, prs2, csrs, prd_old, prd_new, rat, free_list, free_head, free_tail
+        prs1, prs2, csrs, prd_old, prd_new, rat, free_head
 );
 
 modport rob (
-        input issue, ctrl_word, pc, rat, free_list, free_head, free_tail,
-        speculation_meta,
+        input issue, ctrl_word, pc, rat, free_head, speculation_meta, preg_ready,
         output tag
 );
 
+modport prf (
+        input issue, prd_new,
+        output preg_ready
+);
+
 modport rs (
-        input issue, ctrl_word, pc, imm,
+        input issue, ctrl_word, pc, imm, preg_ready,
         prs1, prs2, csrs, prd_old, prd_new, tag
 );
 
@@ -252,9 +256,9 @@ logic jump_mis;
 logic rollback;
 
 logic [31:0][PRF_BITS-1:0] rat;
-logic [FREE_SIZE-1:0][PRF_BITS-1:0] free_list;
 logic [FREE_BITS-1:0] free_head;
-logic [FREE_BITS-1:0] free_tail;
+
+logic [PRF_SIZE-1:0] preg_ready;
 
 assign branch_mis_t = update & speculation_meta.branch &
         (speculation_meta.branch_taken & ~branch_taken);
@@ -267,6 +271,10 @@ assign jump_mis = update & speculation_meta.jump &
 
 assign rollback = branch_mis_t | branch_mis_nt | jump_mis;
 
+modport decode (
+        input rollback, rat, free_head
+);
+
 modport execute (
         output update, tag, value, dest, dest_old, branch_taken, target_addr, pc,
         csrd, csr_result
@@ -277,12 +285,12 @@ modport rs (
 );
 
 modport prf (
-        input dest, value
+        input update, dest, value, rollback, preg_ready
 );
 
 modport rob (
         input update, tag, value, dest, dest_old, rollback, csrd, csr_result,
-        output speculation_meta, rat, free_list, free_head, free_tail
+        output speculation_meta, rat, free_head, preg_ready
 );
 
 modport fetch (
