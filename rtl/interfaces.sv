@@ -66,7 +66,7 @@ modport rob (
 );
 
 modport decode (
-        input flush, stall, rat, free_list, free_head, free_tail
+        input flush, stall, stall_exit, rat, free_list, free_head, free_tail
 );
 
 modport rs (
@@ -128,9 +128,9 @@ import rv32::*;
 )(
 );
 
-logic issue;
+logic issue /* verilator public */;
 ctrl_t ctrl_word;
-logic [31:0] pc;
+logic [31:0] pc /* verilator public */;
 logic [31:0] imm;
 logic [PRF_BITS-1:0] prs1;
 logic [PRF_BITS-1:0] prs2;

@@ -28,12 +28,12 @@ instr_t instr;
 ctrl_t ctrl_word;
 logic [31:0] imm;
 logic [4:0] rd;
-logic issue_next;
+logic issue_next /* verilator public */;
 
-logic [31:0][PRF_BITS-1:0] rat;
-logic [FREE_SIZE-1:0][PRF_BITS-1:0] free_list;
-logic [FREE_BITS-1:0] free_head;
-logic [FREE_BITS-1:0] free_tail;
+logic [31:0][PRF_BITS-1:0] rat /* verilator public */;
+logic [FREE_SIZE-1:0][PRF_BITS-1:0] free_list /* verilator public */;
+logic [FREE_BITS-1:0] free_head /* verilator public */;
+logic [FREE_BITS-1:0] free_tail /* verilator public */;
 logic [31:0][PRF_BITS-1:0] rat_next;
 logic [FREE_SIZE-1:0][PRF_BITS-1:0] free_list_next;
 logic [FREE_BITS-1:0] free_head_next;
@@ -118,7 +118,7 @@ end
 // ============
 always_comb
 begin
-        issue_next = fet_dec_ifc.valid;
+        issue_next = fet_dec_ifc.valid | ctrl_ifc.stall_exit;
 
         if (ctrl_ifc.stall | cdb_ifc.rollback) begin
                 issue_next = 0;
