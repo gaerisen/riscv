@@ -72,7 +72,7 @@ begin
                 end
         end
 
-        full = issue_ifc.issue & !dispatch_next;
+        full = !dispatch_next;
 
         for (int i = 0; i < NUM_ENTRIES; i++) begin
                 full &= entries[i].full;

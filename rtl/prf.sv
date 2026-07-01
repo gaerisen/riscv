@@ -47,15 +47,15 @@ always_comb
 begin
         preg_ready_next = preg_ready;
 
-        if (cdb_ifc.update) begin
-                preg_ready_next[cdb_ifc.dest] = 1;
+        if (cdb_ifc.update && (cdb_ifc.dest != 0)) begin
+                preg_ready_next[cdb_ifc.dest] = cdb_ifc.valid;
         end
 
         if (cdb_ifc.rollback) begin
-                preg_ready_next = cdb_ifc.preg_ready;
+                preg_ready_next = cdb_ifc.preg_ready | preg_ready;
         end
 
-        if (issue_ifc.issue) begin
+        if (issue_ifc.issue && (issue_ifc.prd_new != 0)) begin
                 preg_ready_next[issue_ifc.prd_new] = 0;
         end
 end

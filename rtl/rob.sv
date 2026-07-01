@@ -50,6 +50,7 @@ assign cdb_ifc.speculation_meta = rob[cdb_ifc.tag].speculation_meta;
 assign cdb_ifc.rat = rob[cdb_ifc.tag].rat;
 assign cdb_ifc.free_head = rob[cdb_ifc.tag].free_head;
 assign cdb_ifc.preg_ready = rob[cdb_ifc.tag].preg_ready;
+assign cdb_ifc.valid = rob[cdb_ifc.tag].valid;
 
 // Commit logic
 

@@ -11,5 +11,7 @@ obj_dir/
 *.txt
 *.json
 *.f
+*.S
+dump
 main
 logs/

@@ -237,6 +237,7 @@ import rv32::*;
 
 logic update;
 logic [ROB_BITS-1:0] tag;
+logic valid;
 
 logic [31:0] value;
 logic branch_taken;
@@ -285,12 +286,12 @@ modport rs (
 );
 
 modport prf (
-        input update, dest, value, rollback, preg_ready
+        input update, dest, value, rollback, preg_ready, valid
 );
 
 modport rob (
         input update, tag, value, dest, dest_old, rollback, csrd, csr_result,
-        output speculation_meta, rat, free_head, preg_ready
+        output speculation_meta, rat, free_head, preg_ready, valid
 );
 
 modport fetch (

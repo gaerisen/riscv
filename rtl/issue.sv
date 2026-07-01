@@ -158,8 +158,8 @@ begin
                 issue_ifc.prd_old <= prd_old;
                 issue_ifc.prd_new <= prd_new;
                 issue_ifc.speculation_meta <= fet_dec_ifc.speculation_meta;
-                issue_ifc.rat <= rat;
-                issue_ifc.free_head <= free_head;
+                issue_ifc.rat <= rat_next;
+                issue_ifc.free_head <= free_head_next;
         end
 end
 
