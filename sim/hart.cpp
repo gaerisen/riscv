@@ -117,7 +117,7 @@ int hart::run_tests(int cycles)
 
                         set_i_data(instr);
 
-                   /*     if (dut->hart->issue_ifc->issue) {
+/*                        if (dut->hart->issue_ifc->issue) {
                                 VlWide_to_rat(dut->hart->issue->rat, rat);
                                 VlWide_to_rat(dut->hart->issue->free_list, free);
                                 std::cout << std::hex << " PC: " << dut->hart->issue_ifc->pc << std::endl;

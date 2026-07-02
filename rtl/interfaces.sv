@@ -217,6 +217,10 @@ modport execute (
         tag, csr_val, csrd
 );
 
+modport rob (
+        input dispatch, tag
+);
+
 endinterface: dispatch_ifc
 
 
@@ -308,6 +312,8 @@ endinterface
 interface commit_ifc 
 import rv32::*;
 #(
+        parameter int PRF_SIZE = 64,
+        localparam int PRF_BITS = $clog2(PRF_SIZE)
 )(
 );
 
@@ -318,8 +324,8 @@ logic exception;
 logic trapret;
 trap_cause_e trap_cause;
 logic [31:0] value;
-logic [5:0] dest;
-logic [5:0] dest_old;
+logic [PRF_BITS-1:0] dest;
+logic [PRF_BITS-1:0] dest_old;
 logic [31:0] csr_val;
 logic [11:0] csr_dest;
 

@@ -3,7 +3,8 @@ module hart
 import rv32::*;
 #(
         parameter int ROB_LEN = 64,
-        parameter int PRF_SIZE = 64
+        parameter int PRF_SIZE = 128,
+        parameter int RS_ENTRIES = 4
 )(
         input clk,
         input rst,
@@ -27,18 +28,23 @@ global_ctrl_ifc ctrl_ifc(
         .*,
         .external_stall(~i_data_ready)
 );
+defparam ctrl_ifc.PRF_SIZE = PRF_SIZE;
 
 fet_to_dec_ifc fet_dec_ifc();
 
 issue_ifc issue_ifc();
 defparam issue_ifc.ROB_LEN = ROB_LEN;
+defparam issue_ifc.PRF_SIZE = PRF_SIZE;
 
 dispatch_ifc dispatch_ifc();
+defparam dispatch_ifc.PRF_SIZE = PRF_SIZE;
 
 cdb_ifc cdb_ifc();
 defparam cdb_ifc.ROB_LEN = ROB_LEN;
+defparam cdb_ifc.PRF_SIZE = PRF_SIZE;
 
 commit_ifc commit_ifc();
+defparam commit_ifc.PRF_SIZE = PRF_SIZE;
 
 
 // Integer register file
@@ -53,10 +59,14 @@ csrf csrf(.*);
 fetch fetch (.*);
 
 issue issue (.*);
+defparam issue.PRF_SIZE = PRF_SIZE;
 
 rs rs (.*);
+defparam rs.PRF_SIZE = PRF_SIZE;
+defparam rs.NUM_ENTRIES = RS_ENTRIES;
 
 execute execute (.*);
+defparam execute.PRF_SIZE = PRF_SIZE;
 
 rob rob (.*);
 defparam rob.ROB_LEN = ROB_LEN;

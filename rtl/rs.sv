@@ -5,9 +5,9 @@ import rv32::*;
 #(
         parameter int PRF_SIZE = 64,
         localparam int PRF_BITS = $clog2(PRF_SIZE),
-        parameter int NUM_ENTRIES = 1,
-//        localparam int ENTRIES_BITS = $clog2(NUM_ENTRIES),
-        localparam int ENTRIES_BITS = 1,
+        parameter int NUM_ENTRIES = 4,
+        localparam int ENTRIES_BITS = $clog2(NUM_ENTRIES),
+//        localparam int ENTRIES_BITS = 1,
         parameter int ROB_SIZE = 64,
         localparam int ROB_BITS = $clog2(ROB_SIZE)
 

@@ -20,6 +20,8 @@ import rv32::*;
         global_ctrl_ifc.rob ctrl_ifc,
 
         issue_ifc.rob issue_ifc,
+
+        dispatch_ifc.rob dispatch_ifc,
         
         cdb_ifc.rob cdb_ifc,
 
@@ -44,13 +46,13 @@ logic sys_in_flight_state;
 
 logic [31:0] pc; // For debugging
 
-assign commit_ifc.commit = rob[rob_head].ready;
+assign commit_ifc.commit = rob[rob_head].valid & rob[rob_head].ready;
 
 assign cdb_ifc.speculation_meta = rob[cdb_ifc.tag].speculation_meta;
 assign cdb_ifc.rat = rob[cdb_ifc.tag].rat;
 assign cdb_ifc.free_head = rob[cdb_ifc.tag].free_head;
 assign cdb_ifc.preg_ready = rob[cdb_ifc.tag].preg_ready;
-assign cdb_ifc.valid = rob[cdb_ifc.tag].valid;
+assign cdb_ifc.valid = rob[cdb_ifc.tag].executing;
 
 // Commit logic
 
@@ -132,16 +134,19 @@ begin
         rob_head_next = rob_head;
         rob_tail_next = rob_tail;
 
-        if (commit_ifc.commit) begin
-                rob_head_next = rob_head + 1;
+        if (commit_ifc.commit | !rob[rob_head].valid) begin
+                for (rob_head_next = rob_head + 1;
+                !rob[rob_head_next].valid;
+                rob_head_next++) begin
+                        if (rob_head_next == rob_head) begin
+                                rob_head_next = rob_tail;
+                                break;
+                        end
+                end
         end
 
-        if (issue_ifc.issue & ~ctrl_ifc.flush) begin
+        if (issue_ifc.issue) begin
                 rob_tail_next = rob_tail + 1;
-        end
-
-        if (cdb_ifc.rollback) begin
-                rob_tail_next = cdb_ifc.tag + 1;
         end
 end
 
@@ -173,7 +178,14 @@ begin
                 rob_next[rob_tail].valid = 1;
         end
 
-        if (cdb_ifc.update & rob[cdb_ifc.tag].valid) begin
+        // Intermediate 'executing' flag. If an invalid instruction is scheduled
+        // sufficiently late, it may attempt to update a tag that is now used by
+        // a post-rollback instruction.
+        if (dispatch_ifc.dispatch & rob[dispatch_ifc.tag].valid) begin
+                rob_next[dispatch_ifc.tag].executing = 1;
+        end
+
+        if (cdb_ifc.update & rob[cdb_ifc.tag].executing) begin
                 rob_next[cdb_ifc.tag].prd = cdb_ifc.dest;
                 rob_next[cdb_ifc.tag].prd_old = cdb_ifc.dest_old;
                 rob_next[cdb_ifc.tag].value = cdb_ifc.value;
@@ -183,8 +195,9 @@ begin
         end
 
         if (cdb_ifc.rollback) begin
-                for (logic [ROB_BITS-1:0] i = cdb_ifc.tag; i++ != rob_tail;) begin
-                        rob_next[i] = 0;
+                for (logic [ROB_BITS-1:0] i = cdb_ifc.tag; i != rob_tail; i++) begin
+                        rob_next[i].valid = 0;
+                        rob_next[i].ready = 1;
                 end
         end
 

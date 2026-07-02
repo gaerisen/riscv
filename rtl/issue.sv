@@ -5,7 +5,7 @@ import rv32::*;
 #(
         parameter int PRF_SIZE = 64,
         localparam int PRF_BITS = $clog2(PRF_SIZE),
-        localparam int FREE_SIZE = PRF_SIZE - 32,
+        localparam int FREE_SIZE = PRF_SIZE,
         localparam int FREE_BITS = $clog2(FREE_SIZE)
 )(
         input clk,
@@ -95,14 +95,15 @@ end
 always_ff @(posedge clk or posedge rst)
 begin
         if (rst) begin
-                for (int i = 0; i < 32; i++) begin
-                        rat[i] <= i[5:0];
+                int i;
+                for (i = 0; i < 32; i++) begin
+                        rat[i] <= i[PRF_BITS-1:0];
                 end
-                for (int i = 0; i < PRF_SIZE - 32; i++) begin
-                        free_list[i] <= i[5:0] + 32;
+                for (i = 0; i < PRF_SIZE - 32; i++) begin
+                        free_list[i] <= i[PRF_BITS-1:0] + 32;
                 end
                 free_head <= 0;
-                free_tail <= 0;
+                free_tail <= i[FREE_BITS-1:0];
         end
         else begin
                 rat <= rat_next;

@@ -1,21 +1,40 @@
 .globl _start
 _start:
         li a0, 1
-        li a1, 2
-        li t0, 1000
-        la t1, halt
-        csrw mepc, t1
-        mret 
-
-fib_loop:
-        add a2, a1, a0
-        mv a0, a1
-        mv a1, a2
-        sw a2, 0(x0)
-        blt a2, t0, fib_loop
+        addi a0, a0, 1
         nop
-
-        sw a1, 0(x0)
+        nop
+        nop
+        nop
+        addi a0, a0, 1
+        addi a0, a0, 1
+        nop
+        nop
+        nop
+        nop
+        addi a0, a0, 1
+        nop
+        addi a0, a0, 1
+        nop
+        nop
+        nop
+        nop
+        addi a0, a0, 1
+        nop
+        nop
+        addi a0, a0, 1
+        nop
+        nop
+        nop
+        nop
+        addi a0, a0, 1
+        nop
+        nop
+        nop
+        addi a0, a0, 1
+        nop
+        nop
+        nop
+        nop
 halt:
         j halt
-         

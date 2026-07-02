@@ -204,16 +204,16 @@ package rv32;
         typedef struct packed {
                 ctrl_t ctrl_word;
 
-                logic [5:0] prs1;
+                logic [6:0] prs1;
                 logic in1_ready;
 
-                logic [5:0] prs2;
+                logic [6:0] prs2;
                 logic in2_ready;
 
                 logic [11:0] csrs;
 
-                logic [5:0] prd_old;
-                logic [5:0] prd_new;
+                logic [6:0] prd_old;
+                logic [6:0] prd_new;
 
                 logic [31:0] pc;
                 logic [31:0] imm;
@@ -227,21 +227,22 @@ package rv32;
                 ctrl_t ctrl_word;
                 speculation_meta_t speculation_meta;
 
-                logic [5:0] prd;
-                logic [5:0] prd_old;
+                logic [6:0] prd;
+                logic [6:0] prd_old;
 
                 logic [11:0] csrd;
                 logic [31:0] csr_val;
 
                 logic [31:0] pc;
 
-                logic [31:0][5:0] rat;
-                logic [4:0] free_head;
-                logic [63:0] preg_ready;
+                logic [31:0][6:0] rat;
+                logic [6:0] free_head;
+                logic [127:0] preg_ready;
 
                 logic [31:0] value;
                 
                 logic valid;
+                logic executing;
                 logic ready;
         } rob_entry_t;
 

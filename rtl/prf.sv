@@ -1,8 +1,7 @@
 `timescale 1ps / 1ps
 module prf
 #(
-        parameter int PRF_SIZE = 64,
-        localparam int PRF_BITS = $clog2(PRF_SIZE)
+        parameter int PRF_SIZE = 64
 )(
         input clk,
         input rst,
@@ -23,7 +22,7 @@ begin
                         prf[i] <= 0;
                 end
         end
-        else if (cdb_ifc.dest != 0) begin
+        else if (cdb_ifc.update && cdb_ifc.valid && (cdb_ifc.dest != 0)) begin
                 prf[cdb_ifc.dest] <= cdb_ifc.value;
         end
 end
@@ -47,12 +46,12 @@ always_comb
 begin
         preg_ready_next = preg_ready;
 
-        if (cdb_ifc.update && (cdb_ifc.dest != 0)) begin
-                preg_ready_next[cdb_ifc.dest] = cdb_ifc.valid;
-        end
-
         if (cdb_ifc.rollback) begin
                 preg_ready_next = cdb_ifc.preg_ready | preg_ready;
+        end
+
+        if (cdb_ifc.update && (cdb_ifc.dest != 0)) begin
+                preg_ready_next[cdb_ifc.dest] = cdb_ifc.valid;
         end
 
         if (issue_ifc.issue && (issue_ifc.prd_new != 0)) begin
@@ -63,7 +62,7 @@ end
 always_ff @(posedge clk or posedge rst)
 begin
         if (rst) begin
-                preg_ready <= 64'hffffffff;
+                preg_ready <= {{{PRF_SIZE-32}{1'b0}}, 32'hffffffff};
         end
         else begin
                 preg_ready <= preg_ready_next;
