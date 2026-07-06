@@ -6,7 +6,7 @@ module csrf
         input rst,
 
         // Read/write port
-        dispatch_ifc.csrf dispatch_ifc,
+        issue_ifc.csrf issue_ifc,
 
         commit_ifc.csrf commit_ifc,
 
@@ -31,6 +31,9 @@ logic [31:0] mcause, mcause_next;
 logic [31:0] mtval, mtval_next;
 logic [31:0] mip, mip_next;
 
+logic [31:0] cycles;
+logic [31:0] instret;
+
 //==================================
 //      CSR READ
 //==================================
@@ -38,25 +41,25 @@ logic [31:0] mip, mip_next;
 always_ff @(posedge clk or posedge rst)
 begin
         if (rst) begin
-                dispatch_ifc.csr_val = 0;
+                issue_ifc.csr_val = 0;
         end
         else begin
-                case (dispatch_ifc.csrs)
-                12'hf11: dispatch_ifc.csr_val = mvendorid;
-                12'hf12: dispatch_ifc.csr_val = marchid;
-                12'hf13: dispatch_ifc.csr_val = mimpid;
-                12'hf14: dispatch_ifc.csr_val = mhartid;
-                12'h300: dispatch_ifc.csr_val = mstatus;
-                12'h310: dispatch_ifc.csr_val = mstatush;
-                12'h301: dispatch_ifc.csr_val = misa;
-                12'h304: dispatch_ifc.csr_val = mie;
-                12'h305: dispatch_ifc.csr_val = mtvec;
-                12'h340: dispatch_ifc.csr_val = mscratch;
-                12'h341: dispatch_ifc.csr_val = mepc;
-                12'h342: dispatch_ifc.csr_val = mcause;
-                12'h343: dispatch_ifc.csr_val = mtval;
-                12'h344: dispatch_ifc.csr_val = mip;
-                default: dispatch_ifc.csr_val = 0;
+                case (issue_ifc.csrs)
+                12'hf11: issue_ifc.csr_val = mvendorid;
+                12'hf12: issue_ifc.csr_val = marchid;
+                12'hf13: issue_ifc.csr_val = mimpid;
+                12'hf14: issue_ifc.csr_val = mhartid;
+                12'h300: issue_ifc.csr_val = mstatus;
+                12'h310: issue_ifc.csr_val = mstatush;
+                12'h301: issue_ifc.csr_val = misa;
+                12'h304: issue_ifc.csr_val = mie;
+                12'h305: issue_ifc.csr_val = mtvec;
+                12'h340: issue_ifc.csr_val = mscratch;
+                12'h341: issue_ifc.csr_val = mepc;
+                12'h342: issue_ifc.csr_val = mcause;
+                12'h343: issue_ifc.csr_val = mtval;
+                12'h344: issue_ifc.csr_val = mip;
+                default: issue_ifc.csr_val = 0;
                 endcase
         end
 end
@@ -114,6 +117,9 @@ begin
                 mcause <= 0;
                 mtval <= 0;
                 mip <= 0;
+
+                cycles <= 0;
+                instret <= 0;
         end
         else begin
                 mstatus <= mstatus_next;
@@ -126,6 +132,9 @@ begin
                 mcause <= mcause_next;
                 mtval <= mtval_next;
                 mip <= mip_next;
+
+                cycles <= cycles + 1;
+                instret <= instret + (commit_ifc.commit ? 1 : 0);
         end
 end
 

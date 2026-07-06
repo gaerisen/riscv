@@ -1,6 +1,6 @@
 `timescale 1ps / 1ps
 
-module rs
+module iq
 import rv32::*;
 #(
         parameter int PRF_SIZE = 64,
@@ -17,11 +17,11 @@ import rv32::*;
 
         global_ctrl_ifc.rs ctrl_ifc,
 
-        issue_ifc.rs issue_ifc,
+        dispatch_ifc.rs dispatch_ifc,
 
         cdb_ifc.rs cdb_ifc,
 
-        dispatch_ifc.rs dispatch_ifc
+        issue_ifc.rs issue_ifc
 );
 
 rs_entry_t entries [NUM_ENTRIES-1:0];
@@ -30,9 +30,9 @@ rs_entry_t overflow_next;
 rs_entry_t overflow;
 
 logic [ENTRIES_BITS-1:0] fill_idx;
-logic [ENTRIES_BITS-1:0] dispatch_idx;
+logic [ENTRIES_BITS-1:0] issue_idx;
 
-logic dispatch_next;
+logic issue_next;
 ctrl_t ctrl_word_next;
 logic [PRF_BITS-1:0] prd_old_next;
 logic [PRF_BITS-1:0] prd_new_next;
@@ -47,21 +47,21 @@ logic full;
 // Entry selection
 always_comb
 begin
-        dispatch_idx = 0;
+        issue_idx = 0;
         fill_idx = 0;
 
-        dispatch_next = 0;
+        issue_next = 0;
 
         for (int i = 0; i < NUM_ENTRIES; i++) begin
                 if (entries[i].full & entries[i].ready) begin
-                        dispatch_idx = i[ENTRIES_BITS-1:0];
-                        dispatch_next = 1;
+                        issue_idx = i[ENTRIES_BITS-1:0];
+                        issue_next = 1;
                         break;
                 end
         end
 
-        if (dispatch_next) begin
-                fill_idx = dispatch_idx;
+        if (issue_next) begin
+                fill_idx = issue_idx;
         end
         else begin
                 for (int i = 0; i < NUM_ENTRIES; i++) begin
@@ -72,7 +72,7 @@ begin
                 end
         end
 
-        full = !dispatch_next;
+        full = !issue_next;
 
         for (int i = 0; i < NUM_ENTRIES; i++) begin
                 full &= entries[i].full;
@@ -85,9 +85,9 @@ assign ctrl_ifc.rs_stall = full;
 always_comb
 begin
         // Signals needed for register read go out immediately
-        dispatch_ifc.prs1 = 0;
-        dispatch_ifc.prs2 = 0;
-        dispatch_ifc.csrs = 0;
+        issue_ifc.prs1 = 0;
+        issue_ifc.prs2 = 0;
+        issue_ifc.csrs = 0;
 
         // Signals not involved in register read go out as pipeline registers
         ctrl_word_next = 0;
@@ -98,42 +98,42 @@ begin
         imm_next = 0;
         tag_next = 0;
 
-        if (dispatch_next) begin
-                dispatch_ifc.prs1 = entries[dispatch_idx].prs1;
-                dispatch_ifc.prs2 = entries[dispatch_idx].prs2;
-                dispatch_ifc.csrs = entries[dispatch_idx].csrs;
+        if (issue_next) begin
+                issue_ifc.prs1 = entries[issue_idx].prs1;
+                issue_ifc.prs2 = entries[issue_idx].prs2;
+                issue_ifc.csrs = entries[issue_idx].csrs;
 
-                ctrl_word_next = entries[dispatch_idx].ctrl_word;
-                prd_new_next = entries[dispatch_idx].prd_new;
-                prd_old_next = entries[dispatch_idx].prd_old;
-                csrd_next = entries[dispatch_idx].csrs;
-                pc_next = entries[dispatch_idx].pc;
-                imm_next = entries[dispatch_idx].imm;
-                tag_next = entries[dispatch_idx].tag;
+                ctrl_word_next = entries[issue_idx].ctrl_word;
+                prd_new_next = entries[issue_idx].prd_new;
+                prd_old_next = entries[issue_idx].prd_old;
+                csrd_next = entries[issue_idx].csrs;
+                pc_next = entries[issue_idx].pc;
+                imm_next = entries[issue_idx].imm;
+                tag_next = entries[issue_idx].tag;
         end
 end
 
 always_ff @(posedge clk or posedge rst)
 begin
         if (rst) begin
-                dispatch_ifc.dispatch <= 0;
-                dispatch_ifc.ctrl_word <= 0;
-                dispatch_ifc.prd_new <= 0;
-                dispatch_ifc.prd_old <= 0;
-                dispatch_ifc.csrd <= 0;
-                dispatch_ifc.pc <= 0;
-                dispatch_ifc.imm <= 0;
-                dispatch_ifc.tag <= 0;
+                issue_ifc.issue <= 0;
+                issue_ifc.ctrl_word <= 0;
+                issue_ifc.prd_new <= 0;
+                issue_ifc.prd_old <= 0;
+                issue_ifc.csrd <= 0;
+                issue_ifc.pc <= 0;
+                issue_ifc.imm <= 0;
+                issue_ifc.tag <= 0;
         end
         else begin
-                dispatch_ifc.dispatch <= dispatch_next;
-                dispatch_ifc.ctrl_word <= ctrl_word_next;
-                dispatch_ifc.prd_new <= prd_new_next;
-                dispatch_ifc.prd_old <= prd_old_next;
-                dispatch_ifc.csrd <= csrd_next;
-                dispatch_ifc.pc <= pc_next;
-                dispatch_ifc.imm <= imm_next;
-                dispatch_ifc.tag <= tag_next;
+                issue_ifc.issue <= issue_next;
+                issue_ifc.ctrl_word <= ctrl_word_next;
+                issue_ifc.prd_new <= prd_new_next;
+                issue_ifc.prd_old <= prd_old_next;
+                issue_ifc.csrd <= csrd_next;
+                issue_ifc.pc <= pc_next;
+                issue_ifc.imm <= imm_next;
+                issue_ifc.tag <= tag_next;
         end
 end
 // New entry construction
@@ -143,32 +143,32 @@ begin
                 entries_next[i] = entries[i];
         end
 
-        if (dispatch_next) begin
-                entries_next[dispatch_idx].full = 0;
+        if (issue_next) begin
+                entries_next[issue_idx].full = 0;
                 if (overflow.full) begin
                         entries_next[fill_idx] = overflow;
                 end
         end
         
-        if (issue_ifc.issue & !full) begin
-                entries_next[fill_idx].ctrl_word = issue_ifc.ctrl_word;
-                entries_next[fill_idx].spec_mask = issue_ifc.spec_mask;
-                entries_next[fill_idx].prs1 = issue_ifc.prs1;
-                entries_next[fill_idx].prs2 = issue_ifc.prs2;
-                entries_next[fill_idx].csrs = issue_ifc.csrs;
-                entries_next[fill_idx].prd_old = issue_ifc.prd_old;
-                entries_next[fill_idx].prd_new = issue_ifc.prd_new;
-                entries_next[fill_idx].imm = issue_ifc.imm;
-                entries_next[fill_idx].pc = issue_ifc.pc;
-                entries_next[fill_idx].tag = issue_ifc.tag;
+        if (dispatch_ifc.dispatch & !full) begin
+                entries_next[fill_idx].ctrl_word = dispatch_ifc.ctrl_word;
+                entries_next[fill_idx].spec_mask = dispatch_ifc.spec_mask;
+                entries_next[fill_idx].prs1 = dispatch_ifc.prs1;
+                entries_next[fill_idx].prs2 = dispatch_ifc.prs2;
+                entries_next[fill_idx].csrs = dispatch_ifc.csrs;
+                entries_next[fill_idx].prd_old = dispatch_ifc.prd_old;
+                entries_next[fill_idx].prd_new = dispatch_ifc.prd_new;
+                entries_next[fill_idx].imm = dispatch_ifc.imm;
+                entries_next[fill_idx].pc = dispatch_ifc.pc;
+                entries_next[fill_idx].tag = dispatch_ifc.tag;
 
-                unique case (issue_ifc.ctrl_word.alu_src)
+                unique case (dispatch_ifc.ctrl_word.alu_src)
                 REG_REG: begin
-                        entries_next[fill_idx].in1_ready = issue_ifc.preg_ready[issue_ifc.prs1];
-                        entries_next[fill_idx].in2_ready = issue_ifc.preg_ready[issue_ifc.prs2];
+                        entries_next[fill_idx].in1_ready = dispatch_ifc.preg_ready[dispatch_ifc.prs1];
+                        entries_next[fill_idx].in2_ready = dispatch_ifc.preg_ready[dispatch_ifc.prs2];
                 end
                 REG_IMM: begin
-                        entries_next[fill_idx].in1_ready = issue_ifc.preg_ready[issue_ifc.prs1];
+                        entries_next[fill_idx].in1_ready = dispatch_ifc.preg_ready[dispatch_ifc.prs1];
                         entries_next[fill_idx].in2_ready = 1;
                 end
                 ZERO_IMM: begin
@@ -187,25 +187,25 @@ begin
                                 entries_next[fill_idx].in2_ready;
         end
 
-        if (issue_ifc.issue & full) begin
-                overflow_next.ctrl_word = issue_ifc.ctrl_word;
-                overflow_next.spec_mask = issue_ifc.spec_mask;
-                overflow_next.prs1 = issue_ifc.prs1;
-                overflow_next.prs2 = issue_ifc.prs2;
-                overflow_next.csrs = issue_ifc.csrs;
-                overflow_next.prd_old = issue_ifc.prd_old;
-                overflow_next.prd_new = issue_ifc.prd_new;
-                overflow_next.imm = issue_ifc.imm;
-                overflow_next.pc = issue_ifc.pc;
-                overflow_next.tag = issue_ifc.tag;
+        if (dispatch_ifc.dispatch & full) begin
+                overflow_next.ctrl_word = dispatch_ifc.ctrl_word;
+                overflow_next.spec_mask = dispatch_ifc.spec_mask;
+                overflow_next.prs1 = dispatch_ifc.prs1;
+                overflow_next.prs2 = dispatch_ifc.prs2;
+                overflow_next.csrs = dispatch_ifc.csrs;
+                overflow_next.prd_old = dispatch_ifc.prd_old;
+                overflow_next.prd_new = dispatch_ifc.prd_new;
+                overflow_next.imm = dispatch_ifc.imm;
+                overflow_next.pc = dispatch_ifc.pc;
+                overflow_next.tag = dispatch_ifc.tag;
 
-                unique case (issue_ifc.ctrl_word.alu_src)
+                unique case (dispatch_ifc.ctrl_word.alu_src)
                 REG_REG: begin
-                        overflow_next.in1_ready = issue_ifc.preg_ready[issue_ifc.prs1];
-                        overflow_next.in2_ready = issue_ifc.preg_ready[issue_ifc.prs2];
+                        overflow_next.in1_ready = dispatch_ifc.preg_ready[dispatch_ifc.prs1];
+                        overflow_next.in2_ready = dispatch_ifc.preg_ready[dispatch_ifc.prs2];
                 end
                 REG_IMM: begin
-                        overflow_next.in1_ready = issue_ifc.preg_ready[issue_ifc.prs1];
+                        overflow_next.in1_ready = dispatch_ifc.preg_ready[dispatch_ifc.prs1];
                         overflow_next.in2_ready = 1;
                 end
                 ZERO_IMM: begin
@@ -223,7 +223,7 @@ begin
                                 overflow_next.in1_ready &
                                 overflow_next.in2_ready;
         end
-        else if (dispatch_next & !full) begin
+        else if (issue_next & !full) begin
                 overflow_next = 0;
         end
         else begin
@@ -287,4 +287,4 @@ begin
         end
 end
 
-endmodule: rs
+endmodule: iq

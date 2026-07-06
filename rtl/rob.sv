@@ -19,9 +19,9 @@ import rv32::*;
 
         global_ctrl_ifc.rob ctrl_ifc,
 
-        issue_ifc.rob issue_ifc,
-
         dispatch_ifc.rob dispatch_ifc,
+
+        issue_ifc.rob issue_ifc,
         
         cdb_ifc.rob cdb_ifc,
 
@@ -88,8 +88,8 @@ begin
 end
 
 // Stall logic
-assign issued_is_system = issue_ifc.ctrl_word.exception | issue_ifc.ctrl_word.trapret |
-                issue_ifc.ctrl_word.wfi | issue_ifc.ctrl_word.csr_we;
+assign issued_is_system = dispatch_ifc.ctrl_word.exception | dispatch_ifc.ctrl_word.trapret |
+                dispatch_ifc.ctrl_word.wfi | dispatch_ifc.ctrl_word.csr_we;
 
 assign committed_is_system = rob[rob_head].ctrl_word.exception |
                                 rob[rob_head].ctrl_word.trapret |
@@ -102,7 +102,7 @@ begin
                 sys_in_flight = !(ctrl_ifc.flush | (commit_ifc.commit & committed_is_system));
         end
         else begin
-                sys_in_flight = issue_ifc.issue & issued_is_system;
+                sys_in_flight = dispatch_ifc.dispatch & issued_is_system;
         end
 end
 
@@ -127,7 +127,7 @@ initial begin
         $dumpvars(0, rob);
 end
 
-assign issue_ifc.tag = rob_tail;
+assign dispatch_ifc.tag = rob_tail;
 
 // ROB pointer update logic
 always_comb
@@ -139,7 +139,7 @@ begin
                 rob_head_next = rob_head + 1;
         end
 
-        if (issue_ifc.issue) begin
+        if (dispatch_ifc.dispatch) begin
                 rob_tail_next = rob_tail + 1;
         end
 end
@@ -161,23 +161,23 @@ always_comb
 begin
         rob_next = rob;
 
-        if (issue_ifc.issue & ~ctrl_ifc.flush) begin
+        if (dispatch_ifc.dispatch & ~ctrl_ifc.flush) begin
                 rob_next[rob_tail] = 0;
-                rob_next[rob_tail].ctrl_word = issue_ifc.ctrl_word;
-                rob_next[rob_tail].pc = issue_ifc.pc;
-                rob_next[rob_tail].rat = issue_ifc.rat;
-                rob_next[rob_tail].free_head = issue_ifc.free_head;
-                rob_next[rob_tail].preg_ready = issue_ifc.preg_ready;
-                rob_next[rob_tail].speculation_meta = issue_ifc.speculation_meta;
-                rob_next[rob_tail].spec_mask = issue_ifc.spec_mask;
+                rob_next[rob_tail].ctrl_word = dispatch_ifc.ctrl_word;
+                rob_next[rob_tail].pc = dispatch_ifc.pc;
+                rob_next[rob_tail].rat = dispatch_ifc.rat;
+                rob_next[rob_tail].free_head = dispatch_ifc.free_head;
+                rob_next[rob_tail].preg_ready = dispatch_ifc.preg_ready;
+                rob_next[rob_tail].speculation_meta = dispatch_ifc.speculation_meta;
+                rob_next[rob_tail].spec_mask = dispatch_ifc.spec_mask;
                 rob_next[rob_tail].valid = 1;
         end
 
         // Intermediate 'executing' flag. If an invalid instruction is scheduled
         // sufficiently late, it may attempt to update a tag that is now used by
         // a post-rollback instruction.
-        if (dispatch_ifc.dispatch & rob[dispatch_ifc.tag].valid) begin
-                rob_next[dispatch_ifc.tag].executing = 1;
+        if (issue_ifc.issue & rob[issue_ifc.tag].valid) begin
+                rob_next[issue_ifc.tag].executing = 1;
         end
 
         if (cdb_ifc.update & rob[cdb_ifc.tag].executing) begin

@@ -32,12 +32,12 @@ defparam ctrl_ifc.PRF_SIZE = PRF_SIZE;
 
 fet_to_dec_ifc fet_dec_ifc();
 
-issue_ifc issue_ifc();
-defparam issue_ifc.ROB_LEN = ROB_LEN;
-defparam issue_ifc.PRF_SIZE = PRF_SIZE;
-
 dispatch_ifc dispatch_ifc();
 defparam dispatch_ifc.PRF_SIZE = PRF_SIZE;
+defparam dispatch_ifc.ROB_LEN = ROB_LEN;
+
+issue_ifc issue_ifc();
+defparam issue_ifc.PRF_SIZE = PRF_SIZE;
 
 cdb_ifc cdb_ifc();
 defparam cdb_ifc.ROB_LEN = ROB_LEN;
@@ -58,12 +58,12 @@ csrf csrf(.*);
 
 fetch fetch (.*);
 
-issue issue (.*);
-defparam issue.PRF_SIZE = PRF_SIZE;
+decode decode (.*);
+defparam decode.PRF_SIZE = PRF_SIZE;
 
-rs rs (.*);
-defparam rs.PRF_SIZE = PRF_SIZE;
-defparam rs.NUM_ENTRIES = RS_ENTRIES;
+iq iq (.*);
+defparam iq.PRF_SIZE = PRF_SIZE;
+defparam iq.NUM_ENTRIES = RS_ENTRIES;
 
 execute execute (.*);
 defparam execute.PRF_SIZE = PRF_SIZE;

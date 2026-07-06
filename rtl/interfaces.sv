@@ -113,10 +113,10 @@ modport decode (
 endinterface
 
 
-/*=================*/
-/*    Issue Ifc    */
-/*=================*/
-interface issue_ifc 
+/*====================*/
+/*    Dispatch Ifc    */
+/*====================*/
+interface dispatch_ifc 
 import rv32::*;
 #(
         parameter int PRF_SIZE,
@@ -128,7 +128,7 @@ import rv32::*;
 )(
 );
 
-logic issue /* verilator public */;
+logic dispatch /* verilator public */;
 ctrl_t ctrl_word;
 logic [31:0] spec_mask;
 logic [31:0] pc /* verilator public */;
@@ -147,22 +147,22 @@ logic [FREE_BITS-1:0] free_head;
 logic [PRF_SIZE-1:0] preg_ready;
 
 modport decode (
-        output issue, ctrl_word, pc, imm, speculation_meta, spec_mask,
+        output dispatch, ctrl_word, pc, imm, speculation_meta, spec_mask,
         prs1, prs2, csrs, prd_old, prd_new, rat, free_head
 );
 
 modport rob (
-        input issue, ctrl_word, pc, rat, free_head, speculation_meta, preg_ready, spec_mask,
+        input dispatch, ctrl_word, pc, rat, free_head, speculation_meta, preg_ready, spec_mask,
         output tag
 );
 
 modport prf (
-        input issue, prd_new,
+        input dispatch, prd_new,
         output preg_ready
 );
 
 modport rs (
-        input issue, ctrl_word, pc, imm, preg_ready, spec_mask,
+        input dispatch, ctrl_word, pc, imm, preg_ready, spec_mask,
         prs1, prs2, csrs, prd_old, prd_new, tag
 );
 
@@ -173,7 +173,7 @@ endinterface
 /*====================*/
 /*    Dispatch Ifc    */
 /*====================*/
-interface dispatch_ifc
+interface issue_ifc
 import rv32::*;
 #(
         parameter int PRF_SIZE = 64,
@@ -183,7 +183,7 @@ import rv32::*;
 )(
 );
 
-logic dispatch;
+logic issue;
 ctrl_t ctrl_word;
 logic [PRF_BITS-1:0] prs1;
 logic [PRF_BITS-1:0] prs2;
@@ -200,7 +200,7 @@ logic [5:0] tag;
 
 modport rs (
         output prs1, prs2, csrs, // Asynchronous
-        output dispatch, ctrl_word, prd_old, prd_new, csrd, pc, imm, tag // Synchronous
+        output issue, ctrl_word, prd_old, prd_new, csrd, pc, imm, tag // Synchronous
 );
 
 modport prf (
@@ -214,15 +214,15 @@ modport csrf (
 );
 
 modport execute (
-        input dispatch, ctrl_word, rs1_val, rs2_val, pc, imm, prd_old, prd_new,
+        input issue, ctrl_word, rs1_val, rs2_val, pc, imm, prd_old, prd_new,
         tag, csr_val, csrd
 );
 
 modport rob (
-        input dispatch, tag
+        input issue, tag
 );
 
-endinterface: dispatch_ifc
+endinterface: issue_ifc
 
 
 /*=======================*/

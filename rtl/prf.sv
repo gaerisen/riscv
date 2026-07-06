@@ -6,9 +6,9 @@ module prf
         input clk,
         input rst,
 
-        issue_ifc.prf issue_ifc,
-
         dispatch_ifc.prf dispatch_ifc,
+
+        issue_ifc.prf issue_ifc,
 
         cdb_ifc.prf cdb_ifc
 );
@@ -30,12 +30,12 @@ end
 always_ff @(posedge clk or posedge rst)
 begin
         if (rst) begin
-                dispatch_ifc.rs1_val <= 0;
-                dispatch_ifc.rs2_val <= 0;
+                issue_ifc.rs1_val <= 0;
+                issue_ifc.rs2_val <= 0;
         end
         else begin
-                dispatch_ifc.rs1_val <= prf[dispatch_ifc.prs1];
-                dispatch_ifc.rs2_val <= prf[dispatch_ifc.prs2];
+                issue_ifc.rs1_val <= prf[issue_ifc.prs1];
+                issue_ifc.rs2_val <= prf[issue_ifc.prs2];
         end
 end
 
@@ -54,8 +54,8 @@ begin
                 preg_ready_next[cdb_ifc.dest] = preg_ready[cdb_ifc.dest] | cdb_ifc.valid;
         end
 
-        if (issue_ifc.issue && (issue_ifc.prd_new != 0)) begin
-                preg_ready_next[issue_ifc.prd_new] = 0;
+        if (dispatch_ifc.dispatch && (dispatch_ifc.prd_new != 0)) begin
+                preg_ready_next[dispatch_ifc.prd_new] = 0;
         end
 end
 
@@ -69,6 +69,6 @@ begin
         end
 end
 
-assign issue_ifc.preg_ready = preg_ready;
+assign dispatch_ifc.preg_ready = preg_ready;
 
 endmodule: prf

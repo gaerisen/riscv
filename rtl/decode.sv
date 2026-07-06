@@ -1,6 +1,6 @@
 `timescale 1ps / 1ps
 
-module issue
+module decode 
 import rv32::*;
 #(
         parameter int PRF_SIZE = 64,
@@ -15,7 +15,7 @@ import rv32::*;
 
         fet_to_dec_ifc.decode fet_dec_ifc,
 
-        issue_ifc.decode issue_ifc,
+        dispatch_ifc.decode dispatch_ifc,
 
         cdb_ifc.decode cdb_ifc,
 
@@ -27,7 +27,7 @@ instr_t instr;
 ctrl_t ctrl_word;
 logic [31:0] imm;
 logic [4:0] rd;
-logic issue_next /* verilator public */;
+logic dispatch_next /* verilator public */;
 logic [31:0] spec_mask_next;
 logic [31:0] spec_mask;
 
@@ -94,7 +94,7 @@ begin
 
         // Issue first; should be overwritten by rollback (although this isn't
         // strictly necessary since issue_next goes low on rb)
-        if ((rd != 0) & issue_next) begin
+        if ((rd != 0) & dispatch_next) begin
                 free_head_next = free_head + 1;
                 prd_new = free_list[free_head];
                 rat_next[rd] = prd_new;
@@ -141,50 +141,50 @@ end
 // ============
 always_comb
 begin
-        issue_next = fet_dec_ifc.valid;
+        dispatch_next = fet_dec_ifc.valid;
 
         if (ctrl_ifc.internal_stall | cdb_ifc.rollback) begin
-                issue_next = 0;
+                dispatch_next = 0;
         end
 end
 
 always_ff @(posedge clk or posedge rst)
 begin
         if (rst) begin
-                issue_ifc.issue <= 0;
+                dispatch_ifc.dispatch <= 0;
         end
         else begin
-                issue_ifc.issue <= issue_next;
+                dispatch_ifc.dispatch <= dispatch_next;
         end
 
         if (rst) begin
-                issue_ifc.ctrl_word <= 0;
-                issue_ifc.pc <= 0;
-                issue_ifc.imm <= 0;
-                issue_ifc.prs1 <= 0;
-                issue_ifc.prs2 <= 0;
-                issue_ifc.csrs <= 0;
-                issue_ifc.prd_old <= 0;
-                issue_ifc.prd_new <= 0;
-                issue_ifc.speculation_meta <= 0;
-                issue_ifc.rat <= 0;
-                issue_ifc.free_head <= 0;
-                issue_ifc.spec_mask <= 0;
+                dispatch_ifc.ctrl_word <= 0;
+                dispatch_ifc.pc <= 0;
+                dispatch_ifc.imm <= 0;
+                dispatch_ifc.prs1 <= 0;
+                dispatch_ifc.prs2 <= 0;
+                dispatch_ifc.csrs <= 0;
+                dispatch_ifc.prd_old <= 0;
+                dispatch_ifc.prd_new <= 0;
+                dispatch_ifc.speculation_meta <= 0;
+                dispatch_ifc.rat <= 0;
+                dispatch_ifc.free_head <= 0;
+                dispatch_ifc.spec_mask <= 0;
         end
-        else if (issue_next) begin
-                issue_ifc.ctrl_word <= ctrl_word;
-                issue_ifc.pc <= fet_dec_ifc.pc;
-                issue_ifc.imm <= imm;
-                issue_ifc.prs1 <= prs1;
-                issue_ifc.prs2 <= prs2;
-                issue_ifc.csrs <= csrs;
-                issue_ifc.prd_old <= prd_old;
-                issue_ifc.prd_new <= prd_new;
-                issue_ifc.speculation_meta <= fet_dec_ifc.speculation_meta;
-                issue_ifc.rat <= rat_next;
-                issue_ifc.free_head <= free_head_next;
-                issue_ifc.spec_mask <= spec_mask;
+        else if (dispatch_next) begin
+                dispatch_ifc.ctrl_word <= ctrl_word;
+                dispatch_ifc.pc <= fet_dec_ifc.pc;
+                dispatch_ifc.imm <= imm;
+                dispatch_ifc.prs1 <= prs1;
+                dispatch_ifc.prs2 <= prs2;
+                dispatch_ifc.csrs <= csrs;
+                dispatch_ifc.prd_old <= prd_old;
+                dispatch_ifc.prd_new <= prd_new;
+                dispatch_ifc.speculation_meta <= fet_dec_ifc.speculation_meta;
+                dispatch_ifc.rat <= rat_next;
+                dispatch_ifc.free_head <= free_head_next;
+                dispatch_ifc.spec_mask <= spec_mask;
         end
 end
 
-endmodule: issue
+endmodule: decode 

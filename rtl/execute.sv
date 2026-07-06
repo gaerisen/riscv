@@ -8,7 +8,7 @@ import rv32::*;
         input clk,
         input rst,
 
-        dispatch_ifc.execute dispatch_ifc,
+        issue_ifc.execute issue_ifc,
 
         cdb_ifc.execute cdb_ifc
 );
@@ -23,32 +23,32 @@ logic [31:0] alu_in2;
 
 always_comb
 begin
-        unique case(dispatch_ifc.ctrl_word.alu_src)
+        unique case(issue_ifc.ctrl_word.alu_src)
         REG_REG: begin
-                if (dispatch_ifc.ctrl_word.branch) begin
-                        alu_in1 = dispatch_ifc.pc;
-                        alu_in2 = dispatch_ifc.imm;
+                if (issue_ifc.ctrl_word.branch) begin
+                        alu_in1 = issue_ifc.pc;
+                        alu_in2 = issue_ifc.imm;
                 end
-                else if (dispatch_ifc.ctrl_word.store) begin
-                        alu_in1 = dispatch_ifc.rs1_val;
-                        alu_in2 = dispatch_ifc.imm;
+                else if (issue_ifc.ctrl_word.store) begin
+                        alu_in1 = issue_ifc.rs1_val;
+                        alu_in2 = issue_ifc.imm;
                 end
                 else begin
-                        alu_in1 = dispatch_ifc.rs1_val;
-                        alu_in2 = dispatch_ifc.rs2_val;
+                        alu_in1 = issue_ifc.rs1_val;
+                        alu_in2 = issue_ifc.rs2_val;
                 end
         end
         REG_IMM: begin
-                alu_in1 = dispatch_ifc.rs1_val;
-                alu_in2 = dispatch_ifc.imm;
+                alu_in1 = issue_ifc.rs1_val;
+                alu_in2 = issue_ifc.imm;
         end
         ZERO_IMM: begin
                 alu_in1 = 0;
-                alu_in2 = dispatch_ifc.imm;
+                alu_in2 = issue_ifc.imm;
         end
         PC_IMM: begin
-                alu_in1 = dispatch_ifc.pc;
-                alu_in2 = dispatch_ifc.imm;
+                alu_in1 = issue_ifc.pc;
+                alu_in2 = issue_ifc.imm;
         end
         endcase
 end
@@ -61,8 +61,8 @@ alu alu (
         .in1(alu_in1),
         .in2(alu_in2),
 
-        .op(dispatch_ifc.ctrl_word.alu_op),
-        .alt(dispatch_ifc.ctrl_word.alu_alt),
+        .op(issue_ifc.ctrl_word.alu_op),
+        .alt(issue_ifc.ctrl_word.alu_alt),
 
         .result(alu_result)
 );
@@ -71,10 +71,10 @@ alu alu (
 bu bu (
         .*,
 
-        .rs1_val(dispatch_ifc.rs1_val),
-        .rs2_val(dispatch_ifc.rs2_val),
+        .rs1_val(issue_ifc.rs1_val),
+        .rs2_val(issue_ifc.rs2_val),
 
-        .op(dispatch_ifc.ctrl_word.branch_op),
+        .op(issue_ifc.ctrl_word.branch_op),
 
         .result(branch_taken)
 );
@@ -83,12 +83,12 @@ bu bu (
 csru csru (
         .*,
 
-        .rs1_val(dispatch_ifc.rs1_val),
+        .rs1_val(issue_ifc.rs1_val),
 
-        .op(dispatch_ifc.ctrl_word.csr_op),
-        .src(dispatch_ifc.ctrl_word.csr_src),
+        .op(issue_ifc.ctrl_word.csr_op),
+        .src(issue_ifc.ctrl_word.csr_src),
 
-        .imm(dispatch_ifc.imm),
+        .imm(issue_ifc.imm),
 
         .csr_old(0),
 
@@ -98,19 +98,19 @@ csru csru (
 always_comb
 begin
         result_exe_next = 0;
-        rd_exe_next = dispatch_ifc.prd_new;
+        rd_exe_next = issue_ifc.prd_new;
 
-        unique case (dispatch_ifc.ctrl_word.wb_src)
+        unique case (issue_ifc.ctrl_word.wb_src)
         WB_ALU: begin // Decoder lets default value thru for stores
-                if (dispatch_ifc.ctrl_word.store) begin
-                        result_exe_next = dispatch_ifc.rs2_val;
+                if (issue_ifc.ctrl_word.store) begin
+                        result_exe_next = issue_ifc.rs2_val;
                 end
                 else
                         result_exe_next = alu_result;
         end
         WB_MEM: result_exe_next = 0; // TODO: Come on, bro
-        WB_PC4: result_exe_next = dispatch_ifc.pc + 32'h4;
-        WB_CSR: result_exe_next = dispatch_ifc.csr_val;
+        WB_PC4: result_exe_next = issue_ifc.pc + 32'h4;
+        WB_CSR: result_exe_next = issue_ifc.csr_val;
         endcase
 end
 
@@ -127,24 +127,20 @@ begin
                 cdb_ifc.branch_taken <= 0;
                 cdb_ifc.pc <= 0;
                 cdb_ifc.target_addr <= 0;
-
-                ctrl_ifc.tag <= 0;
         end
         else begin
-                cdb_ifc.update <= dispatch_ifc.dispatch;
+                cdb_ifc.update <= issue_ifc.issue;
                 cdb_ifc.dest <= rd_exe_next;
-                cdb_ifc.dest_old <= dispatch_ifc.prd_old;
-                cdb_ifc.csrd <= dispatch_ifc.csrd;
+                cdb_ifc.dest_old <= issue_ifc.prd_old;
+                cdb_ifc.csrd <= issue_ifc.csrd;
                 cdb_ifc.csr_result <= csr_result;
                 cdb_ifc.value <= result_exe_next;
-                cdb_ifc.tag <= dispatch_ifc.tag;
+                cdb_ifc.tag <= issue_ifc.tag;
                 cdb_ifc.branch_taken <= branch_taken;
-                cdb_ifc.pc <= dispatch_ifc.pc;
+                cdb_ifc.pc <= issue_ifc.pc;
                 cdb_ifc.target_addr <= alu_result; // Technically redundant for
                                                 // branches, but nice for jumps
                                                 // and stores
-
-                ctrl_ifc.tag <= dispatch_ifc.tag;
         end
 end
 
