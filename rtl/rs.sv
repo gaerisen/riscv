@@ -166,25 +166,9 @@ begin
                 REG_REG: begin
                         entries_next[fill_idx].in1_ready = issue_ifc.preg_ready[issue_ifc.prs1];
                         entries_next[fill_idx].in2_ready = issue_ifc.preg_ready[issue_ifc.prs2];
-
-                        if (cdb_ifc.update && (cdb_ifc.spec_mask == issue_ifc.spec_mask) && 
-                                (issue_ifc.prs1 == cdb_ifc.dest)) begin
-                                entries_next[fill_idx].in1_ready = 1;
-                        end
-
-                        if (cdb_ifc.update && (cdb_ifc.spec_mask == issue_ifc.spec_mask) &&
-                                (issue_ifc.prs2 == cdb_ifc.dest)) begin
-                                entries_next[fill_idx].in2_ready = 1;
-                        end
                 end
                 REG_IMM: begin
                         entries_next[fill_idx].in1_ready = issue_ifc.preg_ready[issue_ifc.prs1];
-
-                        if (cdb_ifc.update && (cdb_ifc.spec_mask == issue_ifc.spec_mask) &&
-                                (issue_ifc.prs1 == cdb_ifc.dest)) begin
-                                entries_next[fill_idx].in1_ready = 1;
-                        end
-
                         entries_next[fill_idx].in2_ready = 1;
                 end
                 ZERO_IMM: begin
@@ -219,25 +203,9 @@ begin
                 REG_REG: begin
                         overflow_next.in1_ready = issue_ifc.preg_ready[issue_ifc.prs1];
                         overflow_next.in2_ready = issue_ifc.preg_ready[issue_ifc.prs2];
-
-                        if (cdb_ifc.update && (cdb_ifc.spec_mask == issue_ifc.spec_mask) &&
-                                (issue_ifc.prs1 == cdb_ifc.dest)) begin
-                                overflow_next.in1_ready = 1;
-                        end
-
-                        if (cdb_ifc.update && (cdb_ifc.spec_mask == issue_ifc.spec_mask) &&
-                                (issue_ifc.prs2 == cdb_ifc.dest)) begin
-                                overflow_next.in2_ready = 1;
-                        end
                 end
                 REG_IMM: begin
                         overflow_next.in1_ready = issue_ifc.preg_ready[issue_ifc.prs1];
-
-                        if (cdb_ifc.update && (cdb_ifc.spec_mask == issue_ifc.spec_mask) &&
-                                (issue_ifc.prs1 == cdb_ifc.dest)) begin
-                                overflow_next.in1_ready = 1;
-                        end
-
                         overflow_next.in2_ready = 1;
                 end
                 ZERO_IMM: begin
@@ -265,7 +233,13 @@ begin
         if (cdb_ifc.update) begin
                 for (int i = 0; i < NUM_ENTRIES; i++) begin
                         if (~entries_next[i].full) continue;
-                        if (cdb_ifc.spec_mask != entries_next[i].spec_mask) continue;
+
+                        if (cdb_ifc.rollback &&
+                                (entries_next[i].spec_mask > cdb_ifc.spec_mask)) begin
+                                entries_next[i] = 0;
+                                continue;
+                        end
+
                         if (entries_next[i].prs1 == cdb_ifc.dest) begin
                                 entries_next[i].in1_ready = 1;
                         end
@@ -277,17 +251,22 @@ begin
                                         entries_next[i].in2_ready;
                 end
 
-                if (overflow_next.full && 
-                        (cdb_ifc.spec_mask == overflow_next.spec_mask)) begin
-                        if (overflow_next.prs1 == cdb_ifc.dest) begin
-                                overflow_next.in1_ready = 1;
+                if (overflow_next.full) begin
+                        if (cdb_ifc.rollback &&
+                                (overflow_next.spec_mask > cdb_ifc.spec_mask)) begin
+                                overflow_next = 0;
                         end
-                        if (overflow_next.prs2 == cdb_ifc.dest) begin
-                                overflow_next.in2_ready = 1;
+                        else begin
+                                if (overflow_next.prs1 == cdb_ifc.dest) begin
+                                        overflow_next.in1_ready = 1;
+                                end
+                                if (overflow_next.prs2 == cdb_ifc.dest) begin
+                                        overflow_next.in2_ready = 1;
+                                end
+                                overflow_next.ready = 
+                                                overflow_next.in1_ready &
+                                                overflow_next.in2_ready;
                         end
-                        overflow_next.ready = 
-                                        overflow_next.in1_ready &
-                                        overflow_next.in2_ready;
                 end
         end
 end

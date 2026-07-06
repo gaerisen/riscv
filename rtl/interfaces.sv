@@ -130,7 +130,7 @@ import rv32::*;
 
 logic issue /* verilator public */;
 ctrl_t ctrl_word;
-logic [3:0] spec_mask;
+logic [31:0] spec_mask;
 logic [31:0] pc /* verilator public */;
 logic [31:0] imm;
 logic [PRF_BITS-1:0] prs1;
@@ -242,7 +242,7 @@ import rv32::*;
 
 logic update;
 logic [ROB_BITS-1:0] tag;
-logic [3:0] spec_mask;
+logic [31:0] spec_mask;
 logic valid;
 
 logic [31:0] value;
@@ -288,7 +288,7 @@ modport execute (
 );
 
 modport rs (
-        input update, valid, dest, spec_mask
+        input update, valid, dest, spec_mask, rollback
 );
 
 modport prf (

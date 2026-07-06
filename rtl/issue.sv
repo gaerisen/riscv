@@ -28,8 +28,8 @@ ctrl_t ctrl_word;
 logic [31:0] imm;
 logic [4:0] rd;
 logic issue_next /* verilator public */;
-logic [3:0] spec_mask_next;
-logic [3:0] spec_mask;
+logic [31:0] spec_mask_next;
+logic [31:0] spec_mask;
 
 logic [31:0][PRF_BITS-1:0] rat /* verilator public */;
 logic [FREE_SIZE-1:0][PRF_BITS-1:0] free_list /* verilator public */;
