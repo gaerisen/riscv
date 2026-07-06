@@ -30,6 +30,8 @@ logic [4:0] rd;
 logic dispatch_next /* verilator public */;
 logic [31:0] spec_mask_next;
 logic [31:0] spec_mask;
+logic [4:0] spec_ctr_next;
+logic [4:0] spec_ctr;
 
 logic [31:0][PRF_BITS-1:0] rat /* verilator public */;
 logic [FREE_SIZE-1:0][PRF_BITS-1:0] free_list /* verilator public */;
@@ -61,9 +63,23 @@ decoder decoder (.*);
 always_comb
 begin
         spec_mask_next = spec_mask;
+        spec_ctr_next = spec_ctr;
 
-        if (fet_dec_ifc.speculation_meta.branch || fet_dec_ifc.speculation_meta.jump) begin
-                spec_mask_next = spec_mask + 1;
+        if (dispatch_next &&
+                (fet_dec_ifc.speculation_meta.branch || fet_dec_ifc.speculation_meta.jump)) begin 
+                spec_ctr_next = spec_ctr + 1;
+                spec_mask_next |= (32'b1 << spec_ctr);
+        end
+
+        if (cdb_ifc.resolved) begin
+                if (cdb_ifc.rollback) begin
+                        for (logic [4:0] i = cdb_ifc.spec_idx; i != spec_ctr; i++) begin
+                                spec_mask_next[i] = 0;
+                        end
+                end
+                else begin
+                        spec_mask_next[cdb_ifc.spec_idx] = 0;
+                end
         end
 end
 
@@ -71,9 +87,11 @@ always_ff @(posedge clk or posedge rst)
 begin
         if (rst) begin
                 spec_mask <= 0;
+                spec_ctr <= 0;
         end
         else begin
                 spec_mask <= spec_mask_next;
+                spec_ctr <= spec_ctr_next;
         end
 end
 
@@ -170,6 +188,7 @@ begin
                 dispatch_ifc.rat <= 0;
                 dispatch_ifc.free_head <= 0;
                 dispatch_ifc.spec_mask <= 0;
+                dispatch_ifc.spec_idx <= 0;
         end
         else if (dispatch_next) begin
                 dispatch_ifc.ctrl_word <= ctrl_word;
@@ -183,7 +202,8 @@ begin
                 dispatch_ifc.speculation_meta <= fet_dec_ifc.speculation_meta;
                 dispatch_ifc.rat <= rat_next;
                 dispatch_ifc.free_head <= free_head_next;
-                dispatch_ifc.spec_mask <= spec_mask;
+                dispatch_ifc.spec_idx <= spec_ctr;
+                dispatch_ifc.spec_mask <= spec_mask_next;
         end
 end
 

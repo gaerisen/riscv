@@ -118,6 +118,7 @@ always_ff @(posedge clk or posedge rst)
 begin
         if (rst) begin
                 cdb_ifc.update <= 0;
+                cdb_ifc.valid <= 0;
                 cdb_ifc.dest <= 0;
                 cdb_ifc.dest_old <= 0;
                 cdb_ifc.csrd <= 0;
@@ -130,6 +131,7 @@ begin
         end
         else begin
                 cdb_ifc.update <= issue_ifc.issue;
+                cdb_ifc.valid <= issue_ifc.valid;
                 cdb_ifc.dest <= rd_exe_next;
                 cdb_ifc.dest_old <= issue_ifc.prd_old;
                 cdb_ifc.csrd <= issue_ifc.csrd;

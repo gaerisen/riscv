@@ -4,7 +4,7 @@ import rv32::*;
 #(
         parameter int ROB_LEN = 64,
         parameter int PRF_SIZE = 128,
-        parameter int RS_ENTRIES = 4
+        parameter int IQ_ENTRIES = 4
 )(
         input clk,
         input rst,
@@ -63,7 +63,8 @@ defparam decode.PRF_SIZE = PRF_SIZE;
 
 iq iq (.*);
 defparam iq.PRF_SIZE = PRF_SIZE;
-defparam iq.NUM_ENTRIES = RS_ENTRIES;
+defparam iq.ROB_SIZE = ROB_LEN;
+defparam iq.NUM_ENTRIES = IQ_ENTRIES;
 
 execute execute (.*);
 defparam execute.PRF_SIZE = PRF_SIZE;

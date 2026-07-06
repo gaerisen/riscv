@@ -131,6 +131,7 @@ import rv32::*;
 logic dispatch /* verilator public */;
 ctrl_t ctrl_word;
 logic [31:0] spec_mask;
+logic [4:0] spec_idx;
 logic [31:0] pc /* verilator public */;
 logic [31:0] imm;
 logic [PRF_BITS-1:0] prs1;
@@ -147,12 +148,12 @@ logic [FREE_BITS-1:0] free_head;
 logic [PRF_SIZE-1:0] preg_ready;
 
 modport decode (
-        output dispatch, ctrl_word, pc, imm, speculation_meta, spec_mask,
+        output dispatch, ctrl_word, pc, imm, speculation_meta, spec_mask, spec_idx,
         prs1, prs2, csrs, prd_old, prd_new, rat, free_head
 );
 
 modport rob (
-        input dispatch, ctrl_word, pc, rat, free_head, speculation_meta, preg_ready, spec_mask,
+        input dispatch, ctrl_word, pc, rat, free_head, speculation_meta, preg_ready, spec_idx,
         output tag
 );
 
@@ -197,10 +198,12 @@ logic [31:0] csr_val;
 logic [31:0] pc;
 logic [31:0] imm;
 logic [5:0] tag;
+logic valid;
 
 modport rs (
         output prs1, prs2, csrs, // Asynchronous
-        output issue, ctrl_word, prd_old, prd_new, csrd, pc, imm, tag // Synchronous
+        output issue, ctrl_word, prd_old, prd_new, csrd, pc, imm, tag, // Synchronous
+        output valid
 );
 
 modport prf (
@@ -215,7 +218,7 @@ modport csrf (
 
 modport execute (
         input issue, ctrl_word, rs1_val, rs2_val, pc, imm, prd_old, prd_new,
-        tag, csr_val, csrd
+        tag, csr_val, csrd, valid
 );
 
 modport rob (
@@ -243,6 +246,7 @@ import rv32::*;
 logic update;
 logic [ROB_BITS-1:0] tag;
 logic [31:0] spec_mask;
+logic [4:0] spec_idx;
 logic valid;
 
 logic [31:0] value;
@@ -261,6 +265,7 @@ logic branch_mis_t;
 logic branch_mis_nt;
 logic jump_mis;
 logic rollback;
+logic resolved;
 
 logic [31:0][PRF_BITS-1:0] rat;
 logic [FREE_BITS-1:0] free_head;
@@ -277,18 +282,19 @@ assign jump_mis = update & speculation_meta.jump &
         (speculation_meta.target != target_addr);
 
 assign rollback = branch_mis_t | branch_mis_nt | jump_mis;
+assign resolved = update & (speculation_meta.branch | speculation_meta.jump);
 
 modport decode (
-        input rollback, rat, free_head
+        input rollback, rat, free_head, spec_idx, resolved
 );
 
 modport execute (
         output update, tag, value, dest, dest_old, branch_taken, target_addr, pc,
-        csrd, csr_result
+        csrd, csr_result, valid
 );
 
 modport rs (
-        input update, valid, dest, spec_mask, rollback
+        input update, valid, dest, spec_idx, rollback
 );
 
 modport prf (
@@ -297,7 +303,7 @@ modport prf (
 
 modport rob (
         input update, tag, value, dest, dest_old, rollback, csrd, csr_result,
-        output speculation_meta, rat, free_head, preg_ready, valid, spec_mask
+        output speculation_meta, rat, free_head, preg_ready, spec_idx
 );
 
 modport fetch (

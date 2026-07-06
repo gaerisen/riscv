@@ -3,12 +3,11 @@
 module iq
 import rv32::*;
 #(
-        parameter int PRF_SIZE = 64,
+        parameter int PRF_SIZE,
         localparam int PRF_BITS = $clog2(PRF_SIZE),
-        parameter int NUM_ENTRIES = 4,
-        localparam int ENTRIES_BITS = $clog2(NUM_ENTRIES),
-//        localparam int ENTRIES_BITS = 1,
-        parameter int ROB_SIZE = 64,
+        parameter int NUM_ENTRIES,
+        localparam int ENTRIES_BITS = (NUM_ENTRIES == 1) ? 1 : $clog2(NUM_ENTRIES),
+        parameter int ROB_SIZE,
         localparam int ROB_BITS = $clog2(ROB_SIZE)
 
 )(
@@ -40,9 +39,11 @@ logic [11:0] csrd_next;
 logic [31:0] pc_next;
 logic [31:0] imm_next;
 logic [ROB_BITS-1:0] tag_next;
+logic valid_next;
 
 logic full;
 
+logic [ROB_BITS-1:0] tag_lowest;
 
 // Entry selection
 always_comb
@@ -97,6 +98,7 @@ begin
         pc_next = 0;
         imm_next = 0;
         tag_next = 0;
+        valid_next = 0;
 
         if (issue_next) begin
                 issue_ifc.prs1 = entries[issue_idx].prs1;
@@ -110,6 +112,7 @@ begin
                 pc_next = entries[issue_idx].pc;
                 imm_next = entries[issue_idx].imm;
                 tag_next = entries[issue_idx].tag;
+                valid_next = entries[issue_idx].valid;
         end
 end
 
@@ -124,6 +127,7 @@ begin
                 issue_ifc.pc <= 0;
                 issue_ifc.imm <= 0;
                 issue_ifc.tag <= 0;
+                issue_ifc.valid <= 0;
         end
         else begin
                 issue_ifc.issue <= issue_next;
@@ -134,6 +138,7 @@ begin
                 issue_ifc.pc <= pc_next;
                 issue_ifc.imm <= imm_next;
                 issue_ifc.tag <= tag_next;
+                issue_ifc.valid <= valid_next;
         end
 end
 // New entry construction
@@ -182,6 +187,7 @@ begin
                 endcase
 
                 entries_next[fill_idx].full = 1;
+                entries_next[fill_idx].valid = 1;
                 entries_next[fill_idx].ready = 
                                 entries_next[fill_idx].in1_ready &
                                 entries_next[fill_idx].in2_ready;
@@ -219,6 +225,7 @@ begin
                 endcase
 
                 overflow_next.full = 1;
+                overflow_next.valid = 1;
                 overflow_next.ready = 
                                 overflow_next.in1_ready &
                                 overflow_next.in2_ready;
@@ -235,7 +242,7 @@ begin
                         if (~entries_next[i].full) continue;
 
                         if (cdb_ifc.rollback &&
-                                (entries_next[i].spec_mask > cdb_ifc.spec_mask)) begin
+                                entries_next[i].spec_mask[cdb_ifc.spec_idx]) begin
                                 entries_next[i] = 0;
                                 continue;
                         end
@@ -253,7 +260,7 @@ begin
 
                 if (overflow_next.full) begin
                         if (cdb_ifc.rollback &&
-                                (overflow_next.spec_mask > cdb_ifc.spec_mask)) begin
+                                overflow_next.spec_mask[cdb_ifc.spec_idx]) begin
                                 overflow_next = 0;
                         end
                         else begin

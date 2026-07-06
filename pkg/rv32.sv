@@ -161,7 +161,6 @@ package rv32;
                 logic branch_taken;
                 logic jump;
                 logic [31:0] target;
-                logic [31:0] spec_mask;
         } speculation_meta_t;
 
         /*====================================================================*/
@@ -221,13 +220,14 @@ package rv32;
 
                 logic [5:0] tag;
                 logic full;
+                logic valid;
                 logic ready;
         } rs_entry_t;
 
         typedef struct packed {
                 ctrl_t ctrl_word;
                 speculation_meta_t speculation_meta;
-                logic [31:0] spec_mask;
+                logic [4:0] spec_idx;
 
                 logic [6:0] prd;
                 logic [6:0] prd_old;

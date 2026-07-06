@@ -49,11 +49,10 @@ logic [31:0] pc; // For debugging
 assign commit_ifc.commit = rob[rob_head].valid & rob[rob_head].ready;
 
 assign cdb_ifc.speculation_meta = rob[cdb_ifc.tag].speculation_meta;
-assign cdb_ifc.spec_mask = rob[cdb_ifc.tag].spec_mask;
+assign cdb_ifc.spec_idx = rob[cdb_ifc.tag].spec_idx;
 assign cdb_ifc.rat = rob[cdb_ifc.tag].rat;
 assign cdb_ifc.free_head = rob[cdb_ifc.tag].free_head;
 assign cdb_ifc.preg_ready = rob[cdb_ifc.tag].preg_ready;
-assign cdb_ifc.valid = rob[cdb_ifc.tag].executing;
 
 // Commit logic
 
@@ -169,7 +168,7 @@ begin
                 rob_next[rob_tail].free_head = dispatch_ifc.free_head;
                 rob_next[rob_tail].preg_ready = dispatch_ifc.preg_ready;
                 rob_next[rob_tail].speculation_meta = dispatch_ifc.speculation_meta;
-                rob_next[rob_tail].spec_mask = dispatch_ifc.spec_mask;
+                rob_next[rob_tail].spec_idx = dispatch_ifc.spec_idx;
                 rob_next[rob_tail].valid = 1;
         end
 
