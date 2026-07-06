@@ -51,7 +51,7 @@ begin
         end
 
         if (cdb_ifc.update && (cdb_ifc.dest != 0)) begin
-                preg_ready_next[cdb_ifc.dest] = cdb_ifc.valid;
+                preg_ready_next[cdb_ifc.dest] = preg_ready[cdb_ifc.dest] | cdb_ifc.valid;
         end
 
         if (issue_ifc.issue && (issue_ifc.prd_new != 0)) begin

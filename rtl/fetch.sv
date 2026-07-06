@@ -132,10 +132,12 @@ logic inc_predictor;
 logic dec_predictor;
 
 assign inc_predictor =  cdb_ifc.update &
+                        cdb_ifc.valid &
                         cdb_ifc.speculation_meta.branch &
                         cdb_ifc.branch_taken;
 
 assign dec_predictor =  cdb_ifc.update &
+                        cdb_ifc.valid &
                         cdb_ifc.speculation_meta.branch &
                         ~cdb_ifc.branch_taken;
 

@@ -49,6 +49,7 @@ logic [31:0] pc; // For debugging
 assign commit_ifc.commit = rob[rob_head].valid & rob[rob_head].ready;
 
 assign cdb_ifc.speculation_meta = rob[cdb_ifc.tag].speculation_meta;
+assign cdb_ifc.spec_mask = rob[cdb_ifc.tag].spec_mask;
 assign cdb_ifc.rat = rob[cdb_ifc.tag].rat;
 assign cdb_ifc.free_head = rob[cdb_ifc.tag].free_head;
 assign cdb_ifc.preg_ready = rob[cdb_ifc.tag].preg_ready;
@@ -134,15 +135,8 @@ begin
         rob_head_next = rob_head;
         rob_tail_next = rob_tail;
 
-        if (commit_ifc.commit | !rob[rob_head].valid) begin
-                for (rob_head_next = rob_head + 1;
-                !rob[rob_head_next].valid;
-                rob_head_next++) begin
-                        if (rob_head_next == rob_head) begin
-                                rob_head_next = rob_tail;
-                                break;
-                        end
-                end
+        if (rob[rob_head].ready) begin
+                rob_head_next = rob_head + 1;
         end
 
         if (issue_ifc.issue) begin
@@ -175,6 +169,7 @@ begin
                 rob_next[rob_tail].free_head = issue_ifc.free_head;
                 rob_next[rob_tail].preg_ready = issue_ifc.preg_ready;
                 rob_next[rob_tail].speculation_meta = issue_ifc.speculation_meta;
+                rob_next[rob_tail].spec_mask = issue_ifc.spec_mask;
                 rob_next[rob_tail].valid = 1;
         end
 
@@ -195,13 +190,13 @@ begin
         end
 
         if (cdb_ifc.rollback) begin
-                for (logic [ROB_BITS-1:0] i = cdb_ifc.tag; i != rob_tail; i++) begin
-                        rob_next[i].valid = 0;
+                for (logic [ROB_BITS-1:0] i = cdb_ifc.tag + 1; i != rob_tail_next; i++) begin
+                        rob_next[i] = 0;
                         rob_next[i].ready = 1;
                 end
         end
 
-        if (commit_ifc.commit) begin
+        if (rob[rob_head].ready) begin
                 rob_next[rob_head] = 0;
         end
 end

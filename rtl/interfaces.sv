@@ -119,17 +119,18 @@ endinterface
 interface issue_ifc 
 import rv32::*;
 #(
-        parameter int PRF_SIZE = 64,
+        parameter int PRF_SIZE,
         localparam int PRF_BITS = $clog2(PRF_SIZE),
-        parameter int ROB_LEN = 64,
+        parameter int ROB_LEN,
         localparam int ROB_BITS = $clog2(ROB_LEN),
-        localparam int FREE_SIZE = PRF_SIZE - 32,
+        localparam int FREE_SIZE = PRF_SIZE,
         localparam int FREE_BITS = $clog2(FREE_SIZE)
 )(
 );
 
 logic issue /* verilator public */;
 ctrl_t ctrl_word;
+logic [3:0] spec_mask;
 logic [31:0] pc /* verilator public */;
 logic [31:0] imm;
 logic [PRF_BITS-1:0] prs1;
@@ -138,7 +139,7 @@ logic [11:0] csrs;
 logic [PRF_BITS-1:0] prd_old;
 logic [PRF_BITS-1:0] prd_new;
 speculation_meta_t speculation_meta;
-logic [5:0] tag;
+logic [ROB_BITS-1:0] tag;
 
 logic [31:0][PRF_BITS-1:0] rat;
 logic [FREE_BITS-1:0] free_head;
@@ -146,12 +147,12 @@ logic [FREE_BITS-1:0] free_head;
 logic [PRF_SIZE-1:0] preg_ready;
 
 modport decode (
-        output issue, ctrl_word, pc, imm, speculation_meta,
+        output issue, ctrl_word, pc, imm, speculation_meta, spec_mask,
         prs1, prs2, csrs, prd_old, prd_new, rat, free_head
 );
 
 modport rob (
-        input issue, ctrl_word, pc, rat, free_head, speculation_meta, preg_ready,
+        input issue, ctrl_word, pc, rat, free_head, speculation_meta, preg_ready, spec_mask,
         output tag
 );
 
@@ -161,7 +162,7 @@ modport prf (
 );
 
 modport rs (
-        input issue, ctrl_word, pc, imm, preg_ready,
+        input issue, ctrl_word, pc, imm, preg_ready, spec_mask,
         prs1, prs2, csrs, prd_old, prd_new, tag
 );
 
@@ -230,17 +231,18 @@ endinterface: dispatch_ifc
 interface cdb_ifc
 import rv32::*;
 #(
-        parameter int PRF_SIZE = 64,
+        parameter int PRF_SIZE,
         localparam int PRF_BITS = $clog2(PRF_SIZE),
-        parameter int ROB_LEN = 64,
+        parameter int ROB_LEN,
         localparam int ROB_BITS = $clog2(ROB_LEN),
-        localparam int FREE_SIZE = PRF_SIZE - 32,
+        localparam int FREE_SIZE = PRF_SIZE,
         localparam int FREE_BITS = $clog2(FREE_SIZE)
 )(
 );
 
 logic update;
 logic [ROB_BITS-1:0] tag;
+logic [3:0] spec_mask;
 logic valid;
 
 logic [31:0] value;
@@ -286,7 +288,7 @@ modport execute (
 );
 
 modport rs (
-        input update, dest
+        input update, valid, dest, spec_mask
 );
 
 modport prf (
@@ -295,11 +297,11 @@ modport prf (
 
 modport rob (
         input update, tag, value, dest, dest_old, rollback, csrd, csr_result,
-        output speculation_meta, rat, free_head, preg_ready, valid
+        output speculation_meta, rat, free_head, preg_ready, valid, spec_mask
 );
 
 modport fetch (
-        input update, speculation_meta, branch_taken,
+        input update, valid, speculation_meta, branch_taken,
         branch_mis_t, branch_mis_nt, jump_mis, target_addr, pc
 );
 
@@ -318,6 +320,7 @@ import rv32::*;
 );
 
 logic commit;
+logic ready;
 logic store;
 logic branch;
 logic exception;
@@ -334,7 +337,7 @@ logic irf_select;
 assign irf_select = commit & !(store | branch | exception | trapret);
 
 modport rob (
-        output commit, store, branch, exception, trapret,
+        output commit, ready, store, branch, exception, trapret,
         trap_cause, value, dest, dest_old, csr_val, csr_dest
 );
 

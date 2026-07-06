@@ -28,6 +28,8 @@ ctrl_t ctrl_word;
 logic [31:0] imm;
 logic [4:0] rd;
 logic issue_next /* verilator public */;
+logic [3:0] spec_mask_next;
+logic [3:0] spec_mask;
 
 logic [31:0][PRF_BITS-1:0] rat /* verilator public */;
 logic [FREE_SIZE-1:0][PRF_BITS-1:0] free_list /* verilator public */;
@@ -53,8 +55,27 @@ assign instr = fet_dec_ifc.instr;
 assign rs1 = instr.r.rs1;
 assign rs2 = instr.r.rs2;
 assign csrs = instr.i.imm11_0;
+
 decoder decoder (.*);
 
+always_comb
+begin
+        spec_mask_next = spec_mask;
+
+        if (fet_dec_ifc.speculation_meta.branch || fet_dec_ifc.speculation_meta.jump) begin
+                spec_mask_next = spec_mask + 1;
+        end
+end
+
+always_ff @(posedge clk or posedge rst)
+begin
+        if (rst) begin
+                spec_mask <= 0;
+        end
+        else begin
+                spec_mask <= spec_mask_next;
+        end
+end
 
 // ==========
 //   Rename
@@ -148,6 +169,7 @@ begin
                 issue_ifc.speculation_meta <= 0;
                 issue_ifc.rat <= 0;
                 issue_ifc.free_head <= 0;
+                issue_ifc.spec_mask <= 0;
         end
         else if (issue_next) begin
                 issue_ifc.ctrl_word <= ctrl_word;
@@ -161,6 +183,7 @@ begin
                 issue_ifc.speculation_meta <= fet_dec_ifc.speculation_meta;
                 issue_ifc.rat <= rat_next;
                 issue_ifc.free_head <= free_head_next;
+                issue_ifc.spec_mask <= spec_mask;
         end
 end
 

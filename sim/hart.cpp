@@ -1,7 +1,7 @@
 #include "hart.hpp"
-#include "Vtop_hart.h"
-#include "Vtop_issue.h"
-#include "Vtop_issue_ifc.h"
+//#include "Vtop_hart.h"
+//#include "Vtop_issue.h"
+//#include "Vtop_issue_ifc.h"
 #include <iomanip>
 #include <iostream>
 #include <fstream>

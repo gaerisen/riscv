@@ -203,6 +203,7 @@ package rv32;
         /*====================================================================*/
         typedef struct packed {
                 ctrl_t ctrl_word;
+                logic [3:0] spec_mask;
 
                 logic [6:0] prs1;
                 logic in1_ready;
@@ -226,6 +227,7 @@ package rv32;
         typedef struct packed {
                 ctrl_t ctrl_word;
                 speculation_meta_t speculation_meta;
+                logic [3:0] spec_mask;
 
                 logic [6:0] prd;
                 logic [6:0] prd_old;
