@@ -44,7 +44,7 @@ logic committed_is_system;
 logic sys_in_flight;
 logic sys_in_flight_state;
 
-logic [31:0] pc; // For debugging
+logic [31:0] pc /* verilator public */;
 
 assign commit_ifc.commit = rob[rob_head].valid & rob[rob_head].ready;
 

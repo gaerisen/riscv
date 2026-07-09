@@ -32,6 +32,7 @@ TB_SRC = sim/main.cpp \
 	 sim/field.cpp \
 	 sim/generator.cpp \
 	 sim/device.cpp \
+	 sim/riscv_cosim.cpp \
 	 sim/$(TARGET).cpp
 
 TB_OBJ = $(TB_SRC:.cpp=.o)

@@ -1,8 +1,11 @@
 #include "hart.hpp"
-//#include "Vtop_hart.h"
-//#include "Vtop_issue.h"
-//#include "Vtop_issue_ifc.h"
-#include <iomanip>
+#include "generator.hpp"
+#include "riscv_cosim.hpp"
+
+#include "Vtop_hart.h"
+#include "Vtop_commit_ifc__P80.h"
+#include "Vtop_rob__Cz5_Dz1_Iz2_CBz3_CCz4.h"
+
 #include <iostream>
 #include <fstream>
 #include <vector>
@@ -21,9 +24,9 @@
 int opcodes[] = {
         0b01101, // lui
         0b00101, // auipc
-        0b11011, // jal
-        0b11001, // jalr
-        0b11000, // branch
+//      0b11011, // jal
+//      0b11001, // jalr
+//      0b11000, // branch
 //      0b00000, // load
 //      0b01000, // store
         0b00100, // alui
@@ -49,6 +52,9 @@ void hart::set_i_ready(int in) { dut->i_data_ready = in; }
 void hart::set_i_data(int in) { dut->i_data = in; }
 
 int hart::get_i_addr() { return dut->i_addr; }
+bool hart::get_commit() { return dut->hart->commit_ifc->commit; }
+uint32_t hart::get_result() { return dut->hart->commit_ifc->value; }
+uint32_t hart::get_pc() { return dut->hart->rob->pc; }
 
 void hart::print_regfile() {
         std::cout << "Register File" << std::endl; // lol
@@ -56,123 +62,65 @@ void hart::print_regfile() {
 
 int hart::run_tests(int cycles)
 {
-        std::ifstream progfs("progs.txt");
-        std::vector<unsigned char> prog;
-        std::string filename;
-        
-        unsigned int rat[32];
-        unsigned int free[32];
+        sim::generator instr_gen;
+        std::vector<uint8_t> prog;
+        sim::rv32ui soft_core;
+        std::vector<uint32_t> soft_pcs;
+        std::vector<uint32_t> soft_results;
+        std::vector<uint32_t> hard_pcs;
+        std::vector<uint32_t> hard_results;
 
-        int count = 1;
+        instr_gen.add_field(1, 0, 3);
+        instr_gen.add_field(6, 2, opcodes, sizeof(opcodes) / sizeof(int));
+        instr_gen.add_field(11, 7, 0, 31);
+        instr_gen.add_field(14, 12, 0);
+        instr_gen.add_field(19, 15, 0, 31);
+        instr_gen.add_field(24, 20, 0, 31);
+        instr_gen.add_field(31, 25, 0);
 
-        while (true) {
-                prog.clear();
+        // Populate program w/ random instrs
+        for (int i = 0; i < 4096; i++) {
+                prog.push_back(instr_gen.generate());
+        }
 
-                std::getline(progfs, filename);
-                if (!progfs) break;
+        // Execute software model
+        for (int i = 0; i < cycles; i++) {
+                soft_core.eval(prog[soft_core.get_nextpc() & 0xfff]);
+                soft_pcs.push_back(soft_core.get_pc());
+                soft_results.push_back(soft_core.get_result());
+        }
 
-                std::cout << "[" << count << "] " << std::setw(30) << std::left
-                        << filename << "\t";
-                count++;
+        reset(6);
+        set_i_ready(1);
 
-                read_program(filename, prog);
-                
-                // Pad end of memory with some NOPs
-                for (int i = 0; i < 32; i++) {
-                        prog.push_back(0x13);
-                        prog.push_back(0x00);
-                        prog.push_back(0x00);
-                        prog.push_back(0x00);
+        for (int i = 0; i < 16 * cycles; i++) {
+                set_i_data(prog[get_i_addr()]);
+
+                pulse();
+
+                if (get_commit()) {
+                        hard_pcs.push_back(get_pc());
+                        hard_results.push_back(get_result());
                 }
 
-                unsigned int last_block = 0;
-                unsigned int instr;
-                unsigned int addr = 0;
-
-                int miss_done = 0;
-                int status = 1;
-
-                reset(6);
-                
-                for (int i = 0; true; i++) {
-                        last_block = addr >> 8;
-
-                        addr = get_i_addr();
-
-                        // Construct instruction from bytes
-                        instr = prog.at(addr + 3);
-                        instr <<= 8;
-                        instr |= prog.at(addr + 2);
-                        instr <<= 8;
-                        instr |= prog.at(addr + 1);
-                        instr <<= 8;
-                        instr |= prog.at(addr + 0);
-
-                        // Simulate cache misses
-                        if (last_block != addr >> 8)
-                                miss_done = i + 16;
-
-                        set_i_ready(i >= miss_done);
-//                        set_i_ready(1);
-
-                        set_i_data(instr);
-
-/*                        if (dut->hart->issue_ifc->issue) {
-                                VlWide_to_rat(dut->hart->issue->rat, rat);
-                                VlWide_to_rat(dut->hart->issue->free_list, free);
-                                std::cout << std::hex << " PC: " << dut->hart->issue_ifc->pc << std::endl;
-                                std::cout << std::dec << " RAT:  [";
-                                std::cout << std::setw(2)
-                                        << std::setfill('0')
-                                        << std::right
-                                        << rat[0];
-
-                                for (int j = 1; j < 32; j++) {
-                                        std::cout << ", " << std::setw(2)
-                                                << std::setfill('0')
-                                                << std::right
-                                                << rat[j];
-                                }
-                                std::cout << "]" << std::endl;
-
-                                std::cout << std::dec << " free: [";
-                                std::cout << std::setw(2)
-                                        << std::setfill('0')
-                                        << std::right
-                                        << free[0];
-                                for (int j = 1; j < 32; j++) {
-                                        std::cout << ", " << std::setw(2)
-                                                << std::setfill('0')
-                                                << std::right
-                                                << free[j];
-                                }
-                                std::cout << "]" << std::endl;
-
-                                std::cout << "        ";
-                                for (int j = 0; j < 32; j++) {
-                                        if (dut->hart->issue->free_tail == j) {
-                                                std::cout << "t";
-                                        } else if (dut->hart->issue->free_head == j) {
-                                                std::cout << "h";
-                                        } else {
-                                                std::cout << " ";
-                                        }
-                                        std::cout << "   ";
-                                }
-                                std::cout << std::endl;
-                        }*/
-
-                        pulse();
-
-                        // Workaround for checking exit status without memory iface
-                        if (dut->d_valid) {
-                                status = !(dut->d_data_o == 1);
-                                break;
-                        }
+                if (hard_pcs.size() == cycles) {
+                        break;
                 }
+        }
 
-                if (status) std::cout << "Failed";
-                std::cout << std::endl;
+        std::cout << std::hex;
+
+        for (int i = 0; i < hard_pcs.size(); i++) {
+                if ((hard_pcs.at(i) == soft_pcs.at(i)) &&
+                        (hard_results.at(i) == soft_results.at(i))) {
+                        std::cout << "--  " << hard_pcs.at(i) << "\t" <<
+                                hard_results.at(i) << std::endl;
+                } else {
+                        std::cout << ">>  " << hard_pcs.at(i) << "\t" <<
+                                hard_results.at(i) << std::endl;
+                        std::cout << "    " << soft_pcs.at(i) << "\t" <<
+                                soft_results.at(i) << std::endl;
+                }
         }
         
         return 0;

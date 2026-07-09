@@ -325,15 +325,15 @@ import rv32::*;
 )(
 );
 
-logic commit;
+logic commit /* verilator public */;
 logic ready;
 logic store;
 logic branch;
 logic exception;
 logic trapret;
 trap_cause_e trap_cause;
-logic [31:0] value;
-logic [PRF_BITS-1:0] dest;
+logic [31:0] value /* verilator public */;
+logic [PRF_BITS-1:0] dest /* verilator public */;
 logic [PRF_BITS-1:0] dest_old;
 logic [31:0] csr_val;
 logic [11:0] csr_dest;

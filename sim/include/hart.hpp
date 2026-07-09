@@ -14,6 +14,9 @@ struct hart : public device {
         void set_i_ready(int in);
         void set_i_data(int in);
 
+        bool get_commit();
+        uint32_t get_result();
+        uint32_t get_pc();
         int get_i_addr();
 
         void print_regfile();
