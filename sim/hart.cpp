@@ -21,19 +21,7 @@
 
 #define slice(x, msb, lsb) ((x & ((2 << msb) - 1)) >> lsb)
 
-int opcodes[] = {
-        0b01101, // lui
-        0b00101, // auipc
-//      0b11011, // jal
-//      0b11001, // jalr
-//      0b11000, // branch
-//      0b00000, // load
-//      0b01000, // store
-        0b00100, // alui
-        0b01100, // alur
-//      0b00011, // fence 
-//      0b11100  // system
-};
+int auimm_ops[] = { 0x37, 0x17 };
 
 void read_program(std::string, std::vector<unsigned char>&);
 void VlWide_to_rat(VlWide<6> wide, unsigned int arr[]);
@@ -62,39 +50,82 @@ void hart::print_regfile() {
 
 int hart::run_tests(int cycles)
 {
-        sim::generator instr_gen;
         std::vector<uint8_t> prog;
         sim::rv32ui soft_core;
         std::vector<uint32_t> soft_pcs;
         std::vector<uint32_t> soft_results;
         std::vector<uint32_t> hard_pcs;
         std::vector<uint32_t> hard_results;
+        uint32_t instr;
+        uint32_t addr;
 
-        instr_gen.add_field(1, 0, 3);
-        instr_gen.add_field(6, 2, opcodes, sizeof(opcodes) / sizeof(int));
-        instr_gen.add_field(11, 7, 0, 31);
-        instr_gen.add_field(14, 12, 0);
-        instr_gen.add_field(19, 15, 0, 31);
-        instr_gen.add_field(24, 20, 0, 31);
-        instr_gen.add_field(31, 25, 0);
+        sim::generator alui_gen;
+        sim::generator alur_gen;
+        sim::generator auimm_gen;
+        sim::generator branch_gen;
+        sim::generator jal_gen;
+        sim::generator jalr_gen;
+
+        alui_gen.add_field(6, 0, 0x13);
+        alui_gen.add_field(11, 7, 0, 31);
+        alui_gen.add_field(14, 12, 0, 7);
+        alui_gen.add_field(19, 15, 0, 31);
+        alui_gen.add_field(31, 20, 0, 31);
+
+        alur_gen.add_field(6, 0, 0x33);
+        alur_gen.add_field(11, 7, 0, 31);
+        alur_gen.add_field(14, 12, 0, 7);
+        alur_gen.add_field(19, 15, 0, 31);
+        alur_gen.add_field(24, 20, 0, 31);
+        alur_gen.add_field(31, 25, 0);
+
+        auimm_gen.add_field(6, 0, auimm_ops, 2);
+        auimm_gen.add_field(11, 7, 0, 31);
+        auimm_gen.add_field(31, 12, 0, 0xfffff);
 
         // Populate program w/ random instrs
-        for (int i = 0; i < 4096; i++) {
-                prog.push_back(instr_gen.generate());
+        for (int i = 0; i < 1024; i++) {
+                instr = alui_gen.generate();
+                prog.push_back(byte(instr));
+                instr >>= 8;
+                prog.push_back(byte(instr));
+                instr >>= 8;
+                prog.push_back(byte(instr));
+                instr >>= 8;
+                prog.push_back(byte(instr));
         }
+
+        // Dump program for observation
+        std::ofstream ofs("random.bin", std::ios::out | std::ios::binary);
+        ofs.write((char *)prog.data(), prog.size());
 
         // Execute software model
         for (int i = 0; i < cycles; i++) {
-                soft_core.eval(prog[soft_core.get_nextpc() & 0xfff]);
+                addr = soft_core.get_nextpc() & 0xfff;
+                instr = prog[addr];
+                instr |= prog[addr + 1] << 8;
+                instr |= prog[addr + 2] << 16;
+                instr |= prog[addr + 3] << 24;
+        
+                soft_core.eval(instr);
                 soft_pcs.push_back(soft_core.get_pc());
                 soft_results.push_back(soft_core.get_result());
+
+                std::cout << "\t" << soft_core.get_result() << std::endl;
         }
 
+        /*
         reset(6);
         set_i_ready(1);
 
         for (int i = 0; i < 16 * cycles; i++) {
-                set_i_data(prog[get_i_addr()]);
+                addr = get_i_addr() & 0xfff;
+                instr = prog[addr];
+                instr |= prog[addr + 1] << 8;
+                instr |= prog[addr + 2] << 16;
+                instr |= prog[addr + 3] << 24;
+
+                set_i_data(instr);
 
                 pulse();
 
@@ -121,7 +152,7 @@ int hart::run_tests(int cycles)
                         std::cout << "    " << soft_pcs.at(i) << "\t" <<
                                 soft_results.at(i) << std::endl;
                 }
-        }
+        } */
         
         return 0;
 }

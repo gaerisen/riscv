@@ -1,4 +1,5 @@
 #include "riscv_cosim.hpp"
+#include <iostream>
 
 void parse(uint32_t instr, instr_t &result);
 int32_t get_imm(instr_t instr);
@@ -58,6 +59,8 @@ void rv32ui::eval(uint32_t instr)
                         ctrl_word.in2 = get_imm(inst_word);
                 default:;
         }
+
+        std::cout << std::hex << instr << " " << get_imm(inst_word) << std::endl;
 
         ctrl_word.op = get_alu_op(inst_word);
 
