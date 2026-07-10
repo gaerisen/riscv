@@ -110,11 +110,8 @@ int hart::run_tests(int cycles)
                 soft_core.eval(instr);
                 soft_pcs.push_back(soft_core.get_pc());
                 soft_results.push_back(soft_core.get_result());
-
-                std::cout << "\t" << soft_core.get_result() << std::endl;
         }
 
-        /*
         reset(6);
         set_i_ready(1);
 
@@ -152,7 +149,7 @@ int hart::run_tests(int cycles)
                         std::cout << "    " << soft_pcs.at(i) << "\t" <<
                                 soft_results.at(i) << std::endl;
                 }
-        } */
+        }
         
         return 0;
 }

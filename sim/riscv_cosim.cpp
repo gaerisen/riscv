@@ -1,10 +1,9 @@
 #include "riscv_cosim.hpp"
 #include <iostream>
 
-void parse(uint32_t instr, instr_t &result);
-int32_t get_imm(instr_t instr);
-alu_src_e get_alu_src (instr_t instr);
-alu_f3_e get_alu_op (instr_t instr);
+int32_t get_imm(uint32_t instr);
+alu_src_e get_alu_src (uint32_t instr);
+alu_f3_e get_alu_op (uint32_t instr);
 int32_t execute(ctrl_word_t ctrl_word);
 bool branch_eval(branch_f3_e op, int32_t rs1, int32_t rs2);
 
@@ -35,48 +34,45 @@ void rv32ui::reset()
 
 void rv32ui::eval(uint32_t instr)
 {
-        instr_t inst_word;
-
         opcode_e opcode;
         int32_t imm;
         ctrl_word_t ctrl_word;
 
-        // Instruction decode
-        parse(instr, inst_word);
-
-        switch (get_alu_src(inst_word)) {
+        switch (get_alu_src(instr)) {
                 case REG_REG:
-                        ctrl_word.in1 = irf[inst_word.r.rs1];
-                        ctrl_word.in2 = irf[inst_word.r.rs2];
+                        ctrl_word.in1 = irf[rs1(instr)];
+                        ctrl_word.in2 = irf[rs2(instr)];
+                        break;
                 case REG_IMM:
-                        ctrl_word.in1 = irf[inst_word.r.rs1];
-                        ctrl_word.in2 = get_imm(inst_word);
+                        ctrl_word.in1 = irf[rs1(instr)];
+                        ctrl_word.in2 = get_imm(instr);
+                        break;
                 case ZERO_IMM:
                         ctrl_word.in1 = 0;
-                        ctrl_word.in2 = get_imm(inst_word);
+                        ctrl_word.in2 = get_imm(instr);
+                        break;
                 case PC_IMM:
                         ctrl_word.in1 = nextpc;
-                        ctrl_word.in2 = get_imm(inst_word);
+                        ctrl_word.in2 = get_imm(instr);
+                        break;
                 default:;
         }
 
-        std::cout << std::hex << instr << " " << get_imm(inst_word) << std::endl;
+        ctrl_word.op = get_alu_op(instr);
 
-        ctrl_word.op = get_alu_op(inst_word);
-
-        ctrl_word.alt = inst_word.r.opcode == ALUR;
-        ctrl_word.alt |= (inst_word.r.opcode == ALUI) && (ctrl_word.op == SR);
-        ctrl_word.alt &= inst_word.r.funct7 == 0x20;
+        ctrl_word.alt = (opcode_e)opcode(instr) == ALUR;
+        ctrl_word.alt |= ((opcode_e)opcode(instr) == ALUI) && (ctrl_word.op == SR);
+        ctrl_word.alt &= f7(instr) == 0x20;
 
         int32_t value = execute(ctrl_word);
-        bool branch_taken = branch_eval(static_cast<branch_f3_e>(inst_word.b.funct3),
-                                irf[inst_word.r.rs1],
-                                irf[inst_word.r.rs2]);
+        bool branch_taken = branch_eval(static_cast<branch_f3_e>(f3(instr)),
+                                irf[rs1(instr)],
+                                irf[rs2(instr)]);
 
         // Execute and commit
         pc = nextpc;
 
-        switch (inst_word.r.opcode) {
+        switch ((opcode_e)opcode(instr)) {
                 case LOAD:
                 case BRANCH:
                         result = 0;
@@ -86,13 +82,13 @@ void rv32ui::eval(uint32_t instr)
                         result = pc + 4;
                         break;
                 case STORE:
-                        result = irf[inst_word.r.rs2];
+                        result = irf[rs2(instr)];
                         break;
                 default:
-                        result = value;
+                        result = value; 
         }
 
-        switch (inst_word.r.opcode) {
+        switch ((opcode_e)opcode(instr)) {
                 case STORE:
                         dest = value;
                         break;
@@ -100,10 +96,10 @@ void rv32ui::eval(uint32_t instr)
                         dest = 0;
                         break;
                 default:
-                        dest = inst_word.r.rd;
+                        dest = rd(instr);
         }
 
-        switch (inst_word.r.opcode) {
+        switch ((opcode_e)opcode(instr)) {
                 case JAL:
                 case JALR:
                         nextpc = value;
@@ -115,96 +111,87 @@ void rv32ui::eval(uint32_t instr)
                         nextpc = pc + 4;
         }
 
-        if ((inst_word.r.opcode != BRANCH) && (inst_word.r.opcode != STORE)) {
+        if (((opcode_e)opcode(instr) != BRANCH) && ((opcode_e)opcode(instr) != STORE)) {
                 irf[dest] = result;
                 irf[0] = 0;
         }
+
+#ifdef DEBUG_COSIM
+        std::cout << "pc: " << pc << ",\t";
+        std::cout << "rs1(val): " << rs1(instr) << "(" << irf[rs1(instr)] << "),\t";
+        std::cout << "rs2(val): " << rs2(instr) << "(" << irf[rs2(instr)] << "),\t";
+        std::cout << "imm: " << get_imm(instr) << ",\t";
+        std::cout << "result: " << result << "\n";
+#endif
 }
 
 }
 
-void parse(uint32_t instr, instr_t &result)
+alu_src_e get_alu_src (uint32_t instr)
 {
-        result.r.funct7 = f7(instr);
-        result.r.rs2 = rs2(instr);
-        result.r.rs1 = rs1(instr);
-        result.r.funct3 = f3(instr);
-        result.r.rd = rd(instr);
-        result.r.opcode = opcode(instr);
-}
-
-alu_src_e get_alu_src (instr_t instr)
-{
-        alu_src_e src;
-
-        switch (instr.r.opcode)
+        switch ((opcode_e)opcode(instr))
         {
                 case LUI:
-                        src = ZERO_IMM;
-                        break;
+                        return ZERO_IMM;
                 case AUIPC:
                 case JAL:
                 case JALR:
                 case BRANCH:
-                        src = PC_IMM;
-                        break;
+                        return PC_IMM;
                 case LOAD:
                 case STORE:
                 case ALUI:
-                        src = REG_IMM;
-                        break;
+                        return REG_IMM;
                 default:
-                        src = REG_REG;
+                        return REG_REG;
         }
-
-        return src;
 }
 
-int32_t get_imm(instr_t instr)
+int32_t get_imm(uint32_t instr)
 {
         int32_t imm;
 
-        switch (instr.r.opcode) {
+        switch ((opcode_e)opcode(instr)) {
                 case LUI: // uimm
                 case AUIPC:
-                        imm = instr.u.imm31_25 << 25;
-                        imm |= instr.u.imm24_20 << 20;
-                        imm |= instr.u.imm19_15 << 15;
-                        imm |= instr.u.imm14_12 << 12;
+                        imm = f7(instr) << 25;
+                        imm |= rs2(instr) << 20;
+                        imm |= rs1(instr) << 15;
+                        imm |= f3(instr) << 12;
                         break;
                 case JAL: // jimm
-                        imm = instr.j.imm20_and_10_5 << 25;
+                        imm = f7(instr) << 25;
                         imm >>= 11;
                         imm &= 0xfff00000;
-                        imm |= instr.j.imm19_15 << 15;
-                        imm |= instr.j.imm14_12 << 12;
-                        imm |= (instr.j.imm4_1_and_11 & 0x1) << 11;
-                        imm |= (instr.j.imm20_and_10_5 & 0x3f) << 5;
-                        imm |= instr.j.imm4_1_and_11 & 0x1e;
+                        imm |= rs1(instr) << 15;
+                        imm |= f3(instr) << 12;
+                        imm |= (rs2(instr) & 0x1) << 11;
+                        imm |= (f7(instr) & 0x3f) << 5;
+                        imm |= rs2(instr) & 0x1e;
                         break;
                 case JALR: // iimm
                 case LOAD:
                 case ALUI:
-                        if ((instr.i.funct3 & 0x3) == 1) {
-                                imm = instr.i.imm4_0;
+                        if ((f3(instr) & 0x3) == 1) {
+                                imm = rs2(instr);
                         } else {
-                                imm = instr.i.imm11_5 << 25;
+                                imm = f7(instr) << 25;
                                 imm >>= 20;
-                                imm |= instr.i.imm4_0;
+                                imm |= rs2(instr);
                         }
                         break;
                 case STORE: // simm
-                        imm = instr.s.imm11_5 << 25;
+                        imm = f7(instr) << 25;
                         imm >>= 20;
-                        imm |= instr.s.imm4_0;
+                        imm |= rd(instr);
                         break;
                 case BRANCH: // bimm
-                        imm = instr.b.imm12_and_10_5 << 25;
+                        imm = f7(instr) << 25;
                         imm >>= 19;
                         imm &= 0xfffff000;
-                        imm |= (instr.b.imm4_1_and_11 & 0x1) << 11;
-                        imm |= (instr.b.imm12_and_10_5 & 0x3f) << 5;
-                        imm |= instr.b.imm4_1_and_11 & 0x17;
+                        imm |= (rd(instr) & 0x1) << 11;
+                        imm |= (f7(instr) & 0x3f) << 5;
+                        imm |= rd(instr) & 0x17;
                         break;
                 default: // no imm
                         imm = 0;
@@ -214,11 +201,11 @@ int32_t get_imm(instr_t instr)
         return imm;
 }
 
-alu_f3_e get_alu_op(instr_t instr)
+alu_f3_e get_alu_op(uint32_t instr)
 {
         alu_f3_e op;
 
-        switch (instr.r.opcode) {
+        switch ((opcode_e)opcode(instr)) {
                 case LUI:
                 case AUIPC:
                 case JAL:
@@ -229,7 +216,7 @@ alu_f3_e get_alu_op(instr_t instr)
                         op = ADDSUB;
                         break;
                 default: 
-                        op = static_cast<alu_f3_e>(instr.r.funct3);
+                        op = static_cast<alu_f3_e>(f3(instr));
         }
 
         return op;
