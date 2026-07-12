@@ -73,14 +73,28 @@ void rv32ui::eval(uint32_t instr)
         pc = nextpc;
 
         switch ((opcode_e)opcode(instr)) {
-                case LOAD:
+                case JAL:
+                case JALR:
+                        nextpc = value;
+                        break;
                 case BRANCH:
+                        nextpc = value;
+                        if (branch_taken) break;
+                default:
+                        nextpc = pc + 4;
+        }
+
+        switch ((opcode_e)opcode(instr)) {
+                case LOAD:
                         result = 0;
                         break;
                 case JAL:
                 case JALR:
                         result = pc + 4;
                         break;
+/*                case BRANCH:
+                        result = nextpc;
+                        break; */
                 case STORE:
                         result = irf[rs2(instr)];
                         break;
@@ -99,18 +113,6 @@ void rv32ui::eval(uint32_t instr)
                         dest = rd(instr);
         }
 
-        switch ((opcode_e)opcode(instr)) {
-                case JAL:
-                case JALR:
-                        nextpc = value;
-                        break;
-                case BRANCH:
-                        nextpc = value;
-                        if (branch_taken) break;
-                default:
-                        nextpc = pc + 4;
-        }
-
         if (((opcode_e)opcode(instr) != BRANCH) && ((opcode_e)opcode(instr) != STORE)) {
                 irf[dest] = result;
                 irf[0] = 0;
@@ -123,12 +125,9 @@ void rv32ui::eval(uint32_t instr)
         std::cout << "imm: " << get_imm(instr) << ",\t";
         std::cout << "result: " << result << "\n";
 
-        if (pc == 0x2c) {
+        if (pc == 0x8) {
                 std::cout << "\t";
-                std::cout << (((opcode_e)opcode(instr) == ALUI) ? "op good" : "op bad");
-                std::cout << ", ";
-                std::cout << ((ctrl_word.op == ADDSUB) ? "f3 good" : "f3 bad");
-                std::cout << ", alt: " << ctrl_word.alt;
+                std::cout << "imm: " << get_imm(instr);
                 std::cout << ", value: " << value << "\n";
                 std::cout << "\t[in1, in2]: [" << ctrl_word.in1 << ", "
                         << ctrl_word.in2 << "]\n";
@@ -202,7 +201,7 @@ int32_t get_imm(uint32_t instr)
                         imm &= 0xfffff000;
                         imm |= (rd(instr) & 0x1) << 11;
                         imm |= (f7(instr) & 0x3f) << 5;
-                        imm |= rd(instr) & 0x17;
+                        imm |= rd(instr) & 0x1c;
                         break;
                 default: // no imm
                         imm = 0;
@@ -283,12 +282,12 @@ int32_t execute(ctrl_word_t &ctrl_word)
 bool branch_eval(branch_f3_e op, int32_t rs1, int32_t rs2)
 {
         switch (op) {
-                case BEQ: return rs1 == rs2;
-                case BNE: return rs1 != rs2;
-                case BLT: return rs1 < rs2;
-                case BGE: return rs1 >= rs2;
-                case BLTU: return static_cast<uint32_t>(rs1) < static_cast<uint32_t>(rs2);
-                case BGEU: return static_cast<uint32_t>(rs1) >= static_cast<uint32_t>(rs2);
+                case BEQ: return (rs1 == rs2);
+                case BNE: return (rs1 != rs2);
+                case BLT: return (rs1 < rs2);
+                case BGE: return (rs1 >= rs2);
+                case BLTU: return (static_cast<uint32_t>(rs1) < static_cast<uint32_t>(rs2));
+                case BGEU: return (static_cast<uint32_t>(rs1) >= static_cast<uint32_t>(rs2));
                 default: return false;
         }
 }

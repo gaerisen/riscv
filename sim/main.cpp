@@ -13,10 +13,23 @@ int main(int argc, char *argv[])
         sim::hart dut(ctx);
 
         srand(time(0));
+        int seed;
+
+        int ret = 0;
 
         try {
+                for (int i = 0; i < 32; i++) {
+                        seed = rand();
+                        std::cout << "Trial #" << i+1 << "; Seed: " << seed << std::endl;
+                        srand(seed);
 
-                std::cout << dut.run_tests(1024) << std::endl;
+                        ret = dut.run_tests(2048);
+
+                        if (ret != 0) {
+                                std::cout << "Failed, exiting..." << std::endl;
+                                return ret;
+                        }
+                }
 
         } catch (const std::runtime_error& e) {
                 std::cerr << "RUNTIME: " << e.what();

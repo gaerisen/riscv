@@ -21,7 +21,13 @@
 
 #define slice(x, msb, lsb) ((x & ((2 << msb) - 1)) >> lsb)
 
+#define GEN_ARITH rand() % 3
+#define GEN_BRANCH rand() % 4
+#define GEN_JAL rand() % 5
+#define GEN_ALL rand() % 6
+
 int auimm_ops[] = { 0x37, 0x17 };
+int b_f3s[] = { 0, 1, 4, 5, 6, 7 };
 
 void read_program(std::string, std::vector<unsigned char>&);
 void VlWide_to_rat(VlWide<6> wide, unsigned int arr[]);
@@ -50,7 +56,7 @@ void hart::print_regfile() {
 
 int hart::run_tests(int cycles)
 {
-        std::vector<uint8_t> prog;
+        std::vector<uint8_t> imem;
         sim::rv32ui soft_core;
         std::vector<uint32_t> soft_pcs;
         std::vector<uint32_t> soft_results;
@@ -83,6 +89,28 @@ int hart::run_tests(int cycles)
         auimm_gen.add_field(11, 7, 0, 31);
         auimm_gen.add_field(31, 12, 0, 0xfffff);
 
+        branch_gen.add_field(6, 0, 0x63);
+        branch_gen.fields.at(branch_gen.add_field(11, 7, RAND_MASK)).set_mask(0x1c);
+        branch_gen.add_field(14, 12, b_f3s, (sizeof(b_f3s) / sizeof(int)));
+        branch_gen.add_field(19, 15, 0, 31);
+        branch_gen.add_field(24, 20, 0, 31);
+        branch_gen.add_field(31, 25, 0xfff);
+
+        jal_gen.add_field(6, 0, 0x6f);
+        jal_gen.add_field(11, 7, 0, 31);
+        jal_gen.add_field(14, 12, 0);
+        jal_gen.add_field(19, 15, 0);
+        jal_gen.add_field(21, 20, 0);
+        jal_gen.add_field(24, 22, 0, 7);
+        jal_gen.add_field(31, 25, 0xfff);
+
+        jalr_gen.add_field(6, 0, 0x67);
+        jalr_gen.add_field(11, 7, 0, 31);
+        jalr_gen.add_field(14, 12, 0);
+        jalr_gen.add_field(19, 15, 0, 31);
+        jalr_gen.add_field(24, 20, 0, 31);
+        jalr_gen.add_field(31, 25, 0xfff);
+
         sim::generator *generators[6] = {
                 &alui_gen,
                 &alur_gen,
@@ -92,44 +120,51 @@ int hart::run_tests(int cycles)
                 &jalr_gen
         };
 
-        // Populate program w/ random instrs
+        // Populate imem w/ random instrs
         for (int i = 0; i < 1024; i++) {
-                instr = generators[rand() % 3]->generate();
-                prog.push_back(byte(instr));
+                instr = generators[GEN_JAL]->generate();
+                imem.push_back(byte(instr));
                 instr >>= 8;
-                prog.push_back(byte(instr));
+                imem.push_back(byte(instr));
                 instr >>= 8;
-                prog.push_back(byte(instr));
+                imem.push_back(byte(instr));
                 instr >>= 8;
-                prog.push_back(byte(instr));
+                imem.push_back(byte(instr));
         }
 
         // Dump program for observation
         std::ofstream ofs("random.bin", std::ios::out | std::ios::binary);
-        ofs.write((char *)prog.data(), prog.size());
+        ofs.write((char *)imem.data(), imem.size());
 
         // Execute software model
         for (int i = 0; i < cycles; i++) {
                 addr = soft_core.get_nextpc() & 0xfff;
-                instr = prog[addr];
-                instr |= prog[addr + 1] << 8;
-                instr |= prog[addr + 2] << 16;
-                instr |= prog[addr + 3] << 24;
-        
+                instr = imem[addr];
+                instr |= imem[addr + 1] << 8;
+                instr |= imem[addr + 2] << 16;
+                instr |= imem[addr + 3] << 24;
+
                 soft_core.eval(instr);
                 soft_pcs.push_back(soft_core.get_pc());
                 soft_results.push_back(soft_core.get_result());
+
+                if ((instr & 0xfffff07f) == 0x6f) break;
         }
 
+        // Execute hardware model
         reset(6);
         set_i_ready(1);
 
+        uint32_t stop_pc;
+
         for (int i = 0; i < 16 * cycles; i++) {
                 addr = get_i_addr() & 0xfff;
-                instr = prog[addr];
-                instr |= prog[addr + 1] << 8;
-                instr |= prog[addr + 2] << 16;
-                instr |= prog[addr + 3] << 24;
+                instr = imem[addr];
+                instr |= imem[addr + 1] << 8;
+                instr |= imem[addr + 2] << 16;
+                instr |= imem[addr + 3] << 24;
+
+                if ((instr & 0xfffff07f) == 0x6f) stop_pc = get_i_addr();
 
                 set_i_data(instr);
 
@@ -138,13 +173,13 @@ int hart::run_tests(int cycles)
                 if (get_commit()) {
                         hard_pcs.push_back(get_pc());
                         hard_results.push_back(get_result());
+                        if (get_pc() == stop_pc) break;
                 }
 
-                if (hard_pcs.size() == cycles) {
-                        break;
-                }
+                if (hard_pcs.size() == cycles) break;
         }
 
+        // Dump any mismatched results
         std::cout << std::hex;
 
         int count = 0;
