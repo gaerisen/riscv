@@ -4,7 +4,7 @@
 int32_t get_imm(uint32_t instr);
 alu_src_e get_alu_src (uint32_t instr);
 alu_f3_e get_alu_op (uint32_t instr);
-int32_t execute(ctrl_word_t ctrl_word);
+int32_t execute(ctrl_word_t &ctrl_word);
 bool branch_eval(branch_f3_e op, int32_t rs1, int32_t rs2);
 
 namespace sim
@@ -122,6 +122,17 @@ void rv32ui::eval(uint32_t instr)
         std::cout << "rs2(val): " << rs2(instr) << "(" << irf[rs2(instr)] << "),\t";
         std::cout << "imm: " << get_imm(instr) << ",\t";
         std::cout << "result: " << result << "\n";
+
+        if (pc == 0x2c) {
+                std::cout << "\t";
+                std::cout << (((opcode_e)opcode(instr) == ALUI) ? "op good" : "op bad");
+                std::cout << ", ";
+                std::cout << ((ctrl_word.op == ADDSUB) ? "f3 good" : "f3 bad");
+                std::cout << ", alt: " << ctrl_word.alt;
+                std::cout << ", value: " << value << "\n";
+                std::cout << "\t[in1, in2]: [" << ctrl_word.in1 << ", "
+                        << ctrl_word.in2 << "]\n";
+        }
 #endif
 }
 
@@ -222,7 +233,7 @@ alu_f3_e get_alu_op(uint32_t instr)
         return op;
 }
 
-int32_t execute(ctrl_word_t ctrl_word)
+int32_t execute(ctrl_word_t &ctrl_word)
 {
         int32_t result;
 
@@ -236,6 +247,7 @@ int32_t execute(ctrl_word_t ctrl_word)
                         } else {
                                 result = in1 + in2;
                         }
+                        break;
                 case SLL:
                         result = in1 << in2;
                         break;
