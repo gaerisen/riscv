@@ -117,7 +117,9 @@ end
 
 
 // Stall logic
-assign full = rob_tail == (rob_head + {ROB_BITS{1'b1}});
+assign full = (rob_tail == (rob_head + {{(ROB_BITS-1){1'b1}}, 1'b0})) ||
+                (rob_tail == (rob_head + {ROB_BITS{1'b1}}));
+
 assign ctrl_ifc.rob_stall = full | sys_in_flight;
 
 
