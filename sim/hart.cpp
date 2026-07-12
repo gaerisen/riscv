@@ -83,9 +83,18 @@ int hart::run_tests(int cycles)
         auimm_gen.add_field(11, 7, 0, 31);
         auimm_gen.add_field(31, 12, 0, 0xfffff);
 
+        sim::generator *generators[6] = {
+                &alui_gen,
+                &alur_gen,
+                &auimm_gen,
+                &branch_gen,
+                &jal_gen,
+                &jalr_gen
+        };
+
         // Populate program w/ random instrs
         for (int i = 0; i < 1024; i++) {
-                instr = alui_gen.generate();
+                instr = generators[rand() % 3]->generate();
                 prog.push_back(byte(instr));
                 instr >>= 8;
                 prog.push_back(byte(instr));
@@ -138,20 +147,20 @@ int hart::run_tests(int cycles)
 
         std::cout << std::hex;
 
+        int count = 0;
+
         for (int i = 0; i < hard_pcs.size(); i++) {
-                if ((hard_pcs.at(i) == soft_pcs.at(i)) &&
-                        (hard_results.at(i) == soft_results.at(i))) {
-                        std::cout << "--  " << hard_pcs.at(i) << "\t" <<
-                                hard_results.at(i) << std::endl;
-                } else {
+                if ((hard_pcs.at(i) != soft_pcs.at(i)) ||
+                        (hard_results.at(i) != soft_results.at(i))) {
                         std::cout << ">>  " << hard_pcs.at(i) << "\t" <<
                                 hard_results.at(i) << std::endl;
                         std::cout << "    " << soft_pcs.at(i) << "\t" <<
                                 soft_results.at(i) << std::endl;
+                        count++;
                 }
         }
         
-        return 0;
+        return count;
 }
 
 } // namespace sim
