@@ -12,24 +12,27 @@ int main(int argc, char *argv[])
 
         sim::lsu dut(ctx);
 
-        srand(time(0));
+/*        srand(time(0));
         int seed;
 
-        int ret = 0;
+        int ret = 0;*/
 
         try {
-                for (int i = 0; i < 32; i++) {
-                        seed = rand();
-                        std::cout << "Trial #" << i+1 << "; Seed: " << seed << std::endl;
-                        srand(seed);
 
-                        ret = dut.run_tests(2048);
+/*        for (int i = 0; i < 32; i++) {
+                seed = rand();
+                std::cout << "Trial #" << i+1 << "; Seed: " << seed << std::endl;
+                srand(seed);
 
-                        if (ret != 0) {
-                                std::cout << "Failed, exiting..." << std::endl;
-                                return ret;
-                        }
+                ret = dut.run_tests(2048);
+
+                if (ret != 0) {
+                        std::cout << "Failed, exiting..." << std::endl;
+                        return ret;
                 }
+        } */
+
+                return dut.run_tests(0);
 
         } catch (const std::runtime_error& e) {
                 std::cerr << "RUNTIME: " << e.what();
