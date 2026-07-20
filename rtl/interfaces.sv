@@ -6,8 +6,6 @@
 /*==========================*/
 interface global_ctrl_ifc
 #(
-        parameter int ROB_LEN = 64,
-        localparam int ROB_BITS = $clog2(ROB_LEN),
         parameter int PRF_SIZE = 64,
         localparam int PRF_BITS = $clog2(PRF_SIZE),
         localparam int FREE_SIZE = PRF_SIZE - 32,
@@ -23,7 +21,6 @@ logic [31:0] sys_vec;
 
 logic rs_stall;
 logic rob_stall;
-logic [ROB_BITS-1:0] tag;
 logic stall;
 logic internal_stall;
 logic flush;
@@ -61,7 +58,7 @@ modport csrf (
 );
 
 modport rob (
-        input flush, tag,
+        input flush,
         output rob_stall, rat, free_list, free_head, free_tail
 );
 
@@ -178,9 +175,7 @@ interface issue_ifc
 import rv32::*;
 #(
         parameter int PRF_SIZE = 64,
-        localparam int PRF_BITS = $clog2(PRF_SIZE),
-        parameter int ROB_LEN = 64,
-        localparam int ROB_BITS = $clog2(ROB_LEN)
+        localparam int PRF_BITS = $clog2(PRF_SIZE)
 )(
 );
 
@@ -245,7 +240,6 @@ import rv32::*;
 
 logic update;
 logic [ROB_BITS-1:0] tag;
-logic [31:0] spec_mask;
 logic [4:0] spec_idx;
 logic valid;
 
@@ -326,7 +320,6 @@ import rv32::*;
 );
 
 logic commit /* verilator public */;
-logic ready;
 logic store;
 logic branch;
 logic exception;
@@ -343,7 +336,7 @@ logic irf_select;
 assign irf_select = commit & !(store | branch | exception | trapret);
 
 modport rob (
-        output commit, ready, store, branch, exception, trapret,
+        output commit, store, branch, exception, trapret,
         trap_cause, value, dest, dest_old, csr_val, csr_dest
 );
 

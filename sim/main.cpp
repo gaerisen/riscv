@@ -3,14 +3,14 @@
 #include <cstdlib>
 #include <ctime>
 
-#include "hart.hpp"
+#include "lsu.hpp"
 
 int main(int argc, char *argv[])
 {
         auto ctx = std::make_shared<VerilatedContext>();
         ctx->traceEverOn(true);
 
-        sim::hart dut(ctx);
+        sim::lsu dut(ctx);
 
         srand(time(0));
         int seed;
