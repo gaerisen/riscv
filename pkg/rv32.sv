@@ -168,32 +168,32 @@ package rv32;
         /*====================================================================*/
         typedef struct packed {
                 // Instruction type signals
-                logic branch;
-                logic jump;
-                logic load;
-                logic store;
-                logic exception;
-                logic trapret;
-                logic wfi;
+                logic branch;                   // [39]
+                logic jump;                     // [38]
+                logic load;                     // [37]
+                logic store;                    // [36]
+                logic exception;                // [35]
+                logic trapret;                  // [34]
+                logic wfi;                      // [33]
 
                 // RF write enables
-                logic irf_we;
-                logic csr_we;
+                logic irf_we;                   // [32]
+                logic csr_we;                   // [31]
 
                 // Source enums
-                alu_src_e alu_src;
-                wb_src_e wb_src;
-                csr_src_e csr_src;
+                alu_src_e alu_src;              // [30:29]
+                wb_src_e wb_src;                // [28:27]
+                csr_src_e csr_src;              // [26]
 
                 // Operation enums
-                alu_funct3_e alu_op;
-                alu_funct7_e alu_alt;
-                branch_funct3_e branch_op;
-                load_funct3_e load_op;
-                store_funct3_e store_op;
-                csr_funct2_e csr_op;
+                alu_funct3_e alu_op;            // [25:23]
+                alu_funct7_e alu_alt;           // [22:16]
+                branch_funct3_e branch_op;      // [15:13]
+                load_funct3_e load_op;          // [12:10]
+                store_funct3_e store_op;        // [9:7]
+                csr_funct2_e csr_op;            // [6:4]
 
-                trap_cause_e trap_cause;
+                trap_cause_e trap_cause;        // [3:0]
         } ctrl_t;
 
 
@@ -260,6 +260,7 @@ package rv32;
 
                 logic valid;
                 logic ready;
+                logic complete;
         } lsu_entry_t;
 
 

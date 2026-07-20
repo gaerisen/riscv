@@ -12,6 +12,7 @@
         * from the FIFO. Loads get completed right away if forwarding fails and
         * doesn't resolve until memory does.
 */
+
 module lsu
 import rv32::*;
 #(
@@ -56,6 +57,11 @@ import rv32::*;
         output logic [31:0] st_addr,
         output logic [31:0] st_data
 );
+
+initial begin
+        $dumpfile("lsu.vcd");
+        $dumpvars(0, lsu);
+end
 
 lsu_entry_t fifo [FIFO_LEN];
 logic [FIFO_BITS-1:0] fifo_head;
@@ -142,10 +148,26 @@ begin
                                 ld_en_next = 1;
                                 ld_tag_next = i[FIFO_BITS-1:0];
                                 ld_addr_next = fifo[i].addr;
+                                break;
                         end
                 end
         end
 end
+
+always_ff @(posedge clk or posedge rst)
+begin
+        if (rst) begin
+                ld_en <= 0;
+                ld_addr <= 0;
+                ld_tag <= 0;
+        end
+        else begin
+                ld_en <= ld_en_next;
+                ld_addr <= ld_addr_next;
+                ld_tag <= ld_tag_next;
+        end
+end
+
 
 /* === Load execution ===
 * Distinct from scheduling; interacts with the CDB after memory access is done
@@ -202,7 +224,7 @@ begin
         
         // Loads are marked ready only when data is captured and broadcasted
         // Stores must wait for commit, but st_en signals this already
-        if ((!(fifo[fifo_head].store) && fifo[fifo_head].ready) || st_en_next)
+        if (fifo[fifo_head].complete)
                 fifo_head_next = fifo_head + 1;
 end
 
@@ -225,7 +247,7 @@ begin
         * this is trivial, but may be a critical path later.
         */
         for (int i = 0; i < FIFO_BITS; i++) begin
-                if (issue_tag == fifo[i].tag) begin
+                if (issue && (issue_tag == fifo[i].tag)) begin
                         fifo_next[i].addr = rs1_val + imm;
 
                         if (fifo[i].store) fifo_next[i].data = rs2_val;
@@ -233,12 +255,20 @@ begin
                         // Ready flag is for commit; stores are fine as soon as
                         // they have target addresses. Loads cannot go ready
                         // until they have data either from fwding or dmem.
-                        fifo_next[i].ready = fifo[i].store;
+                        fifo_next[i].ready = 1;
+
                         break;
                 end
         end
 
-        if ((!fifo[fifo_head].store && fifo[fifo_head].ready) || st_en_next)
+        if (st_en_next)
+                fifo_next[fifo_head].complete = 1;
+
+        if (ld_en && ld_ready) begin
+                fifo_next[ld_tag].complete = 1;
+        end
+
+        if (fifo[fifo_head].complete)
                 fifo_next[fifo_head] = 0;
 end
 
