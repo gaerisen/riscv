@@ -12,10 +12,8 @@ int main(int argc, char *argv[])
 
         sim::lsu dut(ctx);
 
-/*        srand(time(0));
+        srand(time(0));
         int seed;
-
-        int ret = 0;*/
 
         try {
 
@@ -32,7 +30,11 @@ int main(int argc, char *argv[])
                 }
         } */
 
-                return dut.run_tests(0);
+                seed = rand();
+                std::cout << "Seed: " << seed << std::endl;
+                srand(seed);
+
+                return dut.run_tests(1024);
 
         } catch (const std::runtime_error& e) {
                 std::cerr << "RUNTIME: " << e.what();

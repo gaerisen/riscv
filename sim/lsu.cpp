@@ -6,6 +6,27 @@
 #define sh (((int64_t)1 << 35) | (1 << 7))
 #define sb ((int64_t)1 << 35)
 
+#define store(x) ((x & ((int64_t)1 << 35)) >> 35)
+
+#define byte3(x) ((x & (0xff << 24)) >> 24)
+#define byte2(x) ((x & (0xff << 16)) >> 16)
+#define byte1(x) ((x & (0xff << 8)) >> 8)
+#define byte0(x) (x & 0xff)
+
+typedef struct {
+        int64_t ctrl;
+        int32_t rs1;
+        int32_t rs2;
+        int32_t imm;
+} instr_t;
+
+int64_t ctrls[] = {
+        (int64_t)1 << 36,                // load
+//        ((int64_t)1 << 35) | (1 << 8),   // sw
+//        ((int64_t)1 << 35) | (1 << 7),   // sh
+        (int64_t)1 << 35                 // sb
+};
+
 namespace sim
 {
 
@@ -18,50 +39,47 @@ lsu::~lsu()
 
 int lsu::run_tests(int cycles)
 {
-        uint8_t dmem [256];
+        // Make and initialize dmem
+        uint8_t dmem_canon[256];
+        uint8_t dmem_verif[256];
 
         for (int i = 0; i < 256; i++) {
-                dmem[i] = 0;
+                dmem_canon[i] = 0;
+                dmem_verif[i] = 0;
         }
 
-        // === in-order load-store-load test ===
-        dispatch(0, 2, ld);
-        iter();
+        // Generate random "program"
+        instr_t program[cycles];
 
-        dispatch(1, 0, sw);
-        issue(0, 0, 0, 8);
-        iter();
+        for (int i = 0; i < cycles; i++) {
+                program[i].ctrl = ctrls[rand() % 2];
+                program[i].rs1 = (rand() % 32) << 2;
+                program[i].rs2 = (rand() % 256);
+                program[i].imm = (rand() % 32) << 2;
+        }
 
-        dispatch(2, 4, ld);
-        issue(1, 4, 69, 4);
-        iter();
+        std::cout << std::hex;
 
-        issue(2, 8, 0, 0);
-        iter();
+        // Generate 'canon' final dmem state
+        for (int i = 0; i < cycles; i++) {
+                int addr = program[i].rs1 + program[i].imm;
+                int data = program[i].rs2;
 
-        iter();
+                switch (program[i].ctrl) {
+                case ld:
+                        std::cout << "ld: [" << addr << "] = "
+                                << (int)dmem_canon[addr] << std::endl;
+                        break;
+                case sb:
+                        dmem_canon[addr] = (uint8_t)byte0(data);
+                        std::cout << "st: [" << addr << "] = "
+                                << data << std::endl;
+                        break;
+                default:;
+                }
+        }
 
-        load(dmem[dut->ld_addr]);
-        iter();
-
-        iter();
-        iter();
-        iter();
-
-        commit(1);
-        iter();
-
-        dmem[dut->st_addr] = (uint8_t)dut->st_data;
-
-        iter();
-        iter();
-
-        load(dmem[dut->ld_addr]);
-        iter();
-
-        iter();
-        iter();
-        iter();
+        std::cout << std::dec;
 
         return 0;
 }
