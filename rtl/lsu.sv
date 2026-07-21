@@ -16,7 +16,7 @@
 module lsu
 import rv32::*;
 #(
-        parameter int FIFO_LEN = 8,
+        parameter int FIFO_LEN = 64,
         localparam int FIFO_BITS = $clog2(FIFO_LEN)
 )(
         input clk,

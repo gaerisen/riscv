@@ -13,11 +13,20 @@
 #define byte1(x) ((x & (0xff << 8)) >> 8)
 #define byte0(x) (x & 0xff)
 
+typedef enum {
+        NEW,
+        DISPATCHED,
+        ISSUED,
+        EXECUTING,
+        COMMITTED
+} instr_state_e;
+
 typedef struct {
         int64_t ctrl;
         int32_t rs1;
         int32_t rs2;
         int32_t imm;
+        instr_state_e state;
 } instr_t;
 
 int64_t ctrls[] = {
@@ -48,24 +57,27 @@ int lsu::run_tests(int cycles)
                 dmem_verif[i] = 0;
         }
 
-        // Generate random "program"
-        instr_t program[cycles];
+        // Generate random "prog"
+        instr_t prog[cycles];
 
         for (int i = 0; i < cycles; i++) {
-                program[i].ctrl = ctrls[rand() % 2];
-                program[i].rs1 = (rand() % 32) << 2;
-                program[i].rs2 = (rand() % 256);
-                program[i].imm = (rand() % 32) << 2;
+                prog[i].ctrl = ctrls[rand() % 2];
+                prog[i].rs1 = (rand() % 32) << 2;
+                prog[i].rs2 = (rand() % 256);
+                prog[i].imm = (rand() % 32) << 2;
+                prog[i].state = NEW;
         }
 
         std::cout << std::hex;
 
         // Generate 'canon' final dmem state
         for (int i = 0; i < cycles; i++) {
-                int addr = program[i].rs1 + program[i].imm;
-                int data = program[i].rs2;
+                int addr = prog[i].rs1 + prog[i].imm;
+                int data = prog[i].rs2;
 
-                switch (program[i].ctrl) {
+                std::cout << "<" << i << "> ";
+
+                switch (prog[i].ctrl) {
                 case ld:
                         std::cout << "ld: [" << addr << "] = "
                                 << (int)dmem_canon[addr] << std::endl;
@@ -79,6 +91,70 @@ int lsu::run_tests(int cycles)
                 }
         }
 
+        /* Out-of-order simulation engine:
+         * (1) d(ispatch)_head sends in instructions nonstop sequentially
+         *
+         * (2) i(ssue)_head tracks the **first** dispatched, non-issued
+         * instruction, but any instruction between issue_head and dispatch_head
+         * can be selected for issue at a given time
+         *
+         * (3) c(ommit)_head always stays one entry behind issue_head
+         *
+         * prog[] array indices are used for ROB tags
+         */
+
+        int d_head = 0;
+        int i_head = 0;
+        int c_head = 0;
+
+        reset(5);
+
+        while (c_head < cycles) {
+                // Steps are executed here in 'reverse' order since each one
+                // depends on the previous cycle's _head pointers
+                
+                // Commit: Triggering unconditionally for both load and stores
+                // right now. Will have to change when cache misses are
+                // introduced
+                if (prog[c_head].state == EXECUTING) {
+                        commit(c_head++);
+                }
+
+                // Execute: Purely symbolic, to insert a 1-cycle gap that would
+                // be typical in the actual hart
+                for (int j = c_head; j < d_head; j++) {
+                        if (prog[j].state == ISSUED) {
+                                prog[j].state = EXECUTING;
+                        }
+                }
+                
+                // Issue: For now in-order, but with a slight change of failure
+                if (i_head < d_head) {
+                        if (rand() % 4 != 0) {
+                                issue(i_head,
+                                        prog[i_head].rs1,
+                                        prog[i_head].rs2,
+                                        prog[i_head].imm);
+
+                                prog[i_head].state = ISSUED;
+
+                                i_head++;
+                        }
+                }
+
+                dut->ld_data = i_head;
+
+                // Dispatch
+                if (d_head < cycles) {
+                        dispatch(d_head, 0, prog[d_head].ctrl);
+                        prog[d_head].state = DISPATCHED;
+                        d_head++;
+                }
+
+                pulse();
+                clear();
+        }
+        
         std::cout << std::dec;
 
         return 0;
