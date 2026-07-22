@@ -16,7 +16,7 @@
 module lsu
 import rv32::*;
 #(
-        parameter int FIFO_LEN = 64,
+        parameter int FIFO_LEN = 32,
         localparam int FIFO_BITS = $clog2(FIFO_LEN)
 )(
         input clk,
@@ -250,7 +250,7 @@ begin
                 * Happens combinationally on issue. Since register read happens on issue
                 * this is trivial, but may be a critical path later.
                 */
-                if (issue && (issue_tag == fifo[i].tag)) begin
+                if (issue && fifo[i].valid && (issue_tag == fifo[i].tag)) begin
                         fifo_next[i].addr = rs1_val + imm;
                         if (fifo[i].store) fifo_next[i].data = rs2_val;
                         fifo_next[i].ready = 1;
