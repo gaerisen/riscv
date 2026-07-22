@@ -34,7 +34,7 @@ int main(int argc, char *argv[])
                 std::cout << "Seed: " << seed << std::endl;
                 srand(seed);
 
-                return dut.run_tests(32);
+                return dut.run_tests(1024);
 
         } catch (const std::runtime_error& e) {
                 std::cerr << "RUNTIME: " << e.what();

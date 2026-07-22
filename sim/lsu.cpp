@@ -31,9 +31,8 @@ typedef struct {
 
 int64_t ctrls[] = {
         (int64_t)1 << 36,                // load
-//        ((int64_t)1 << 35) | (1 << 8),   // sw
-//        ((int64_t)1 << 35) | (1 << 7),   // sh
-        (int64_t)1 << 35                 // sb
+        (int64_t)1 << 35,                 // sb
+        0, 0, 0, 0, 0, 0                // nops; 1/8 chance each of ld/st
 };
 
 namespace sim
@@ -64,7 +63,7 @@ int lsu::run_tests(int cycles)
         std::vector<uint8_t> verif_loads;
 
         for (int i = 0; i < cycles; i++) {
-                prog[i].ctrl = ctrls[rand() % 2];
+                prog[i].ctrl = ctrls[rand() % 8];
                 prog[i].rs1 = (rand() % 32) << 2;
                 prog[i].rs2 = (rand() % 256);
                 prog[i].imm = (rand() % 32) << 2;
@@ -130,7 +129,7 @@ int lsu::run_tests(int cycles)
                 }
                 
                 // Issue: For now in-order, but with a slight chance of failure
-                if (i_head < d_head) {
+                if ((i_head < d_head) && !(dut->full)) {
                         // Set issue_idx to a num between i_head and d_head
                         // inclusive
                         int issue_idx;
@@ -156,7 +155,7 @@ int lsu::run_tests(int cycles)
                 }
 
                 // Dispatch
-                if (d_head < cycles) {
+                if ((d_head < cycles) && !(dut->full) && ((d_head - i_head) < 64)) {
                         dispatch(d_head, 0, prog[d_head].ctrl);
                         prog[d_head].state = DISPATCHED;
                         d_head++;

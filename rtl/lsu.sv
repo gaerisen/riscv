@@ -16,7 +16,7 @@
 module lsu
 import rv32::*;
 #(
-        parameter int FIFO_LEN = 32,
+        parameter int FIFO_LEN = 64,
         localparam int FIFO_BITS = $clog2(FIFO_LEN)
 )(
         input clk,
@@ -55,7 +55,9 @@ import rv32::*;
         output logic st_en,
         output store_funct3_e st_op,
         output logic [31:0] st_addr,
-        output logic [31:0] st_data
+        output logic [31:0] st_data,
+
+        output logic full
 );
 
 initial begin
@@ -89,6 +91,8 @@ logic [31:0] update_data_next;
 // For debugging
 logic head_complete;
 assign head_complete = fifo[fifo_head].complete;
+
+assign full = (fifo_tail == fifo_head - 1) | (fifo_tail == fifo_head - 2);
 
 /* === Store scheduling and execution === 
 * Extremely conservative. Only execute on commit. This means we can get away
