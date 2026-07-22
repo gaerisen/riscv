@@ -129,17 +129,29 @@ int lsu::run_tests(int cycles)
                         }
                 }
                 
-                // Issue: For now in-order, but with a slight change of failure
+                // Issue: For now in-order, but with a slight chance of failure
                 if (i_head < d_head) {
-                        if (rand() % 4 != 0) {
-                                issue(i_head,
-                                        prog[i_head].rs1,
-                                        prog[i_head].rs2,
-                                        prog[i_head].imm);
+                        // Set issue_idx to a num between i_head and d_head
+                        // inclusive
+                        int issue_idx;
 
-                                prog[i_head].state = ISSUED;
+                        do {
+                                issue_idx = i_head;
+                                issue_idx += rand() % ((d_head - i_head) + 1);
+                        } while (prog[issue_idx].state >= ISSUED);
 
-                                i_head++;
+                        // If issue_idx is d_head, skip. Gives a slight chance
+                        // of skipping issue this cycle, highest if close behind
+                        if (issue_idx != d_head) {
+                                issue(issue_idx,
+                                        prog[issue_idx].rs1,
+                                        prog[issue_idx].rs2,
+                                        prog[issue_idx].imm);
+
+                                prog[issue_idx].state = ISSUED;
+
+                                // Iterate i_head until reached an unissued op
+                                for (; prog[i_head].state >= ISSUED; i_head++);
                         }
                 }
 
