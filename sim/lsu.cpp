@@ -32,7 +32,7 @@ typedef struct {
 int64_t ctrls[] = {
         (int64_t)1 << 36,                // load
         (int64_t)1 << 35,                 // sb
-        0, 0, 0, 0, 0, 0                // nops; 1/8 chance each of ld/st
+        0, 0, 0                // nops; 1/8 chance each of ld/st
 };
 
 namespace sim
@@ -61,9 +61,10 @@ int lsu::run_tests(int cycles)
 
         std::vector<uint8_t> canon_loads;
         std::vector<uint8_t> verif_loads;
+        std::vector<uint8_t> verif_loads_unordered;
 
         for (int i = 0; i < cycles; i++) {
-                prog[i].ctrl = ctrls[rand() % 8];
+                prog[i].ctrl = ctrls[rand() % (sizeof(ctrls)/sizeof(int64_t))];
                 prog[i].rs1 = (rand() % 32) << 2;
                 prog[i].rs2 = (rand() % 256);
                 prog[i].imm = (rand() % 32) << 2;
@@ -136,7 +137,10 @@ int lsu::run_tests(int cycles)
 
                         do {
                                 issue_idx = i_head;
-                                issue_idx += rand() % ((d_head - i_head) + 1);
+                                int range = d_head - i_head + 1;
+                                if (range > 4) range = 4;
+                                range = rand() % range;
+                                issue_idx += range;
                         } while (prog[issue_idx].state >= ISSUED);
 
                         // If issue_idx is d_head, skip. Gives a slight chance
@@ -172,10 +176,6 @@ int lsu::run_tests(int cycles)
                         dmem_verif[dut->st_addr] = (uint8_t)dut->st_data;
                 }
 
-                if (dut->update) {
-                        verif_loads.push_back((uint8_t)dut->update_data);
-                }
-
                 pulse();
                 clear();
         }
@@ -191,10 +191,6 @@ int lsu::run_tests(int cycles)
                         dmem_verif[dut->st_addr] = (uint8_t)dut->st_data;
                 }
 
-                if (dut->update) {
-                        verif_loads.push_back((uint8_t)dut->update_data);
-                }
-
                 pulse();
                 clear();
         }
@@ -202,22 +198,9 @@ int lsu::run_tests(int cycles)
         // Compare dmems
         int status = 0;
 
-        int num_loads = canon_loads.size();
-        if (num_loads != verif_loads.size()) {
-                std::cout << "Disagreement on number of loads. [" 
-                        << canon_loads.size() << ", " << verif_loads.size()
-                        << "]" << std::endl;
+        for (int i = 0; i < 256; i++) {
+                if (dmem_canon[i] != dmem_verif[i]) status++;
         }
-        if (num_loads > verif_loads.size()) num_loads = verif_loads.size();
-
-        for (int i = 0; i < num_loads; i++) {
-                if (canon_loads.at(i) != verif_loads.at(i)) {
-                        std::cout << "<" << i << "> [" << (int)canon_loads.at(i)
-                                << ", " << (int)verif_loads.at(i) << "]"
-                                << std::endl;
-                }
-        }
-
         
         std::cout << std::dec;
 
@@ -237,7 +220,7 @@ void lsu::clear()
 void lsu::dispatch(int tag, int prd, int64_t ctrl)
 {
         dut->dispatch = 1;
-        dut->dispatch_tag = tag;
+        dut->dispatch_tag = tag & 0x3f;
         dut->new_prd = prd;
         dut->ctrl_word = ctrl;
 }
@@ -245,7 +228,7 @@ void lsu::dispatch(int tag, int prd, int64_t ctrl)
 void lsu::issue(int tag, int32_t rs1, int32_t rs2, int32_t imm)
 {
         dut->issue = 1;
-        dut->issue_tag = tag;
+        dut->issue_tag = tag & 0x3f;
         dut->rs1_val = rs1;
         dut->rs2_val = rs2;
         dut->imm = imm;
@@ -254,7 +237,7 @@ void lsu::issue(int tag, int32_t rs1, int32_t rs2, int32_t imm)
 void lsu::commit(int tag)
 {
         dut->commit = 1;
-        dut->commit_tag = tag;
+        dut->commit_tag = tag & 0x3f;
 }
 
 void lsu::load(int32_t data)
