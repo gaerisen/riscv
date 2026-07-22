@@ -86,22 +86,25 @@ logic [5:0] update_tag_next;
 logic [6:0] update_prd_next;
 logic [31:0] update_data_next;
 
+// For debugging
+logic head_complete;
+assign head_complete = fifo[fifo_head].complete;
+
 /* === Store scheduling and execution === 
 * Extremely conservative. Only execute on commit. This means we can get away
 * with only checking the head, since only the ROB head can commit and
 * instructions are dispatched to both units in the same order
 */
 
-assign st_en_next = commit && (commit_tag == fifo[fifo_head].tag) &&
-                        fifo[fifo_head].store;
-
 always_comb
 begin
+        st_en_next = 0;
         st_op_next = SB;
         st_addr_next = 0;
         st_data_next = 0;
 
-        if (st_en_next) begin
+        if (fifo[fifo_head].store && fifo[fifo_head].complete) begin
+                st_en_next = 1;
                 st_op_next = fifo[fifo_head].st_op;
                 st_addr_next = fifo[fifo_head].addr;
                 st_data_next = fifo[fifo_head].data;
@@ -142,9 +145,9 @@ begin
                 ld_tag_next = 0;
                 ld_addr_next = 0;
 
-                for (int i = 0; i < FIFO_LEN; i++) begin
+                for (logic [FIFO_BITS-1:0] i = fifo_head; i != fifo_tail; i++) begin
                         if (fifo[i].store) break; // TODO: Do some speculation
-                        if (fifo[i].ready) begin
+                        if (fifo[i].ready && !fifo[i].complete) begin
                                 ld_en_next = 1;
                                 ld_tag_next = i[FIFO_BITS-1:0];
                                 ld_addr_next = fifo[i].addr;
@@ -242,27 +245,21 @@ begin
                 fifo_next[fifo_tail].valid = 1;
         end
 
-        /* Generate Address 
-        * Happens combinationally on issue. Since register read happens on issue
-        * this is trivial, but may be a critical path later.
-        */
-        for (int i = 0; i < FIFO_BITS; i++) begin
+        for (int i = 0; i < FIFO_LEN; i++) begin
+                /* Generate Address 
+                * Happens combinationally on issue. Since register read happens on issue
+                * this is trivial, but may be a critical path later.
+                */
                 if (issue && (issue_tag == fifo[i].tag)) begin
                         fifo_next[i].addr = rs1_val + imm;
-
                         if (fifo[i].store) fifo_next[i].data = rs2_val;
-
-                        // Ready flag is for commit; stores are fine as soon as
-                        // they have target addresses. Loads cannot go ready
-                        // until they have data either from fwding or dmem.
                         fifo_next[i].ready = 1;
+                end
 
-                        break;
+                if (commit && fifo[i].store && (commit_tag == fifo[i].tag)) begin
+                        fifo_next[i].complete = 1;
                 end
         end
-
-        if (st_en_next)
-                fifo_next[fifo_head].complete = 1;
 
         if (ld_en && ld_ready) begin
                 fifo_next[ld_tag].complete = 1;
