@@ -53,12 +53,12 @@ int lsu::run_tests(int cycles)
         uint8_t dmem_verif[256];
 
         for (int i = 0; i < 256; i++) {
-                dmem_canon[i] = 0;
-                dmem_verif[i] = 0;
+                dmem_canon[i] = i;
+                dmem_verif[i] = i;
         }
 
         // Generate random "prog"
-        instr_t prog[cycles];
+        instr_t *prog = (instr_t *)malloc(cycles * sizeof(instr_t));
 
         for (int i = 0; i < cycles; i++) {
                 prog[i].ctrl = ctrls[rand() % 2];
@@ -110,6 +110,7 @@ int lsu::run_tests(int cycles)
         reset(5);
 
         while (c_head < cycles) {
+
                 // Steps are executed here in 'reverse' order since each one
                 // depends on the previous cycle's _head pointers
                 
@@ -142,8 +143,6 @@ int lsu::run_tests(int cycles)
                         }
                 }
 
-                dut->ld_data = i_head;
-
                 // Dispatch
                 if (d_head < cycles) {
                         dispatch(d_head, 0, prog[d_head].ctrl);
@@ -151,13 +150,52 @@ int lsu::run_tests(int cycles)
                         d_head++;
                 }
 
+                // Respond to load requests immediately
+                if (dut->ld_en) {
+                        dut->ld_ready = 1;
+                        dut->ld_data = dmem_verif[dut->ld_addr];
+                }
+
+                // Complete stores
+                if (dut->st_en) {
+                        dmem_verif[dut->st_addr] = (uint8_t)dut->st_data;
+                }
+
                 pulse();
                 clear();
+        }
+
+        // Continue running until the queue is cleared
+        for (int i = 0; i < 32; i++) {
+                if (dut->ld_en) {
+                        dut->ld_ready = 1;
+                        dut->ld_data = dmem_verif[dut->ld_addr];
+                }
+
+                if (dut->st_en) {
+                        dmem_verif[dut->st_addr] = (uint8_t)dut->st_data;
+                }
+
+                pulse();
+                clear();
+        }
+
+        // Compare dmems
+        int status = 0;
+
+        for (int i = 0; i < 256; i++) {
+                if (dmem_canon[i] != dmem_verif[i]) {
+                        status = 1;
+                        std::cout << "[" << i << "] = " << dmem_canon[i]
+                                << ", lsu got " << dmem_verif[i] << std::endl;
+                }
         }
         
         std::cout << std::dec;
 
-        return 0;
+        free(prog);
+
+        return status;
 }
 
 void lsu::clear()
