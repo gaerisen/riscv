@@ -146,7 +146,7 @@ begin
                 ld_addr_next = 0;
 
                 for (logic [FIFO_BITS-1:0] i = fifo_head; i != fifo_tail; i++) begin
-                        if (fifo[i].store) break; // TODO: Do some speculation
+                        if (fifo[i].store) break;
                         if (fifo[i].ready && !fifo[i].complete) begin
                                 ld_en_next = 1;
                                 ld_tag_next = i[FIFO_BITS-1:0];
@@ -183,7 +183,7 @@ begin
         update_prd_next = 0;
         update_data_next = 0;
 
-        if (ld_en && ld_ready) begin
+        if (ld_en && ld_ready && !fifo[ld_tag].complete) begin
                 update_next = 1;
                 update_tag_next = fifo[ld_tag].tag;
                 update_prd_next = fifo[ld_tag].prd;
