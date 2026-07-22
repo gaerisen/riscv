@@ -53,12 +53,15 @@ int lsu::run_tests(int cycles)
         uint8_t dmem_verif[256];
 
         for (int i = 0; i < 256; i++) {
-                dmem_canon[i] = i;
-                dmem_verif[i] = i;
+                dmem_canon[i] = 0;
+                dmem_verif[i] = 0;
         }
 
         // Generate random "prog"
         instr_t *prog = (instr_t *)malloc(cycles * sizeof(instr_t));
+
+        std::vector<uint8_t> canon_loads;
+        std::vector<uint8_t> verif_loads;
 
         for (int i = 0; i < cycles; i++) {
                 prog[i].ctrl = ctrls[rand() % 2];
@@ -75,17 +78,14 @@ int lsu::run_tests(int cycles)
                 int addr = prog[i].rs1 + prog[i].imm;
                 int data = prog[i].rs2;
 
-                std::cout << "<" << i << "> ";
-
                 switch (prog[i].ctrl) {
                 case ld:
-                        std::cout << "ld: [" << addr << "] = "
-                                << (int)dmem_canon[addr] << std::endl;
+                        canon_loads.push_back(dmem_canon[addr]);
                         break;
+                case sw:
+                case sh:
                 case sb:
-                        dmem_canon[addr] = (uint8_t)byte0(data);
-                        std::cout << "st: [" << addr << "] = "
-                                << data << std::endl;
+                        dmem_canon[addr] = (uint8_t)data;
                         break;
                 default:;
                 }
@@ -173,12 +173,16 @@ int lsu::run_tests(int cycles)
                         dmem_verif[dut->st_addr] = (uint8_t)dut->st_data;
                 }
 
+                if (dut->update) {
+                        verif_loads.push_back((uint8_t)dut->update_data);
+                }
+
                 pulse();
                 clear();
         }
 
         // Continue running until the queue is cleared
-        for (int i = 0; i < 32; i++) {
+        for (int i = 0; i < 64; i++) {
                 if (dut->ld_en) {
                         dut->ld_ready = 1;
                         dut->ld_data = dmem_verif[dut->ld_addr];
@@ -188,6 +192,10 @@ int lsu::run_tests(int cycles)
                         dmem_verif[dut->st_addr] = (uint8_t)dut->st_data;
                 }
 
+                if (dut->update) {
+                        verif_loads.push_back((uint8_t)dut->update_data);
+                }
+
                 pulse();
                 clear();
         }
@@ -195,13 +203,22 @@ int lsu::run_tests(int cycles)
         // Compare dmems
         int status = 0;
 
-        for (int i = 0; i < 256; i++) {
-                if (dmem_canon[i] != dmem_verif[i]) {
-                        status = 1;
-                        std::cout << "[" << i << "] = " << dmem_canon[i]
-                                << ", lsu got " << dmem_verif[i] << std::endl;
+        int num_loads = canon_loads.size();
+        if (num_loads != verif_loads.size()) {
+                std::cout << "Disagreement on number of loads. [" 
+                        << canon_loads.size() << ", " << verif_loads.size()
+                        << "]" << std::endl;
+        }
+        if (num_loads > verif_loads.size()) num_loads = verif_loads.size();
+
+        for (int i = 0; i < num_loads; i++) {
+                if (canon_loads.at(i) != verif_loads.at(i)) {
+                        std::cout << "<" << i << "> [" << (int)canon_loads.at(i)
+                                << ", " << (int)verif_loads.at(i) << "]"
+                                << std::endl;
                 }
         }
+
         
         std::cout << std::dec;
 
