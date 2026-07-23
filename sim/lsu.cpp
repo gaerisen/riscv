@@ -27,6 +27,8 @@ typedef struct {
         int32_t rs2;
         int32_t imm;
         instr_state_e state;
+        int32_t rd;
+        int32_t result;
 } instr_t;
 
 int64_t ctrls[] = {
@@ -50,45 +52,57 @@ int lsu::run_tests(int cycles)
         // Make and initialize dmem
         uint8_t dmem_canon[256];
         uint8_t dmem_verif[256];
+        uint8_t irf_canon[32];
+        uint8_t irf_verif[32];
 
         for (int i = 0; i < 256; i++) {
                 dmem_canon[i] = 0;
                 dmem_verif[i] = 0;
         }
 
+        for (int i = 0; i < 32; i++) {
+                int n = rand() % 128;
+                irf_canon[i] = n;
+                irf_verif[i] = n;
+        }
+
         // Generate random "prog"
         instr_t *prog = (instr_t *)malloc(cycles * sizeof(instr_t));
 
-        std::vector<uint8_t> canon_loads;
-        std::vector<uint8_t> verif_loads;
-        std::vector<uint8_t> verif_loads_unordered;
-
         for (int i = 0; i < cycles; i++) {
                 prog[i].ctrl = ctrls[rand() % (sizeof(ctrls)/sizeof(int64_t))];
-                prog[i].rs1 = (rand() % 32) << 2;
-                prog[i].rs2 = (rand() % 256);
-                prog[i].imm = (rand() % 32) << 2;
+                prog[i].rs1 = rand() % 32;
+                prog[i].rs2 = rand() % 32;
+                prog[i].imm = rand() % 128;
                 prog[i].state = NEW;
+                prog[i].rd = rand() % 32;
+                prog[i].result = 0;
         }
 
         std::cout << std::hex;
 
         // Generate 'canon' final dmem state
         for (int i = 0; i < cycles; i++) {
-                int addr = prog[i].rs1 + prog[i].imm;
-                int data = prog[i].rs2;
+                int addr = irf_canon[prog[i].rs1] + prog[i].imm;
+                int data = irf_canon[prog[i].rs2];
+
+                std::cout << "<" << i << ">";
 
                 switch (prog[i].ctrl) {
                 case ld:
-                        canon_loads.push_back(dmem_canon[addr]);
+                        irf_canon[prog[i].rd] = dmem_canon[addr];
+                        std::cout << " ld 0x" << addr << " -> x" << prog[i].rd;
                         break;
                 case sw:
                 case sh:
                 case sb:
                         dmem_canon[addr] = (uint8_t)data;
+                        std::cout << " st x" << prog[i].rd << " -> 0x" << addr;
                         break;
                 default:;
                 }
+
+                std::cout << std::endl;
         }
 
         /* Out-of-order simulation engine:
@@ -118,6 +132,7 @@ int lsu::run_tests(int cycles)
                 // right now. Will have to change when cache misses are
                 // introduced
                 if (prog[c_head].state == EXECUTING) {
+                        irf_verif[prog[c_head].rd] = prog[c_head].result;
                         commit(c_head++);
                 }
 
@@ -125,12 +140,19 @@ int lsu::run_tests(int cycles)
                 // be typical in the actual hart
                 for (int j = c_head; j < d_head; j++) {
                         if (prog[j].state == ISSUED) {
-                                prog[j].state = EXECUTING;
+                                if (prog[j].ctrl == ld) {
+                                        if (dut->update && (dut->update_tag == (j & 0x3f))) {
+                                                prog[j].result = dut->update_data;
+                                                prog[j].state = EXECUTING;
+                                        }
+                                } else {
+                                        prog[j].state = EXECUTING;
+                                }
                         }
                 }
                 
                 // Issue: For now in-order, but with a slight chance of failure
-                if ((i_head < d_head) && !(dut->full)) {
+                if ((i_head < d_head)) {
                         // Set issue_idx to a num between i_head and d_head
                         // inclusive
                         int issue_idx;
@@ -138,7 +160,6 @@ int lsu::run_tests(int cycles)
                         do {
                                 issue_idx = i_head;
                                 int range = d_head - i_head + 1;
-                                if (range > 4) range = 4;
                                 range = rand() % range;
                                 issue_idx += range;
                         } while (prog[issue_idx].state >= ISSUED);
