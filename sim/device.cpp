@@ -41,6 +41,8 @@ void device::reset(int n)
 
         dut->rst = 0;
 
+        cycles = 0;
+
         return;
 }
 

@@ -13,6 +13,7 @@
 #define byte1(x) ((x & (0xff << 8)) >> 8)
 #define byte0(x) (x & 0xff)
 
+
 typedef enum {
         NEW,
         DISPATCHED,
@@ -212,6 +213,7 @@ int lsu::run_tests(int cycles)
                 clear();
         }
 
+        
         // Continue running until the queue is cleared
         for (int i = 0; i < 64; i++) {
                 if (dut->ld_en) {
