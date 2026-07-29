@@ -134,8 +134,26 @@ end
 * immediately. If not, send the first available address to DMEM
 */
 
+logic [FIFO_BITS-1:0] first_st;
+logic ld_fwd_next;
+logic [FIFO_BITS-1:0] ld_fwd_tag;
+logic [31:0] ld_fwd_data;
+
 always_comb
 begin
+        first_st = fifo_tail;
+
+        for (logic [FIFO_BITS-1:0] i = fifo_head; i != fifo_tail; i++) begin
+                if (fifo[i].store) begin
+                        first_st = i;
+                        break;
+                end
+        end
+
+        ld_fwd_next = 0;
+        ld_fwd_tag = 0;
+        ld_fwd_data = 0;
+
         // Unlike stores we need to preserve access state until data has arrived
         if (ld_en && !ld_ready) begin
                 ld_en_next = ld_en;
@@ -146,10 +164,20 @@ begin
                 ld_en_next = 0;
                 ld_tag_next = 0;
                 ld_addr_next = 0;
-
-                for (logic [FIFO_BITS-1:0] i = fifo_head; i != fifo_tail; i++) begin
+                
+                for (logic [FIFO_BITS-1:0] i = first_st; i != fifo_tail; i++) begin
                         if (fifo[i].store) break;
-                        if (fifo[i].ready && !fifo[i].complete) begin
+                        if (fifo[i].ready && fifo[first_st].ready && 
+                                !fifo[i].populated && fifo[i].addr == fifo[first_st].addr) begin
+                                ld_fwd_next = 1;
+                                ld_fwd_tag = i;
+                                ld_fwd_data = fifo[first_st].data;
+                                break;
+                        end
+                end
+
+                for (logic [FIFO_BITS-1:0] i = fifo_head; i != first_st; i++) begin
+                        if (fifo[i].ready && !fifo[i].populated) begin
                                 ld_en_next = 1;
                                 ld_tag_next = i[FIFO_BITS-1:0];
                                 ld_addr_next = fifo[i].addr;
@@ -177,19 +205,25 @@ end
 /* === Load execution ===
 * Distinct from scheduling; interacts with the CDB after memory access is done
 */
+logic [FIFO_BITS-1:0] update_idx_next;
+logic [FIFO_BITS-1:0] update_idx;
 
 always_comb
 begin
         update_next = 0;
         update_tag_next = 0;
+        update_idx_next = 0;
         update_prd_next = 0;
         update_data_next = 0;
 
-        if (ld_en && ld_ready && !fifo[ld_tag].complete) begin
-                update_next = 1;
-                update_tag_next = fifo[ld_tag].tag;
-                update_prd_next = fifo[ld_tag].prd;
-                update_data_next = ld_data;
+        for (logic [FIFO_BITS-1:0] i = fifo_head; i != fifo_tail; i++) begin
+                if (!fifo[i].store && fifo[i].populated && !fifo[i].complete) begin
+                        update_next = 1;
+                        update_tag_next = fifo[i].tag;
+                        update_idx_next = i;
+                        update_prd_next = fifo[i].prd;
+                        update_data_next = fifo[i].data;
+                end
         end
 end
 
@@ -198,12 +232,14 @@ begin
         if (rst) begin
                 update <= 0;
                 update_tag <= 0;
+                update_idx <= 0;
                 update_prd <= 0;
                 update_data <= 0;
         end
         else begin
                 update <= update_next;
                 update_tag <= update_tag_next;
+                update_idx <= update_idx_next;
                 update_prd <= update_prd_next;
                 update_data <= update_data_next;
         end
@@ -264,7 +300,17 @@ begin
         end
 
         if (ld_en && ld_ready) begin
-                fifo_next[ld_tag].complete = 1;
+                fifo_next[ld_tag].data = ld_data;
+                fifo_next[ld_tag].populated = 1;
+        end
+
+        if (ld_fwd_next) begin
+                fifo_next[ld_fwd_tag].data = ld_fwd_data;
+                fifo_next[ld_fwd_tag].populated = 1;
+        end
+
+        if (update) begin
+                fifo_next[update_idx].complete = 1;
         end
 
         if (fifo[fifo_head].complete)

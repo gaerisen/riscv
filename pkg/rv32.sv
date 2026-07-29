@@ -260,6 +260,7 @@ package rv32;
 
                 logic valid;
                 logic ready;
+                logic populated;
                 logic complete;
         } lsu_entry_t;
 
