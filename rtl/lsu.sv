@@ -60,7 +60,8 @@ import rv32::*;
         output logic full
 );
 
-initial begin
+initial
+begin
         $dumpfile("lsu.vcd");
         $dumpvars(0, lsu);
 end
@@ -88,11 +89,8 @@ logic [5:0] update_tag_next;
 logic [6:0] update_prd_next;
 logic [31:0] update_data_next;
 
-// For debugging
-logic head_complete;
-assign head_complete = fifo[fifo_head].complete;
-
-assign full = (fifo_tail == fifo_head - 1) | (fifo_tail == fifo_head - 2);
+assign full = (fifo_tail == (fifo_head + {FIFO_BITS{1'b1}})) |
+                (fifo_tail == (fifo_head + {{(FIFO_BITS-1){1'b1}}, 1'b0}));
 
 /* === Store scheduling and execution === 
 * Extremely conservative. Only execute on commit. This means we can get away
