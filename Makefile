@@ -37,7 +37,7 @@ TB_SRC = sim/main.cpp \
 
 TB_OBJ = $(TB_SRC:.cpp=.o)
 
-CXXFLAGS = -I$(VINC) -I$(VLTSTDINC) -Isim/include -Iobj_dir -std=c++17
+CXXFLAGS = -I$(VINC) -I$(VLTSTDINC) -Isim/include -Iobj_dir -std=c++17 -ggdb -O0
 
 $(TB_OBJ): $(TB_SRC) obj_dir/Vtop.mk
 

@@ -23,12 +23,13 @@ typedef enum {
 
 typedef struct {
         int64_t ctrl;
-        int32_t rs1;
-        int32_t rs2;
-        int32_t imm;
+        int rs1;
+        int rs2;
+        int imm;
         instr_state_e state;
-        int32_t rd;
-        int32_t result;
+        int rd;
+        uint8_t canon_result;
+        uint8_t verif_result;
 } instr_t;
 
 int64_t ctrls[] = {
@@ -52,18 +53,10 @@ int lsu::run_tests(int cycles)
         // Make and initialize dmem
         uint8_t dmem_canon[256];
         uint8_t dmem_verif[256];
-        uint8_t irf_canon[32];
-        uint8_t irf_verif[32];
 
         for (int i = 0; i < 256; i++) {
                 dmem_canon[i] = 0;
                 dmem_verif[i] = 0;
-        }
-
-        for (int i = 0; i < 32; i++) {
-                int n = rand() % 128;
-                irf_canon[i] = n;
-                irf_verif[i] = n;
         }
 
         // Generate random "prog"
@@ -71,26 +64,33 @@ int lsu::run_tests(int cycles)
 
         for (int i = 0; i < cycles; i++) {
                 prog[i].ctrl = ctrls[rand() % (sizeof(ctrls)/sizeof(int64_t))];
-                prog[i].rs1 = rand() % 32;
-                prog[i].rs2 = rand() % 32;
+                prog[i].rs1 = rand() % 128;
+                prog[i].rs2 = rand() % 128;
                 prog[i].imm = rand() % 128;
                 prog[i].state = NEW;
                 prog[i].rd = rand() % 32;
-                prog[i].result = 0;
+                prog[i].canon_result = 0;
+                prog[i].verif_result = 0;
         }
 
         std::cout << std::hex;
+        
+        std::cout << "\nProgram:" << std::endl;
 
         // Generate 'canon' final dmem state
         for (int i = 0; i < cycles; i++) {
-                int addr = irf_canon[prog[i].rs1] + prog[i].imm;
-                int data = irf_canon[prog[i].rs2];
+                int addr = prog[i].rs1 + prog[i].imm;
+                int data = prog[i].rs2;
 
                 std::cout << "<" << i << ">";
 
+                std::cout << " rs1=" << prog[i].rs1;
+                std::cout << " rs2=" << prog[i].rs2;
+                std::cout << " imm=" << prog[i].imm;
+
                 switch (prog[i].ctrl) {
                 case ld:
-                        irf_canon[prog[i].rd] = dmem_canon[addr];
+                        prog[i].canon_result = dmem_canon[addr];
                         std::cout << " ld 0x" << addr << " -> x" << prog[i].rd;
                         break;
                 case sw:
@@ -132,22 +132,19 @@ int lsu::run_tests(int cycles)
                 // right now. Will have to change when cache misses are
                 // introduced
                 if (prog[c_head].state == EXECUTING) {
-                        irf_verif[prog[c_head].rd] = prog[c_head].result;
+                        prog[c_head].state = COMMITTED;
                         commit(c_head++);
                 }
 
-                // Execute: Purely symbolic, to insert a 1-cycle gap that would
-                // be typical in the actual hart
+                // Execute: Add a gap between issue and commit, and record load
+                // results
                 for (int j = c_head; j < d_head; j++) {
                         if (prog[j].state == ISSUED) {
-                                if (prog[j].ctrl == ld) {
-                                        if (dut->update && (dut->update_tag == (j & 0x3f))) {
-                                                prog[j].result = dut->update_data;
-                                                prog[j].state = EXECUTING;
-                                        }
-                                } else {
-                                        prog[j].state = EXECUTING;
+                                if ((prog[j].ctrl == ld) && dut->update &&
+                                        (dut->update_tag == (j & 0x3f))) {
+                                        prog[j].verif_result = dut->update_data;
                                 }
+                                prog[j].state = EXECUTING;
                         }
                 }
                 
@@ -175,7 +172,7 @@ int lsu::run_tests(int cycles)
                                 prog[issue_idx].state = ISSUED;
 
                                 // Iterate i_head until reached an unissued op
-                                for (; prog[i_head].state >= ISSUED; i_head++);
+                                for (; i_head < d_head && prog[i_head].state >= ISSUED; i_head++);
                         }
                 }
 
@@ -216,11 +213,30 @@ int lsu::run_tests(int cycles)
                 clear();
         }
 
-        // Compare dmems
+        std::cout << "\nFinal DMEM State:" << std::endl;
+
         int status = 0;
 
         for (int i = 0; i < 256; i++) {
-                if (dmem_canon[i] != dmem_verif[i]) status++;
+                if (dmem_canon[i] != dmem_verif[i]) {
+                        std::cout << "[0x" << i << "] = (canon) 0x"
+                                << (int)dmem_canon[i] << ", (verif) 0x"
+                                << (int)dmem_verif[i] << std::endl;
+                        status++;
+                }
+        }
+
+        std::cout << "\nFinal Program State:" << std::endl;
+
+        // Compare dmems
+
+        for (int i = 0; i < cycles; i++) {
+                if (prog[i].canon_result != prog[i].verif_result) {
+                        std::cout << "<" << i << "> = (canon) 0x"
+                                << (int)prog[i].canon_result << ", (verif) 0x"
+                                << (int)prog[i].verif_result << std::endl;
+                        status++;
+                }
         }
         
         std::cout << std::dec;
