@@ -75,34 +75,44 @@ int lsu::run_tests(int cycles)
 
         std::cout << std::hex;
         
+#ifdef DEBUG
         std::cout << "\nProgram:" << std::endl;
+#endif
 
         // Generate 'canon' final dmem state
         for (int i = 0; i < cycles; i++) {
                 int addr = prog[i].rs1 + prog[i].imm;
                 int data = prog[i].rs2;
 
+#ifdef DEBUG
                 std::cout << "<" << i << ">";
 
                 std::cout << " rs1=" << prog[i].rs1;
                 std::cout << " rs2=" << prog[i].rs2;
                 std::cout << " imm=" << prog[i].imm;
+#endif
 
                 switch (prog[i].ctrl) {
                 case ld:
                         prog[i].canon_result = dmem_canon[addr];
+#ifdef DEBUG
                         std::cout << " ld 0x" << addr << " -> x" << prog[i].rd;
+#endif
                         break;
                 case sw:
                 case sh:
                 case sb:
                         dmem_canon[addr] = (uint8_t)data;
+#ifdef DEBUG
                         std::cout << " st x" << prog[i].rd << " -> 0x" << addr;
+#endif
                         break;
                 default:;
                 }
 
+#ifdef DEBUG
                 std::cout << std::endl;
+#endif
         }
 
         /* Out-of-order simulation engine:
@@ -140,16 +150,20 @@ int lsu::run_tests(int cycles)
                 // results
                 for (int j = c_head; j < d_head; j++) {
                         if (prog[j].state == ISSUED) {
-                                if ((prog[j].ctrl == ld) && dut->update &&
+                                if (prog[j].ctrl == ld) {
+                                        if (dut->update &&
                                         (dut->update_tag == (j & 0x3f))) {
-                                        prog[j].verif_result = dut->update_data;
+                                                prog[j].verif_result = dut->update_data;
+                                                prog[j].state = EXECUTING;
+                                        }
+                                } else {
+                                        prog[j].state = EXECUTING;
                                 }
-                                prog[j].state = EXECUTING;
                         }
                 }
                 
                 // Issue: For now in-order, but with a slight chance of failure
-                if ((i_head < d_head)) {
+                if ((i_head < d_head) && (i_head - c_head < 32)) {
                         // Set issue_idx to a num between i_head and d_head
                         // inclusive
                         int issue_idx;
@@ -177,7 +191,7 @@ int lsu::run_tests(int cycles)
                 }
 
                 // Dispatch
-                if ((d_head < cycles) && !(dut->full) && ((d_head - i_head) < 64)) {
+                if ((d_head < cycles) && !(dut->full) && ((d_head - i_head) < 32)) {
                         dispatch(d_head, 0, prog[d_head].ctrl);
                         prog[d_head].state = DISPATCHED;
                         d_head++;
@@ -213,28 +227,36 @@ int lsu::run_tests(int cycles)
                 clear();
         }
 
+#ifdef DEBUG
         std::cout << "\nFinal DMEM State:" << std::endl;
+#endif
 
         int status = 0;
 
         for (int i = 0; i < 256; i++) {
                 if (dmem_canon[i] != dmem_verif[i]) {
+#ifdef DEBUG
                         std::cout << "[0x" << i << "] = (canon) 0x"
                                 << (int)dmem_canon[i] << ", (verif) 0x"
                                 << (int)dmem_verif[i] << std::endl;
+#endif
                         status++;
                 }
         }
 
+#ifdef DEBUG
         std::cout << "\nFinal Program State:" << std::endl;
+#endif
 
         // Compare dmems
 
         for (int i = 0; i < cycles; i++) {
                 if (prog[i].canon_result != prog[i].verif_result) {
+#ifdef DEBUG
                         std::cout << "<" << i << "> = (canon) 0x"
                                 << (int)prog[i].canon_result << ", (verif) 0x"
                                 << (int)prog[i].verif_result << std::endl;
+#endif
                         status++;
                 }
         }

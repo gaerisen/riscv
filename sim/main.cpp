@@ -14,10 +14,11 @@ int main(int argc, char *argv[])
 
         srand(time(0));
         int seed;
+        int ret;
 
         try {
 
-/*        for (int i = 0; i < 32; i++) {
+        for (int i = 0; i < 256; i++) {
                 seed = rand();
                 std::cout << "Trial #" << i+1 << "; Seed: " << seed << std::endl;
                 srand(seed);
@@ -28,13 +29,7 @@ int main(int argc, char *argv[])
                         std::cout << "Failed, exiting..." << std::endl;
                         return ret;
                 }
-        } */
-
-                seed = rand();
-                std::cout << "Seed: " << seed << std::endl;
-                srand(seed);
-
-                return dut.run_tests(1024);
+        }
 
         } catch (const std::runtime_error& e) {
                 std::cerr << "RUNTIME: " << e.what();
