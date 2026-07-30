@@ -95,6 +95,8 @@ csru csru (
         .csr_new(csr_result)
 );
 
+logic update_next;
+
 always_comb
 begin
         result_exe_next = 0;
@@ -108,10 +110,13 @@ begin
                 else
                         result_exe_next = alu_result;
         end
-        WB_MEM: result_exe_next = 0; // TODO: Come on, bro
+        WB_MEM: result_exe_next = 0;
         WB_PC4: result_exe_next = issue_ifc.pc + 32'h4;
         WB_CSR: result_exe_next = issue_ifc.csr_val;
         endcase
+
+        // Reject loads and stores; those will come out of the LSU
+        update_next = issue_ifc.issue & issue_ifc.ctrl_word[36:35] == 0;
 end
 
 always_ff @(posedge clk or posedge rst)
@@ -130,7 +135,7 @@ begin
                 cdb_ifc.target_addr <= 0;
         end
         else begin
-                cdb_ifc.update <= issue_ifc.issue;
+                cdb_ifc.update <= update_next;
                 cdb_ifc.valid <= issue_ifc.valid;
                 cdb_ifc.dest <= rd_exe_next;
                 cdb_ifc.dest_old <= issue_ifc.prd_old;

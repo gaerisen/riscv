@@ -179,6 +179,15 @@ begin
         // a post-rollback instruction.
         if (issue_ifc.issue & rob[issue_ifc.tag].valid) begin
                 rob_next[issue_ifc.tag].executing = 1;
+                
+                // Special update rule for stores: Addr generation is:
+                // (1) immediate on issue
+                // (2) the last operation that happens before commit
+                // Therefore stores can be committed immediately after issue
+                // (Might be a problem for speculation, check back later)
+                if (rob[issue_ifc.tag].ctrl_word.store) begin
+                        rob_next[issue_ifc.tag].ready = 1;
+                end
         end
 
         if (cdb_ifc.update & rob[cdb_ifc.tag].executing) begin

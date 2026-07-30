@@ -168,9 +168,9 @@ endinterface
 
 
 
-/*====================*/
-/*    Dispatch Ifc    */
-/*====================*/
+/*=================*/
+/*    Issue Ifc    */
+/*=================*/
 interface issue_ifc
 import rv32::*;
 #(

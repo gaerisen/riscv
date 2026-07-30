@@ -4,7 +4,8 @@ import rv32::*;
 #(
         parameter int ROB_LEN = 64,
         parameter int PRF_SIZE = 128,
-        parameter int IQ_ENTRIES = 4
+        parameter int IQ_ENTRIES = 4,
+        parameter int LSQ_LEN = 32
 )(
         input clk,
         input rst,
@@ -68,6 +69,34 @@ defparam iq.NUM_ENTRIES = IQ_ENTRIES;
 
 execute execute (.*);
 defparam execute.PRF_SIZE = PRF_SIZE;
+
+logic update;
+logic [$clog2(ROB_LEN)-1:0] update_tag;
+logic [$clog2(PRF_SIZE)-1:0] update_prd;
+logic [31:0] update_data;
+
+lsu lsu (
+        .dispatch(dispatch_ifc.dispatch),
+        .dispatch_tag(dispatch_ifc.tag),
+        .new_prd(dispatch_ifc.prd_new),
+        .ctrl_word(dispatch_ifc.ctrl_word),
+
+        .issue(issue_ifc.issue),
+        .rs1_val(issue_ifc.rs1_val),
+        .rs2_val(issue_ifc.rs2_val),
+        .imm(issue_ifc.imm),
+
+        .update(update),
+        .update_tag(update_tag),
+        .update_prd(update_prd),
+        .update_data(update_data),
+
+        .commit(commit_ifc.commit),
+        .commit_store(commit_ifc.store),
+
+);
+defparam lsu.FIFO_LEN = LSQ_LEN;
+
 
 rob rob (.*);
 defparam rob.ROB_LEN = ROB_LEN;
