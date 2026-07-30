@@ -1,11 +1,12 @@
 #include "riscv_cosim.hpp"
-#include <iostream>
 
 int32_t get_imm(uint32_t instr);
 alu_src_e get_alu_src (uint32_t instr);
 alu_f3_e get_alu_op (uint32_t instr);
 int32_t execute(ctrl_word_t &ctrl_word);
 bool branch_eval(branch_f3_e op, int32_t rs1, int32_t rs2);
+
+#define byte(x) (x & 0xff)
 
 namespace sim
 {
@@ -15,6 +16,9 @@ rv32ui::rv32ui() :
 {
         for (int i = 0; i < 32; i++) {
                 irf[i] = 0;
+        }
+        for (int i = 0; i < 256; i++) {
+                dmem[i] = 0;
         }
 }
 
@@ -29,6 +33,9 @@ void rv32ui::reset()
         dest = 0;
         for (int i = 0; i < 32; i++) {
                 irf[i] = 0;
+        }
+        for (int i = 0; i < 256; i++) {
+                dmem[i] = 0;
         }
 }
 
@@ -86,7 +93,7 @@ void rv32ui::eval(uint32_t instr)
 
         switch ((opcode_e)opcode(instr)) {
                 case LOAD:
-                        result = 0;
+                        result = dmem[byte(value)];
                         break;
                 case JAL:
                 case JALR:
@@ -113,7 +120,10 @@ void rv32ui::eval(uint32_t instr)
                         dest = rd(instr);
         }
 
-        if (((opcode_e)opcode(instr) != BRANCH) && ((opcode_e)opcode(instr) != STORE)) {
+        if ((opcode_e)opcode(instr) == STORE) {
+                dmem[byte(dest)] = result;
+        }
+        else if ((opcode_e)opcode(instr) != BRANCH) {
                 irf[dest] = result;
                 irf[0] = 0;
         }

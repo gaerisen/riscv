@@ -18,7 +18,7 @@ typedef enum {
         NEW,
         DISPATCHED,
         ISSUED,
-        EXECUTING,
+        READY,
         COMMITTED
 } instr_state_e;
 
@@ -142,9 +142,10 @@ int lsu::run_tests(int cycles)
                 // Commit: Triggering unconditionally for both load and stores
                 // right now. Will have to change when cache misses are
                 // introduced
-                if (prog[c_head].state == EXECUTING) {
+                if (prog[c_head].state == READY) {
                         prog[c_head].state = COMMITTED;
-                        commit(c_head++);
+                        commit(store(prog[c_head].ctrl));
+                        c_head++;
                 }
 
                 // Execute: Add a gap between issue and commit, and record load
@@ -155,10 +156,10 @@ int lsu::run_tests(int cycles)
                                         if (dut->update &&
                                         (dut->update_tag == (j & 0x3f))) {
                                                 prog[j].verif_result = dut->update_data;
-                                                prog[j].state = EXECUTING;
+                                                prog[j].state = READY;
                                         }
                                 } else {
-                                        prog[j].state = EXECUTING;
+                                        prog[j].state = READY;
                                 }
                         }
                 }
@@ -295,10 +296,10 @@ void lsu::issue(int tag, int32_t rs1, int32_t rs2, int32_t imm)
         dut->imm = imm;
 }
 
-void lsu::commit(int tag)
+void lsu::commit(int store)
 {
         dut->commit = 1;
-        dut->commit_tag = tag & 0x3f;
+        dut->commit_store = store & 0x1;
 }
 
 void lsu::load(int32_t data)
@@ -324,10 +325,6 @@ void lsu::iter()
                         << ", rs1=" << dut->rs1_val
                         << ", rs2=" << dut->rs2_val
                         << ", imm=" << dut->imm << std::endl;
-        }
-
-        if (dut->commit) {
-                std::cout << "\tCommit: tag=" << dut->commit_tag << std::endl;
         }
 
         pulse();

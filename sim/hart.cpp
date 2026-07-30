@@ -24,7 +24,8 @@
 #define GEN_ARITH rand() % 3
 #define GEN_BRANCH rand() % 4
 #define GEN_JAL rand() % 5
-#define GEN_ALL rand() % 6
+#define GEN_REG rand() % 6
+#define GEN_ALL rand() % 8
 
 int auimm_ops[] = { 0x37, 0x17 };
 int b_f3s[] = { 0, 1, 4, 5, 6, 7 };
@@ -71,6 +72,8 @@ int hart::run_tests(int cycles)
         sim::generator branch_gen;
         sim::generator jal_gen;
         sim::generator jalr_gen;
+        sim::generator load_gen;
+        sim::generator store_gen;
 
         alui_gen.add_field(6, 0, 0x13);
         alui_gen.add_field(11, 7, 0, 31);
@@ -111,18 +114,34 @@ int hart::run_tests(int cycles)
         jalr_gen.add_field(24, 20, 0, 31);
         jalr_gen.add_field(31, 25, 0xfff);
 
-        sim::generator *generators[6] = {
+        load_gen.add_field(6, 0, 0x03);
+        load_gen.add_field(11, 7, 0, 31);
+        load_gen.add_field(14, 12, 0, 2); // TODO: Add unsigned f3s
+        load_gen.add_field(19, 15, 0, 31);
+        load_gen.add_field(31, 20, 0, 31);
+
+        store_gen.add_field(6, 0, 0x23);
+        store_gen.add_field(11, 7, 0, 31);
+        store_gen.add_field(14, 12, 0, 2); // TODO: Add unsigned f3s
+        store_gen.add_field(19, 15, 0, 31);
+        store_gen.add_field(24, 20, 0, 31);
+        store_gen.add_field(31, 25, 0, 0);
+
+
+        sim::generator *generators[8] = {
                 &alui_gen,
                 &alur_gen,
                 &auimm_gen,
                 &branch_gen,
                 &jal_gen,
-                &jalr_gen
+                &jalr_gen,
+                &load_gen,
+                &store_gen
         };
 
         // Populate imem w/ random instrs
         for (int i = 0; i < 1024; i++) {
-                instr = generators[GEN_JAL]->generate();
+                instr = generators[GEN_ALL]->generate();
                 imem.push_back(byte(instr));
                 instr >>= 8;
                 imem.push_back(byte(instr));

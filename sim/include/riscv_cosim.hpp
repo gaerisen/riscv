@@ -149,6 +149,7 @@ private:
         uint32_t result;
         uint32_t dest;
         uint32_t irf[32];
+        uint32_t dmem[256];
 };
 
 } // namespace sim

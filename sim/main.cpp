@@ -6,6 +6,7 @@
 #include "lsu.hpp"
 
 #define TRIALS 256
+#define SEED 2040514536
 
 int main(int argc, char *argv[])
 {
