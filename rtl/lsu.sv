@@ -43,7 +43,7 @@ import rv32::*;
 
         // Commit interface (stores only)
         input commit,
-        input [5:0] commit_tag,
+        input commit_store,
 
         // DMEM load interface
         output logic ld_en,
@@ -60,11 +60,10 @@ import rv32::*;
         output logic full
 );
 
-initial
-begin
+initial begin
         $dumpfile("lsu.vcd");
         $dumpvars(0, lsu);
-end
+        end
 
 lsu_entry_t fifo [FIFO_LEN];
 logic [FIFO_BITS-1:0] fifo_head;
@@ -105,7 +104,7 @@ begin
         st_addr_next = 0;
         st_data_next = 0;
 
-        if (fifo[fifo_head].store && fifo[fifo_head].complete) begin
+        if (fifo[fifo_head].store && fifo[fifo_head].populated) begin
                 st_en_next = 1;
                 st_op_next = fifo[fifo_head].st_op;
                 st_addr_next = fifo[fifo_head].addr;
@@ -135,6 +134,7 @@ end
 */
 
 logic [FIFO_BITS-1:0] first_st;
+logic [FIFO_BITS-1:0] second_st;
 logic ld_fwd_next;
 logic [FIFO_BITS-1:0] ld_fwd_tag;
 logic [31:0] ld_fwd_data;
@@ -142,10 +142,18 @@ logic [31:0] ld_fwd_data;
 always_comb
 begin
         first_st = fifo_tail;
+        second_st = fifo_tail;
 
         for (logic [FIFO_BITS-1:0] i = fifo_head; i != fifo_tail; i++) begin
                 if (fifo[i].store) begin
                         first_st = i;
+                        break;
+                end
+        end
+
+        for (logic [FIFO_BITS-1:0] i = first_st; i != fifo_tail; i++) begin
+                if (fifo[i].store) begin
+                        second_st = i;
                         break;
                 end
         end
@@ -165,8 +173,39 @@ begin
                 ld_tag_next = 0;
                 ld_addr_next = 0;
                 
-                for (logic [FIFO_BITS-1:0] i = first_st; i != fifo_tail; i++) begin
+                for (logic [FIFO_BITS-1:0] i = second_st; i != fifo_tail; i++) begin
+                        // Second store case; for now, stop scheduling
                         if (fifo[i].store) break;
+                        // Generic case; no dependency, just do the load
+                        if (fifo[i].ready && !fifo[i].populated &&
+                                (fifo[i].addr != fifo[second_st].addr)) begin
+                                ld_en_next = 1;
+                                ld_tag_next = i;
+                                ld_addr_next = fifo[i].addr;
+                                break;
+                        end
+                        // Forwarding case
+                        if (fifo[i].ready && fifo[second_st].ready && 
+                                !fifo[i].populated && fifo[i].addr == fifo[second_st].addr) begin
+                                ld_fwd_next = 1;
+                                ld_fwd_tag = i;
+                                ld_fwd_data = fifo[second_st].data;
+                                break;
+                        end
+                end
+                
+                for (logic [FIFO_BITS-1:0] i = first_st; i != second_st; i++) begin
+                        // Second store case; for now, stop scheduling
+                        if (fifo[i].store) break;
+                        // Generic case; no dependency, just do the load
+                        if (fifo[i].ready && !fifo[i].populated &&
+                                (fifo[i].addr != fifo[first_st].addr)) begin
+                                ld_en_next = 1;
+                                ld_tag_next = i;
+                                ld_addr_next = fifo[i].addr;
+                                break;
+                        end
+                        // Forwarding case
                         if (fifo[i].ready && fifo[first_st].ready && 
                                 !fifo[i].populated && fifo[i].addr == fifo[first_st].addr) begin
                                 ld_fwd_next = 1;
@@ -265,7 +304,7 @@ begin
         
         // Loads are marked ready only when data is captured and broadcasted
         // Stores must wait for commit, but st_en signals this already
-        if (fifo[fifo_head].complete)
+        if (st_en_next | fifo[fifo_head].complete)
                 fifo_head_next = fifo_head + 1;
 end
 
@@ -293,9 +332,12 @@ begin
                         if (fifo[i].store) fifo_next[i].data = rs2_val;
                         fifo_next[i].ready = 1;
                 end
+        end
 
-                if (commit && fifo[i].store && (commit_tag == fifo[i].tag)) begin
-                        fifo_next[i].complete = 1;
+        for (logic [FIFO_BITS-1:0] i = fifo_head; i != fifo_tail; i++) begin
+                if (commit && commit_store && fifo[i].store && !fifo[i].populated) begin
+                        fifo_next[i].populated = 1;
+                        break;
                 end
         end
 
@@ -313,7 +355,7 @@ begin
                 fifo_next[update_idx].complete = 1;
         end
 
-        if (fifo[fifo_head].complete)
+        if (st_en_next | fifo[fifo_head].complete)
                 fifo_next[fifo_head] = 0;
 end
 
