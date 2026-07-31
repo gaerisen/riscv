@@ -36,7 +36,7 @@ typedef struct {
 int64_t ctrls[] = {
         (int64_t)1 << 36,                // load
         (int64_t)1 << 35,                 // sb
-        0, 0, 0                // nops; 1/8 chance each of ld/st
+        0
 };
 
 namespace sim
