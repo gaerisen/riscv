@@ -173,45 +173,42 @@ begin
                 ld_tag_next = 0;
                 ld_addr_next = 0;
                 
-                for (logic [FIFO_BITS-1:0] i = second_st; i != fifo_tail; i++) begin
-                        // Second store case; for now, stop scheduling
+                for (logic [FIFO_BITS-1:0] i = second_st + 1; i != fifo_tail; i++) begin
+                        // Third store case; for now, stop scheduling
                         if (fifo[i].store) break;
-                        // Generic case; no dependency, just do the load
-                        if (fifo[i].ready && !fifo[i].populated &&
-                                (fifo[i].addr != fifo[second_st].addr)) begin
-                                ld_en_next = 1;
-                                ld_tag_next = i;
-                                ld_addr_next = fifo[i].addr;
-                                break;
-                        end
-                        // Forwarding case
-                        if (fifo[i].ready && fifo[second_st].ready && 
-                                !fifo[i].populated && fifo[i].addr == fifo[second_st].addr) begin
-                                ld_fwd_next = 1;
-                                ld_fwd_tag = i;
-                                ld_fwd_data = fifo[second_st].data;
-                                break;
+                        if (fifo[i].ready && !fifo[i].populated) begin
+                                if (fifo[second_st].addr != fifo[i].addr) begin
+                                        ld_en_next = 1;
+                                        ld_tag_next = i;
+                                        ld_addr_next = fifo[i].addr;
+                                end
+                                // For now, check 'ready' and not 'populated'.
+                                // I think this is the right move, since any
+                                // non-committed store that gets flushed is
+                                // earlier on the same speculative path as
+                                // a load, and my current plan is to flush all
+                                // mispredicted memaccesses, making all
+                                // dependencies correct at each given cycle
+                                else if (fifo[second_st].ready) begin
+                                        ld_fwd_next = 1;
+                                        ld_fwd_tag = i;
+                                        ld_fwd_data = fifo[second_st].data;
+                                end
                         end
                 end
                 
-                for (logic [FIFO_BITS-1:0] i = first_st; i != second_st; i++) begin
-                        // Second store case; for now, stop scheduling
-                        if (fifo[i].store) break;
-                        // Generic case; no dependency, just do the load
-                        if (fifo[i].ready && !fifo[i].populated &&
-                                (fifo[i].addr != fifo[first_st].addr)) begin
-                                ld_en_next = 1;
-                                ld_tag_next = i;
-                                ld_addr_next = fifo[i].addr;
-                                break;
-                        end
-                        // Forwarding case
-                        if (fifo[i].ready && fifo[first_st].ready && 
-                                !fifo[i].populated && fifo[i].addr == fifo[first_st].addr) begin
-                                ld_fwd_next = 1;
-                                ld_fwd_tag = i;
-                                ld_fwd_data = fifo[first_st].data;
-                                break;
+                for (logic [FIFO_BITS-1:0] i = first_st + 1; i != second_st; i++) begin
+                        if (fifo[i].ready && !fifo[i].populated) begin
+                                if (fifo[second_st].addr != fifo[i].addr) begin
+                                        ld_en_next = 1;
+                                        ld_tag_next = i;
+                                        ld_addr_next = fifo[i].addr;
+                                end
+                                else if (fifo[second_st].ready) begin
+                                        ld_fwd_next = 1;
+                                        ld_fwd_tag = i;
+                                        ld_fwd_data = fifo[second_st].data;
+                                end
                         end
                 end
 
