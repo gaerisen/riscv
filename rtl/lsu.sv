@@ -17,8 +17,7 @@ module lsu
 import rv32::*;
 #(
         parameter int FIFO_LEN = 32,
-        localparam int FIFO_BITS = $clog2(FIFO_LEN),
-        parameter int NUM_STORES_TRACKED = 2
+        localparam int FIFO_BITS = $clog2(FIFO_LEN)
 )(
         input clk,
         input rst,
@@ -134,20 +133,19 @@ end
 * immediately. If not, send the first available address to DMEM
 */
 
-logic [FIFO_BITS-1:0] st_tags [NUM_STORES_TRACKED];
+logic [FIFO_BITS-1:0] first_st;
 logic ld_fwd_next;
 logic [FIFO_BITS-1:0] ld_fwd_tag;
 logic [31:0] ld_fwd_data;
 
 always_comb
 begin
-        for (int i = 0; i < NUM_STORES_TRACKED; i++) begin
-                if (i == 0) st_tags[i] = fifo_head;
-                else st_tags[i] = st_tags[i-1];
+        first_st = fifo_tail;
 
-                for (logic [FIFO_BITS-1:0] j = st_tags[i]; j != fifo_tail; j++) begin
-                        st_tags[i] = j;
-                        if (fifo[j].store) break;
+        for (logic [FIFO_BITS-1:0] i = fifo_head; i != fifo_tail; i++) begin
+                if (fifo[i].store) begin
+                        first_st = i;
+                        break;
                 end
         end
 
@@ -166,25 +164,32 @@ begin
                 ld_tag_next = 0;
                 ld_addr_next = 0;
                 
-                for (int i = NUM_STORES_TRACKED-1; i > 0; i--) begin
-                        for (logic [FIFO_BITS-1:0] j = st_tags[i-1]; j != st_tags[i]; j++) begin
-                                if (fifo[j].ready && !fifo[j].populated) begin
-                                        if (fifo[j].addr != fifo[st_tags[i]].addr) begin
-                                                ld_en_next = 1;
-                                                ld_tag_next = i[FIFO_BITS-1:0];
-                                                ld_addr_next = fifo[i].addr;
-                                                break;
-                                        end
-                                        else if (fifo[st_tags[i]].ready) begin
-                                                ld_fwd_next = 1;
-                                                ld_fwd_tag = j;
-                                                ld_fwd_data = fifo[st_tags[i]].data;
-                                        end
+                for (logic [FIFO_BITS-1:0] i = first_st + 1; i != fifo_tail; i++) begin
+                        // If there's another store past the first, we simply
+                        // stop.
+                        if (fifo[i].store) break;
+
+                        // If we can't compare addresses, don't even try
+                        if (!fifo[first_st].ready) break;
+
+                        // If it's an unexecuted ready load, execute it
+                        if (fifo[i].ready && !fifo[i].populated) begin
+                                if (fifo[first_st].addr != fifo[i].addr) begin
+                                        ld_en_next = 1;
+                                        ld_tag_next = i;
+                                        ld_addr_next = fifo[i].addr;
+                                end
+                                else begin
+                                        ld_fwd_next = 1;
+                                        ld_fwd_tag = i;
+                                        ld_fwd_data = fifo[first_st].data;
                                 end
                         end
                 end
 
-                for (logic [FIFO_BITS-1:0] i = fifo_head; i != st_tags[0]; i++) begin
+                for (logic [FIFO_BITS-1:0] i = fifo_head; i != first_st; i++) begin
+                        if (fifo[i].store) break;
+
                         if (fifo[i].ready && !fifo[i].populated) begin
                                 ld_en_next = 1;
                                 ld_tag_next = i[FIFO_BITS-1:0];
@@ -320,8 +325,8 @@ begin
                 fifo_next[ld_fwd_tag].populated = 1;
         end
 
-        if (update_next) begin
-                fifo_next[update_idx_next].complete = 1;
+        if (update) begin
+                fifo_next[update_idx].complete = 1;
         end
 
         if (st_en_next | fifo[fifo_head].complete)
