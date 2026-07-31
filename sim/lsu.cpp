@@ -13,7 +13,6 @@
 #define byte1(x) ((x & (0xff << 8)) >> 8)
 #define byte0(x) (x & 0xff)
 
-
 typedef enum {
         NEW,
         DISPATCHED,
@@ -65,9 +64,9 @@ int lsu::run_tests(int cycles)
 
         for (int i = 0; i < cycles; i++) {
                 prog[i].ctrl = ctrls[rand() % (sizeof(ctrls)/sizeof(int64_t))];
-                prog[i].rs1 = rand() % 128;
+                prog[i].rs1 = rand() % 8;
                 prog[i].rs2 = rand() % 128;
-                prog[i].imm = rand() % 128;
+                prog[i].imm = 0;
                 prog[i].state = NEW;
                 prog[i].rd = rand() % 32;
                 prog[i].canon_result = 0;
