@@ -17,7 +17,8 @@ module lsu
 import rv32::*;
 #(
         parameter int FIFO_LEN = 32,
-        localparam int FIFO_BITS = $clog2(FIFO_LEN)
+        localparam int FIFO_BITS = $clog2(FIFO_LEN),
+        parameter int NUM_STORES_TRACKED = 2
 )(
         input clk,
         input rst,
@@ -133,28 +134,20 @@ end
 * immediately. If not, send the first available address to DMEM
 */
 
-logic [FIFO_BITS-1:0] first_st;
-logic [FIFO_BITS-1:0] second_st;
+logic [FIFO_BITS-1:0] st_tags [NUM_STORES_TRACKED];
 logic ld_fwd_next;
 logic [FIFO_BITS-1:0] ld_fwd_tag;
 logic [31:0] ld_fwd_data;
 
 always_comb
 begin
-        first_st = fifo_tail;
-        second_st = fifo_tail;
+        for (int i = 0; i < NUM_STORES_TRACKED; i++) begin
+                if (i == 0) st_tags[i] = fifo_head;
+                else st_tags[i] = st_tags[i-1];
 
-        for (logic [FIFO_BITS-1:0] i = fifo_head; i != fifo_tail; i++) begin
-                if (fifo[i].store) begin
-                        first_st = i;
-                        break;
-                end
-        end
-
-        for (logic [FIFO_BITS-1:0] i = first_st; i != fifo_tail; i++) begin
-                if (fifo[i].store) begin
-                        second_st = i;
-                        break;
+                for (logic [FIFO_BITS-1:0] j = st_tags[i]; j != fifo_tail; j++) begin
+                        st_tags[i] = j;
+                        if (fifo[j].store) break;
                 end
         end
 
@@ -173,46 +166,25 @@ begin
                 ld_tag_next = 0;
                 ld_addr_next = 0;
                 
-                for (logic [FIFO_BITS-1:0] i = second_st + 1; i != fifo_tail; i++) begin
-                        // Third store case; for now, stop scheduling
-                        if (fifo[i].store) break;
-                        if (fifo[i].ready && !fifo[i].populated) begin
-                                if (fifo[second_st].addr != fifo[i].addr) begin
-                                        ld_en_next = 1;
-                                        ld_tag_next = i;
-                                        ld_addr_next = fifo[i].addr;
-                                end
-                                // For now, check 'ready' and not 'populated'.
-                                // I think this is the right move, since any
-                                // non-committed store that gets flushed is
-                                // earlier on the same speculative path as
-                                // a load, and my current plan is to flush all
-                                // mispredicted memaccesses, making all
-                                // dependencies correct at each given cycle
-                                else if (fifo[second_st].ready) begin
-                                        ld_fwd_next = 1;
-                                        ld_fwd_tag = i;
-                                        ld_fwd_data = fifo[second_st].data;
-                                end
-                        end
-                end
-                
-                for (logic [FIFO_BITS-1:0] i = first_st + 1; i != second_st; i++) begin
-                        if (fifo[i].ready && !fifo[i].populated) begin
-                                if (fifo[second_st].addr != fifo[i].addr) begin
-                                        ld_en_next = 1;
-                                        ld_tag_next = i;
-                                        ld_addr_next = fifo[i].addr;
-                                end
-                                else if (fifo[second_st].ready) begin
-                                        ld_fwd_next = 1;
-                                        ld_fwd_tag = i;
-                                        ld_fwd_data = fifo[second_st].data;
+                for (int i = NUM_STORES_TRACKED-1; i > 0; i--) begin
+                        for (logic [FIFO_BITS-1:0] j = st_tags[i-1]; j != st_tags[i]; j++) begin
+                                if (fifo[j].ready && !fifo[j].populated) begin
+                                        if (fifo[j].addr != fifo[st_tags[i]].addr) begin
+                                                ld_en_next = 1;
+                                                ld_tag_next = i[FIFO_BITS-1:0];
+                                                ld_addr_next = fifo[i].addr;
+                                                break;
+                                        end
+                                        else if (fifo[st_tags[i]].ready) begin
+                                                ld_fwd_next = 1;
+                                                ld_fwd_tag = j;
+                                                ld_fwd_data = fifo[st_tags[i]].data;
+                                        end
                                 end
                         end
                 end
 
-                for (logic [FIFO_BITS-1:0] i = fifo_head; i != first_st; i++) begin
+                for (logic [FIFO_BITS-1:0] i = fifo_head; i != st_tags[0]; i++) begin
                         if (fifo[i].ready && !fifo[i].populated) begin
                                 ld_en_next = 1;
                                 ld_tag_next = i[FIFO_BITS-1:0];
@@ -348,8 +320,8 @@ begin
                 fifo_next[ld_fwd_tag].populated = 1;
         end
 
-        if (update) begin
-                fifo_next[update_idx].complete = 1;
+        if (update_next) begin
+                fifo_next[update_idx_next].complete = 1;
         end
 
         if (st_en_next | fifo[fifo_head].complete)
