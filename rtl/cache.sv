@@ -34,7 +34,7 @@ import rv32::*;
         output logic [31:0] cpu_data_o,
         output logic cpu_ready,
 
-        input store_funct3_e st_op,    // Particular to the CPU interface to
+        input store_funct3_e cpu_st_op,    // Particular to the CPU interface to
                                         // respect SBs and SHs
 
         output logic [31:0] mem_addr,
@@ -194,7 +194,7 @@ begin
         line_tag_next = cache[index][fifo_head[index]].tag;
 
         if (!miss & cpu_we) begin
-                case (st_op)
+                case (cpu_st_op)
                 SB: begin
                         line_data_next[offset] = cpu_data_i[7:0];
                 end
@@ -246,29 +246,29 @@ begin
 end
 
 // Read logic
-always_comb
+always_ff @(posedge clk or posedge rst)
 begin
-        cpu_ready = 0;
-        cpu_data_o = 0;
+	if (rst) begin
+		cpu_ready <= 0;
+		cpu_data_o <= 0;
+	end else if (state == IDLE) begin
+		// For now, we'll only provide reads during IDLE state. In the future we
+		// might be able to provide unrelated reads in other states by latching
+		// write miss details and handling those internally
+		if (state == IDLE) begin
+			// Always fetch data to take advantage of parallelism
+			cpu_data_o <= { cache[index][hit].data[offset+3],
+					cache[index][hit].data[offset+2],
+					cache[index][hit].data[offset+1],
+					cache[index][hit].data[offset+0] };
 
-        // For now, we'll only provide reads during IDLE state. In the future we
-        // might be able to provide unrelated reads in other states by latching
-        // write miss details and handling those internally
-        if (state == IDLE) begin
-                // Always fetch data to take advantage of parallelism
-                cpu_data_o = {  cache[index][hit].data[offset+3],
-                                cache[index][hit].data[offset+2],
-                                cache[index][hit].data[offset+1],
-                                cache[index][hit].data[offset+0] };
-
-                // Validate read if there's a hit.
-                cpu_ready = !miss;
-        end
-
-        if (rst) begin
-                cpu_ready = 0;
-                cpu_data_o = 0;
-        end
+			// Validate read if there's a hit.
+			cpu_ready <= !miss;
+		end
+	end else begin 
+		cpu_ready <= 0;
+		cpu_data_o <= 0;
+	end
 end
 
 endmodule // cache
