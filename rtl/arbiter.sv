@@ -47,17 +47,9 @@ logic do_ld;
 logic do_st;
 logic clash;
 
-logic ld_ready_next;
-logic [31:0] ld_data_next;
-logic [31:0] d_addr_next;
-logic [31:0] d_data_o_next;
-logic d_valid_next;
-logic d_we_next;
-store_funct3_e d_st_op_next;
-
 always_comb
 begin
-	d_valid_next = st_en | ld_en;
+	d_valid = st_en | ld_en;
 	clash = st_en & ld_en;
 	pref_st_next = pref_st;
 
@@ -69,26 +61,26 @@ begin
 	do_st = st_en & (~ld_en | pref_st);
 
 	if (do_ld) begin
-		d_addr_next = ld_addr;
-		d_data_o_next = 0;
-		d_st_op_next = SB;
-		d_we_next = 0;
-		ld_ready_next = d_ready;
-		ld_data_next = d_data_i;
+		d_addr = ld_addr;
+		d_data_o = 0;
+		d_st_op = SB;
+		d_we = 0;
+		ld_ready = d_ready;
+		ld_data = d_data_i;
 	end else if (do_st) begin
-		d_addr_next = st_addr;
-		d_data_o_next = st_data;
-		d_st_op_next = st_op;
-		d_we_next = 1;
-		ld_ready_next = 0;
-		ld_data_next = 0;
+		d_addr = st_addr;
+		d_data_o = st_data;
+		d_st_op = st_op;
+		d_we = 1;
+		ld_ready = 0;
+		ld_data = 0;
 	end else begin
-		d_addr_next = 0;
-		d_data_o_next = 0;
-		d_st_op_next = SB;
-		d_we_next = 0;
-		ld_ready_next = 0;
-		ld_data_next = 0;
+		d_addr = 0;
+		d_data_o = 0;
+		d_st_op = SB;
+		d_we = 0;
+		ld_ready = 0;
+		ld_data = 0;
 	end
 end
 
@@ -96,22 +88,8 @@ always_ff @(posedge clk or posedge rst)
 begin
 	if (rst) begin
 		pref_st <= 0;
-		ld_ready <= 0;
-		ld_data <= 0;
-		d_addr <= 0;
-		d_data_o <= 0;
-		d_valid <= 0;
-		d_we <= 0;
-		d_st_op <= SB;
 	end else begin
 		pref_st <= pref_st_next;
-		ld_ready <= ld_ready_next;
-		ld_data <= ld_data_next;
-		d_addr <= d_addr_next;
-		d_data_o <= d_data_o_next;
-		d_valid <= d_valid_next;
-		d_we <= d_we_next;
-		d_st_op <= d_st_op_next;
 	end
 end
 
