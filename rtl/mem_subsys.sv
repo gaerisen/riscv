@@ -11,7 +11,6 @@
 module mem_subsys
 import rv32::*;
 #(
-        parameter int LINE_WIDTH = 64
 )(
 	input clk,
 	input rst,
@@ -50,16 +49,8 @@ end
 
 
 // DMEM load interface
-logic ld_en;
-logic [31:0] ld_addr;
-logic ld_ready;
-logic [31:0] ld_data;
-
-// DMEM store interface
-logic st_en;
-store_funct3_e st_op;
-logic [31:0] st_addr;
-logic [31:0] st_data;
+logic d_ready;
+logic [31:0] d_data_rd;
 
 // Dcache interface
 logic [31:0] d_addr;
@@ -72,13 +63,15 @@ lsu lsu (
 	.mem_valid(d_valid),
 	.mem_we(d_we),
 	.mem_addr(d_addr),
-	.mem_data_o(d_data_wr)
+	.mem_data_o(d_data_wr),
+	.mem_data_ready(d_ready),
+	.mem_data_i(d_data_rd)
 );
 
 dmem dmem (
 	.*,
 	.addr(d_addr),
-	.data_o(ld_data[7:0]),
+	.data_o(d_data_rd[7:0]),
 	.cs(d_valid),
 	.we(d_we),
 	.data_i(d_data_wr[7:0])
@@ -87,9 +80,9 @@ dmem dmem (
 always_ff @(posedge clk, posedge rst)
 begin
 	if (rst) begin
-		ld_ready <= 0;
+		d_ready <= 0;
 	end else begin
-		ld_ready <= d_valid & ~d_we;
+		d_ready <= d_valid & ~d_we;
 	end
 end
 

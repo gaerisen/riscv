@@ -45,25 +45,13 @@ import rv32::*;
         input commit,
         input commit_store,
 
-	// TODO: Eliminate old double-bus setup, including renaming load data
-	// and ready signals, since the old ones are still being used here.
-
-        // DMEM load interface
-        output logic ld_en,
-        output logic [31:0] ld_addr,
-        input ld_ready,
-        input [31:0] ld_data,
-
-        // DMEM store interface
-        output logic st_en,
-        output store_funct3_e st_op,
-        output logic [31:0] st_addr,
-        output logic [31:0] st_data,
-
 	output logic mem_valid,
 	output logic mem_we,
 	output logic [31:0] mem_addr,
 	output logic [31:0] mem_data_o,
+
+        input mem_data_ready,
+        input [31:0] mem_data_i,
 
         output logic full
 );
@@ -81,13 +69,21 @@ lsu_entry_t fifo_next [FIFO_LEN];
 logic [FIFO_BITS-1:0] fifo_head_next;
 logic [FIFO_BITS-1:0] fifo_tail_next;
 
+logic st_en;
+store_funct3_e st_op;
+logic [31:0] st_addr;
+logic [31:0] st_data;
+
 logic st_en_next;
 store_funct3_e st_op_next;
 logic [31:0] st_addr_next;
 logic [31:0] st_data_next;
 
-logic ld_en_next;
+logic ld_en;
 logic [FIFO_BITS-1:0] ld_tag;
+logic [31:0] ld_addr;
+
+logic ld_en_next;
 logic [FIFO_BITS-1:0] ld_tag_next;
 logic [31:0] ld_addr_next;
 
@@ -173,12 +169,12 @@ begin
 	ld_addr_next = 0;
 	
         // Unlike stores we need to preserve access state until data has arrived
-        if (ld_en && !ld_ready) begin
+        if (ld_en && !mem_data_ready) begin
                 ld_en_next = ld_en;
                 ld_addr_next = ld_addr;
                 ld_tag_next = ld_tag;
         end
-	if (ld_en && ld_ready) begin
+	if (ld_en && mem_data_ready) begin
 		ld_en_next = 0;
 		ld_addr_next = 0;
 		ld_tag_next = 0;
@@ -337,8 +333,8 @@ begin
                 end
         end
 
-        if (ld_en && ld_ready) begin
-                fifo_next[ld_tag].data = ld_data;
+        if (ld_en && mem_data_ready) begin
+                fifo_next[ld_tag].data = mem_data_i;
                 fifo_next[ld_tag].populated = 1;
         end
 
