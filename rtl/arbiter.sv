@@ -58,7 +58,12 @@ begin
 	end
 
 	do_ld = ld_en & ~(st_en & pref_st);
-	do_st = st_en & (~ld_en | pref_st);
+
+	if (ld_en && ~ld_ready) begin
+		do_ld = 1;
+	end
+
+	do_st = st_en & ~do_ld;
 
 	if (do_ld) begin
 		d_addr = ld_addr;

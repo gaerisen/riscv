@@ -45,6 +45,9 @@ import rv32::*;
         input commit,
         input commit_store,
 
+	// TODO: Eliminate old double-bus setup, including renaming load data
+	// and ready signals, since the old ones are still being used here.
+
         // DMEM load interface
         output logic ld_en,
         output logic [31:0] ld_addr,
@@ -56,6 +59,11 @@ import rv32::*;
         output store_funct3_e st_op,
         output logic [31:0] st_addr,
         output logic [31:0] st_data,
+
+	output logic mem_valid,
+	output logic mem_we,
+	output logic [31:0] mem_addr,
+	output logic [31:0] mem_data_o,
 
         output logic full
 );
@@ -99,10 +107,17 @@ assign full = (fifo_tail == (fifo_head + {FIFO_BITS{1'b1}})) |
 
 always_comb
 begin
-        st_en_next = 0;
-        st_op_next = SB;
-        st_addr_next = 0;
-        st_data_next = 0;
+        st_en_next = st_en;
+        st_op_next = st_op;
+        st_addr_next = st_addr;
+        st_data_next = st_data;
+
+	if (mem_we) begin
+		st_en_next = 0;
+		st_op_next = SB;
+		st_addr_next = 0;
+		st_data_next = 0;
+	end
 
         if (fifo[fifo_head].store && fifo[fifo_head].populated) begin
                 st_en_next = 1;
@@ -153,17 +168,22 @@ begin
         ld_fwd_tag = 0;
         ld_fwd_data = 0;
 
+	ld_en_next = 0;
+	ld_tag_next = 0;
+	ld_addr_next = 0;
+	
         // Unlike stores we need to preserve access state until data has arrived
         if (ld_en && !ld_ready) begin
                 ld_en_next = ld_en;
                 ld_addr_next = ld_addr;
                 ld_tag_next = ld_tag;
         end
+	if (ld_en && ld_ready) begin
+		ld_en_next = 0;
+		ld_addr_next = 0;
+		ld_tag_next = 0;
+	end
         else begin
-                ld_en_next = 0;
-                ld_tag_next = 0;
-                ld_addr_next = 0;
-                
                 for (logic [FIFO_BITS-1:0] i = first_st + 1; i != fifo_tail; i++) begin
                         // If there's another store past the first, we simply
                         // stop.
@@ -184,6 +204,7 @@ begin
                                         ld_fwd_tag = i;
                                         ld_fwd_data = fifo[first_st].data;
                                 end
+				break;
                         end
                 end
 
@@ -236,6 +257,7 @@ begin
                         update_idx_next = i;
                         update_prd_next = fifo[i].prd;
                         update_data_next = fifo[i].data;
+			break;
                 end
         end
 end
@@ -278,7 +300,7 @@ begin
         
         // Loads are marked ready only when data is captured and broadcasted
         // Stores must wait for commit, but st_en signals this already
-        if (st_en_next | fifo[fifo_head].complete)
+        if (mem_we | fifo[fifo_head].complete)
                 fifo_head_next = fifo_head + 1;
 end
 
@@ -350,4 +372,23 @@ begin
         end
 end
 
+
+// Arbitrate loads and stores to shared memory bus
+always_comb
+begin
+	mem_valid = 0;
+	mem_we = 0;
+	mem_addr = 0;
+	mem_data_o = 0;
+
+	if (ld_en) begin
+		mem_valid = 1;
+		mem_addr = ld_addr;
+	end else if (st_en) begin
+		mem_valid = 1;
+		mem_we = 1;
+		mem_addr = st_addr;
+		mem_data_o = st_data;
+	end
+end
 endmodule: lsu
