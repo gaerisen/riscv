@@ -16,8 +16,11 @@
 module lsu
 import rv32::*;
 #(
-        parameter int FIFO_LEN = 32,
-        localparam int FIFO_BITS = $clog2(FIFO_LEN)
+	parameter STQ_LEN = 64,
+	parameter LDQ_LEN = 128,
+
+	localparam STQ_BITS = $clog2(STQ_LEN),
+	localparam LDQ_BITS = $clog2(LDQ_LEN)
 )(
         input clk,
         input rst,
@@ -61,13 +64,21 @@ initial begin
         $dumpvars(0, lsu);
         end
 
-lsu_entry_t fifo [FIFO_LEN];
-logic [FIFO_BITS-1:0] fifo_head;
-logic [FIFO_BITS-1:0] fifo_tail;
+stq_entry_t [STQ_LEN-1:0] stq;
+logic [STQ_BITS-1:0] stq_head;
+logic [STQ_BITS-1:0] stq_tail;
 
-lsu_entry_t fifo_next [FIFO_LEN];
-logic [FIFO_BITS-1:0] fifo_head_next;
-logic [FIFO_BITS-1:0] fifo_tail_next;
+ldq_entry_t [LDQ_LEN-1:0] ldq;
+logic [LDQ_BITS-1:0] ldq_head;
+logic [LDQ_BITS-1:0] ldq_tail;
+
+stq_entry_t [STQ_LEN-1:0] stq_next;
+logic [STQ_BITS-1:0] stq_head_next;
+logic [STQ_BITS-1:0] stq_tail_next;
+
+ldq_entry_t [LDQ_LEN-1:0] ldq_next;
+logic [LDQ_BITS-1:0] ldq_head_next;
+logic [LDQ_BITS-1:0] ldq_tail_next;
 
 logic st_en;
 store_funct3_e st_op;
@@ -80,11 +91,11 @@ logic [31:0] st_addr_next;
 logic [31:0] st_data_next;
 
 logic ld_en;
-logic [FIFO_BITS-1:0] ld_tag;
+logic [LDQ_BITS-1:0] ld_tag;
 logic [31:0] ld_addr;
 
 logic ld_en_next;
-logic [FIFO_BITS-1:0] ld_tag_next;
+logic [LDQ_BITS-1:0] ld_tag_next;
 logic [31:0] ld_addr_next;
 
 logic update_next;
@@ -92,8 +103,10 @@ logic [5:0] update_tag_next;
 logic [6:0] update_prd_next;
 logic [31:0] update_data_next;
 
-assign full = (fifo_tail == (fifo_head + {FIFO_BITS{1'b1}})) |
-                (fifo_tail == (fifo_head + {{(FIFO_BITS-1){1'b1}}, 1'b0}));
+assign full = 	(ldq_tail == (ldq_head + {LDQ_BITS{1'b1}})) |
+                (ldq_tail == (ldq_head + {{(LDQ_BITS-1){1'b1}}, 1'b0})) |
+		(stq_tail == (stq_head + {STQ_BITS{1'b1}})) |
+                (stq_tail == (stq_head + {{(STQ_BITS-1){1'b1}}, 1'b0}));
 
 /* === Store scheduling and execution === 
 * Extremely conservative. Only execute on commit. This means we can get away
@@ -115,11 +128,11 @@ begin
 		st_data_next = 0;
 	end
 
-        if (fifo[fifo_head].store && fifo[fifo_head].populated) begin
+        if (stq[stq_head].data_valid) begin
                 st_en_next = 1;
-                st_op_next = fifo[fifo_head].st_op;
-                st_addr_next = fifo[fifo_head].addr;
-                st_data_next = fifo[fifo_head].data;
+                st_op_next = stq[stq_head].st_op;
+                st_addr_next = stq[stq_head].addr;
+                st_data_next = stq[stq_head].data;
         end
 end
 always_ff @(posedge clk or posedge rst)
@@ -144,26 +157,8 @@ end
 * immediately. If not, send the first available address to DMEM
 */
 
-logic [FIFO_BITS-1:0] first_st;
-logic ld_fwd_next;
-logic [FIFO_BITS-1:0] ld_fwd_tag;
-logic [31:0] ld_fwd_data;
-
 always_comb
 begin
-        first_st = fifo_tail;
-
-        for (logic [FIFO_BITS-1:0] i = fifo_head; i != fifo_tail; i++) begin
-                if (fifo[i].store) begin
-                        first_st = i;
-                        break;
-                end
-        end
-
-        ld_fwd_next = 0;
-        ld_fwd_tag = 0;
-        ld_fwd_data = 0;
-
 	ld_en_next = 0;
 	ld_tag_next = 0;
 	ld_addr_next = 0;
@@ -180,37 +175,11 @@ begin
 		ld_tag_next = 0;
 	end
         else begin
-                for (logic [FIFO_BITS-1:0] i = first_st + 1; i != fifo_tail; i++) begin
-                        // If there's another store past the first, we simply
-                        // stop.
-                        if (fifo[i].store) break;
-
-                        // If we can't compare addresses, don't even try
-                        if (!fifo[first_st].ready) break;
-
-                        // If it's an unexecuted ready load, execute it
-                        if (fifo[i].ready && !fifo[i].populated) begin
-                                if (fifo[first_st].addr != fifo[i].addr) begin
-                                        ld_en_next = 1;
-                                        ld_tag_next = i;
-                                        ld_addr_next = fifo[i].addr;
-                                end
-                                else begin
-                                        ld_fwd_next = 1;
-                                        ld_fwd_tag = i;
-                                        ld_fwd_data = fifo[first_st].data;
-                                end
-				break;
-                        end
-                end
-
-                for (logic [FIFO_BITS-1:0] i = fifo_head; i != first_st; i++) begin
-                        if (fifo[i].store) break;
-
-                        if (fifo[i].ready && !fifo[i].populated) begin
+                for (logic [LDQ_BITS-1:0] i = ldq_head; i != ldq_tail; i++) begin
+                        if (ldq[i].addr_valid && !ldq[i].data_valid) begin
                                 ld_en_next = 1;
-                                ld_tag_next = i[FIFO_BITS-1:0];
-                                ld_addr_next = fifo[i].addr;
+                                ld_tag_next = i[LDQ_BITS-1:0];
+                                ld_addr_next = ldq[i].addr;
                                 break;
                         end
                 end
@@ -377,6 +346,8 @@ begin
 	mem_addr = 0;
 	mem_data_o = 0;
 
+	// Static ld>st priority works very nicely right now since a gap is
+	// inserted after every load. This may change
 	if (ld_en) begin
 		mem_valid = 1;
 		mem_addr = ld_addr;

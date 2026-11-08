@@ -261,9 +261,10 @@ begin
 		cpu_ready <= 0;
 		cpu_data_o <= 0;
 	end else if (state == IDLE) begin
-		// For now, we'll only provide reads during IDLE state. In the future we
-		// might be able to provide unrelated reads in other states by latching
-		// write miss details and handling those internally
+		// For now, we'll only provide reads during IDLE state. In the
+		// future we might be able to provide unrelated reads in other
+		// states by latching write miss details and handling those
+		// internally
 		if (state == IDLE) begin
 			// Always fetch data to take advantage of parallelism
 			cpu_data_o <= { cache[index][hit].data[offset+3],

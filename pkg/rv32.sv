@@ -249,20 +249,28 @@ package rv32;
         } rob_entry_t;
 
         typedef struct packed {
-                logic store;
+                logic [5:0] tag;
 
+                logic [31:0] addr;
+                logic [31:0] data;
+                logic [6:0] prd;
+
+		logic instr_valid;
+		logic addr_valid;
+		logic data_valid;
+        } ldq_entry_t;
+
+        typedef struct packed {
                 logic [5:0] tag;
 
                 store_funct3_e st_op;
                 logic [31:0] addr;
                 logic [31:0] data;
-                logic [6:0] prd;
 
-                logic valid;
-                logic ready;
-                logic populated;
-                logic complete;
-        } lsu_entry_t;
+		logic instr_valid;
+		logic addr_valid;
+		logic data_valid;
+        } stq_entry_t;
 
 
 endpackage: rv32
